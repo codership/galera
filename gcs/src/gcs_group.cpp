@@ -188,7 +188,8 @@ group_redo_last_applied (gcs_group_t* group)
                      GCS_NODE_STATE_DONOR  == node->status);
         }
 
-//        gu_debug ("last_applied[%ld]: %lld", n, seqno);
+//        gu_debug("redo_last_applied[%ld]: %lld, count: %s",
+//                 n, seqno, count ? "yes" : "no");
 
         /* NOTE: It is crucial for consistency that last_applied algorithm
          *       is absolutely identical on all nodes. Therefore for the

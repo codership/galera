@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -66,37 +66,37 @@ START_TEST (gcs_backend_test)
     long ret;
 
     gu_config_t* config = gu_config_create ();
-    fail_if (config == NULL);
+    ck_assert(config != NULL);
 
     ret = gcs_backend_init (&backend, "wrong://kkk", config);
-    fail_if (ret != -ESOCKTNOSUPPORT);
+    ck_assert(ret == -ESOCKTNOSUPPORT);
 
     ret = gcs_backend_init (&backend, "spread:", config);
-    fail_if (ret != -EINVAL);
+    ck_assert(ret == -EINVAL);
 
     ret = gcs_backend_init (&backend, "dummy://", config);
-    fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
+    ck_assert_msg(ret == 0, "ret = %d (%s)", ret, strerror(-ret));
     backend.destroy(&backend);
-//    fail_if (backend.name != gcs_test_name); this test is broken since we can
+//    ck_assert(backend.name == gcs_test_name); this test is broken since we can
 //    no longer use global gcs_dummy_create() symbol because linking with real
 //    gcs_dummy.o
 
     ret = gcs_backend_init (&backend, "gcomm://0.0.0.0:4567", config);
 #ifdef GCS_USE_GCOMM
-    fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
-    fail_if (backend.name != gcs_gcomm_name);
+    ck_assert_msg(ret == 0, "ret = %d (%s)", ret, strerror(-ret));
+    ck_assert(backend.name == gcs_gcomm_name);
     backend.destroy(&backend);
 #else
-    fail_if (ret != -ESOCKTNOSUPPORT);
+    ck_assert(ret == -ESOCKTNOSUPPORT);
 #endif
 
 //    ret = gcs_backend_init (&backend, "vsbes://kkk");
-//    fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
-//    fail_if (backend.name != gcs_vs_name);
+//    ck_assert_msg(ret == 0, "ret = %d (%s)", ret, strerror(-ret));
+//    ck_assert(backend.name == gcs_vs_name);
 
 //    ret = gcs_backend_init (&backend, "spread://");
-//    fail_if (ret != 0, "ret = %d (%s)", ret, strerror(-ret));
-//    fail_if (backend.name != gcs_spread_name);
+//    ck_assert_msg(ret == 0, "ret = %d (%s)", ret, strerror(-ret));
+//    ck_assert(backend.name == gcs_spread_name);
 
     gu_config_destroy(config);
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2007-2019 Codership Oy <info@codership.com>
+// Copyright (C) 2007-2020 Codership Oy <info@codership.com>
 
 // $Id$
 
@@ -44,59 +44,59 @@ START_TEST (gcs_state_msg_test_basic)
                                        GCS_STATE_FREP      // flags
         );
 
-    fail_if (NULL == send_state);
+    ck_assert(NULL != send_state);
 
     send_len = gcs_state_msg_len (send_state);
-    fail_if (send_len < 0, "gcs_state_msg_len() returned %zd (%s)",
-             send_len, strerror (-send_len));
+    ck_assert_msg(send_len >= 0, "gcs_state_msg_len() returned %zd (%s)",
+                  send_len, strerror (-send_len));
     {
         uint8_t send_buf[send_len];
 
         ret = gcs_state_msg_write (send_buf, send_state);
-        fail_if (ret != send_len, "Return value does not match send_len: "
-                 "expected %zd, got %zd", send_len, ret);
+        ck_assert_msg(ret == send_len, "Return value does not match send_len: "
+                      "expected %zd, got %zd", send_len, ret);
 
         recv_state = gcs_state_msg_read (send_buf, send_len);
-        fail_if (NULL == recv_state);
+        ck_assert(NULL != recv_state);
     }
 
-    fail_if (send_state->flags          != recv_state->flags);
-    fail_if (send_state->gcs_proto_ver  != recv_state->gcs_proto_ver);
-    fail_if (send_state->repl_proto_ver != recv_state->repl_proto_ver);
-    fail_if (recv_state->repl_proto_ver != 1, "repl_proto_ver: %d",
-             recv_state->repl_proto_ver);
-    fail_if (send_state->appl_proto_ver != recv_state->appl_proto_ver);
-    fail_if (recv_state->appl_proto_ver != 2, "appl_proto_ver: %d",
-             recv_state->appl_proto_ver);
-    fail_if (send_state->prim_gcs_ver  != recv_state->prim_gcs_ver);
-    fail_if (send_state->prim_repl_ver != recv_state->prim_repl_ver);
-    fail_if (send_state->prim_appl_ver != recv_state->prim_appl_ver);
-    fail_if (recv_state->prim_appl_ver != 1, "prim_appl_ver: %d",
-             recv_state->prim_appl_ver);
-    fail_if (send_state->received       != recv_state->received,
-             "Last received seqno: sent %lld, recv %lld",
-             send_state->received, recv_state->received);
-    fail_if (send_state->cached         != recv_state->cached,
-             "Last cached seqno: sent %lld, recv %lld",
-             send_state->cached, recv_state->cached);
-    fail_if (send_state->prim_seqno    != recv_state->prim_seqno);
-    fail_if (send_state->current_state != recv_state->current_state);
-    fail_if (send_state->prim_state    != recv_state->prim_state);
-    fail_if (send_state->prim_joined   != recv_state->prim_joined);
-    fail_if (gu_uuid_compare (&recv_state->state_uuid, &state_uuid));
-    fail_if (gu_uuid_compare (&recv_state->group_uuid, &group_uuid));
-    fail_if (gu_uuid_compare (&recv_state->prim_uuid,  &prim_uuid));
-    fail_if (strcmp(send_state->name,     recv_state->name));
-    fail_if (strcmp(send_state->inc_addr, recv_state->inc_addr));
+    ck_assert(send_state->flags          == recv_state->flags);
+    ck_assert(send_state->gcs_proto_ver  == recv_state->gcs_proto_ver);
+    ck_assert(send_state->repl_proto_ver == recv_state->repl_proto_ver);
+    ck_assert_msg(recv_state->repl_proto_ver == 1, "repl_proto_ver: %d",
+                  recv_state->repl_proto_ver);
+    ck_assert(send_state->appl_proto_ver == recv_state->appl_proto_ver);
+    ck_assert_msg(recv_state->appl_proto_ver == 2, "appl_proto_ver: %d",
+                  recv_state->appl_proto_ver);
+    ck_assert(send_state->prim_gcs_ver  == recv_state->prim_gcs_ver);
+    ck_assert(send_state->prim_repl_ver == recv_state->prim_repl_ver);
+    ck_assert(send_state->prim_appl_ver == recv_state->prim_appl_ver);
+    ck_assert_msg(recv_state->prim_appl_ver == 1, "prim_appl_ver: %d",
+                  recv_state->prim_appl_ver);
+    ck_assert_msg(send_state->received       == recv_state->received,
+                  "Last received seqno: sent %lld, recv %lld",
+                  send_state->received, recv_state->received);
+    ck_assert_msg(send_state->cached         == recv_state->cached,
+                  "Last cached seqno: sent %lld, recv %lld",
+                  send_state->cached, recv_state->cached);
+    ck_assert(send_state->prim_seqno    == recv_state->prim_seqno);
+    ck_assert(send_state->current_state == recv_state->current_state);
+    ck_assert(send_state->prim_state    == recv_state->prim_state);
+    ck_assert(send_state->prim_joined   == recv_state->prim_joined);
+    ck_assert(!gu_uuid_compare(&recv_state->state_uuid, &state_uuid));
+    ck_assert(!gu_uuid_compare(&recv_state->group_uuid, &group_uuid));
+    ck_assert(!gu_uuid_compare(&recv_state->prim_uuid,  &prim_uuid));
+    ck_assert(!strcmp(send_state->name,     recv_state->name));
+    ck_assert(!strcmp(send_state->inc_addr, recv_state->inc_addr));
 
     {
         size_t str_len = 1024;
         char   send_str[str_len];
         char   recv_str[str_len];
 
-        fail_if (gcs_state_msg_snprintf (send_str, str_len, send_state) <= 0);
-        fail_if (gcs_state_msg_snprintf (recv_str, str_len, recv_state) <= 0);
-// no longer true fail_if (strncmp (send_str, recv_str, str_len));
+        ck_assert(gcs_state_msg_snprintf(send_str, str_len, send_state) > 0);
+        ck_assert(gcs_state_msg_snprintf(recv_str, str_len, recv_state) > 0);
+// no longer true ck_assert(strncmp (send_str, recv_str, str_len));
     }
 
     gcs_state_msg_destroy (send_state);
@@ -135,7 +135,7 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                   "node0", "",
                                   0, 1, 1, 0, 0, 0,
                                   0, 0);
-    fail_if(NULL == st[0]);
+    ck_assert(NULL != st[0]);
 
     st[1] = gcs_state_msg_create (&state_uuid, &group1_uuid, &prim1_uuid,
                                   prim1_seqno, act1_seqno, act1_seqno - 1, 3,
@@ -143,7 +143,7 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                   "node1", "",
                                   0, 1, 0, 0, 0, 0,
                                   0, 0);
-    fail_if(NULL == st[1]);
+    ck_assert(NULL != st[1]);
 
     st[2] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim2_uuid,
                                   prim2_seqno, act2_seqno, act2_seqno - 2, 5,
@@ -151,21 +151,21 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                   "node2", "",
                                   0, 1, 1, 0, 0, 0,
                                   0, 1);
-    fail_if(NULL == st[2]);
+    ck_assert(NULL != st[2]);
 
     gu_info ("                  Inherited 1");
     int ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
                                         sizeof(st)/sizeof(gcs_state_msg_t*),
                                         &quorum);
-    fail_if (0 != ret);
-    fail_if (QUORUM_VERSION != quorum.version);
-    fail_if (false != quorum.primary);
-    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &GU_UUID_NIL));
-    fail_if (GCS_SEQNO_ILL != quorum.act_id);
-    fail_if (GCS_SEQNO_ILL != quorum.conf_id);
-    fail_if (-1 != quorum.gcs_proto_ver);
-    fail_if (-1 != quorum.repl_proto_ver);
-    fail_if (-1 != quorum.appl_proto_ver);
+    ck_assert(0 == ret);
+    ck_assert(QUORUM_VERSION == quorum.version);
+    ck_assert(false == quorum.primary);
+    ck_assert(0 == gu_uuid_compare(&quorum.group_uuid, &GU_UUID_NIL));
+    ck_assert(GCS_SEQNO_ILL == quorum.act_id);
+    ck_assert(GCS_SEQNO_ILL == quorum.conf_id);
+    ck_assert(-1 == quorum.gcs_proto_ver);
+    ck_assert(-1 == quorum.repl_proto_ver);
+    ck_assert(-1 == quorum.appl_proto_ver);
 
     /* now make node1 inherit PC */
     gcs_state_msg_destroy (st[1]);
@@ -175,21 +175,21 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                   "node1", "",
                                   0, 1, 0, 0, 0, 0,
                                   0, 0);
-    fail_if(NULL == st[1]);
+    ck_assert(NULL != st[1]);
 
     gu_info ("                  Inherited 2");
     ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
                                     sizeof(st)/sizeof(gcs_state_msg_t*),
                                     &quorum);
-    fail_if (0 != ret);
-    fail_if (QUORUM_VERSION != quorum.version);
-    fail_if (true != quorum.primary);
-    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group1_uuid));
-    fail_if (act1_seqno  != quorum.act_id);
-    fail_if (prim1_seqno != quorum.conf_id);
-    fail_if (0 != quorum.gcs_proto_ver);
-    fail_if (1 != quorum.repl_proto_ver);
-    fail_if (0 != quorum.appl_proto_ver);
+    ck_assert(0 == ret);
+    ck_assert(QUORUM_VERSION == quorum.version);
+    ck_assert(true == quorum.primary);
+    ck_assert(0 == gu_uuid_compare(&quorum.group_uuid, &group1_uuid));
+    ck_assert(act1_seqno  == quorum.act_id);
+    ck_assert(prim1_seqno == quorum.conf_id);
+    ck_assert(0 == quorum.gcs_proto_ver);
+    ck_assert(1 == quorum.repl_proto_ver);
+    ck_assert(0 == quorum.appl_proto_ver);
 
     /* now make node0 inherit PC (should yield conflicting uuids) */
     gcs_state_msg_destroy (st[0]);
@@ -199,21 +199,21 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                   "node0", "",
                                   0, 1, 1, 0, 0, 0,
                                   0, 0);
-    fail_if(NULL == st[0]);
+    ck_assert(NULL != st[0]);
 
     gu_info ("                  Inherited 3");
     ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
                                     sizeof(st)/sizeof(gcs_state_msg_t*),
                                     &quorum);
-    fail_if (0 != ret);
-    fail_if (QUORUM_VERSION != quorum.version);
-    fail_if (false != quorum.primary);
-    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &GU_UUID_NIL));
-    fail_if (GCS_SEQNO_ILL != quorum.act_id);
-    fail_if (GCS_SEQNO_ILL != quorum.conf_id);
-    fail_if (-1 != quorum.gcs_proto_ver);
-    fail_if (-1 != quorum.repl_proto_ver);
-    fail_if (-1 != quorum.appl_proto_ver);
+    ck_assert(0 == ret);
+    ck_assert(QUORUM_VERSION == quorum.version);
+    ck_assert(false == quorum.primary);
+    ck_assert(0 == gu_uuid_compare(&quorum.group_uuid, &GU_UUID_NIL));
+    ck_assert(GCS_SEQNO_ILL == quorum.act_id);
+    ck_assert(GCS_SEQNO_ILL == quorum.conf_id);
+    ck_assert(-1 == quorum.gcs_proto_ver);
+    ck_assert(-1 == quorum.repl_proto_ver);
+    ck_assert(-1 == quorum.appl_proto_ver);
 
     /* now make node1 non-joined again: group2 should win */
     gcs_state_msg_destroy (st[1]);
@@ -223,21 +223,21 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                   "node1", "",
                                   0, 1, 0, 0, 0, 0,
                                   0, 0);
-    fail_if(NULL == st[1]);
+    ck_assert(NULL != st[1]);
 
     gu_info ("                  Inherited 4");
     ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
                                     sizeof(st)/sizeof(gcs_state_msg_t*),
                                     &quorum);
-    fail_if (0 != ret);
-    fail_if (QUORUM_VERSION != quorum.version);
-    fail_if (true != quorum.primary);
-    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group2_uuid));
-    fail_if (act2_seqno - 1 != quorum.act_id);
-    fail_if (prim2_seqno - 1 != quorum.conf_id);
-    fail_if (0 != quorum.gcs_proto_ver);
-    fail_if (1 != quorum.repl_proto_ver);
-    fail_if (0 != quorum.appl_proto_ver);
+    ck_assert(0 == ret);
+    ck_assert(QUORUM_VERSION == quorum.version);
+    ck_assert(true == quorum.primary);
+    ck_assert(0 == gu_uuid_compare(&quorum.group_uuid, &group2_uuid));
+    ck_assert(act2_seqno - 1 == quorum.act_id);
+    ck_assert(prim2_seqno - 1 == quorum.conf_id);
+    ck_assert(0 == quorum.gcs_proto_ver);
+    ck_assert(1 == quorum.repl_proto_ver);
+    ck_assert(0 == quorum.appl_proto_ver);
 
     /* now make node2 joined: it should become a representative */
     gcs_state_msg_destroy (st[2]);
@@ -247,21 +247,21 @@ START_TEST (gcs_state_msg_test_quorum_inherit)
                                   "node2", "",
                                   0, 1, 1, 0, 1, 0,
                                   0, 0);
-    fail_if(NULL == st[2]);
+    ck_assert(NULL != st[2]);
 
     gu_info ("                  Inherited 5");
     ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
                                     sizeof(st)/sizeof(gcs_state_msg_t*),
                                     &quorum);
-    fail_if (0 != ret);
-    fail_if (QUORUM_VERSION != quorum.version);
-    fail_if (true != quorum.primary);
-    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group2_uuid));
-    fail_if (act2_seqno != quorum.act_id);
-    fail_if (prim2_seqno != quorum.conf_id);
-    fail_if (0 != quorum.gcs_proto_ver);
-    fail_if (1 != quorum.repl_proto_ver);
-    fail_if (0 != quorum.appl_proto_ver);
+    ck_assert(0 == ret);
+    ck_assert(QUORUM_VERSION == quorum.version);
+    ck_assert(true == quorum.primary);
+    ck_assert(0 == gu_uuid_compare(&quorum.group_uuid, &group2_uuid));
+    ck_assert(act2_seqno == quorum.act_id);
+    ck_assert(prim2_seqno == quorum.conf_id);
+    ck_assert(0 == quorum.gcs_proto_ver);
+    ck_assert(1 == quorum.repl_proto_ver);
+    ck_assert(0 == quorum.appl_proto_ver);
 
     gcs_state_msg_destroy (st[0]);
     gcs_state_msg_destroy (st[1]);
@@ -302,7 +302,7 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                   "node0", "",
                                   0, 1, 1, 0, 0, 0,
                                   0, 0);
-    fail_if(NULL == st[0]);
+    ck_assert(NULL != st[0]);
 
     st[1] = gcs_state_msg_create (&state_uuid, &group1_uuid, &prim1_uuid,
                                   prim1_seqno, act1_seqno, act1_seqno - 3, 3,
@@ -310,7 +310,7 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                   "node1", "",
                                   0, 1, 0, 0, 0, 0,
                                   0, 0);
-    fail_if(NULL == st[1]);
+    ck_assert(NULL != st[1]);
 
     st[2] = gcs_state_msg_create (&state_uuid, &group2_uuid, &prim2_uuid,
                                   prim2_seqno, act2_seqno, -1, 5,
@@ -318,21 +318,21 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                   "node2", "",
                                   0, 1, 1, 0, 0, 0,
                                   0, 1);
-    fail_if(NULL == st[2]);
+    ck_assert(NULL != st[2]);
 
     gu_info ("                  Remerged 1");
     int ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
                                         sizeof(st)/sizeof(gcs_state_msg_t*),
                                         &quorum);
-    fail_if (0 != ret);
-    fail_if (QUORUM_VERSION != quorum.version);
-    fail_if (false != quorum.primary);
-    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &GU_UUID_NIL));
-    fail_if (GCS_SEQNO_ILL != quorum.act_id);
-    fail_if (GCS_SEQNO_ILL != quorum.conf_id);
-    fail_if (-1 != quorum.gcs_proto_ver);
-    fail_if (-1 != quorum.repl_proto_ver);
-    fail_if (-1 != quorum.appl_proto_ver);
+    ck_assert(0 == ret);
+    ck_assert(QUORUM_VERSION == quorum.version);
+    ck_assert(false == quorum.primary);
+    ck_assert(0 == gu_uuid_compare(&quorum.group_uuid, &GU_UUID_NIL));
+    ck_assert(GCS_SEQNO_ILL == quorum.act_id);
+    ck_assert(GCS_SEQNO_ILL == quorum.conf_id);
+    ck_assert(-1 == quorum.gcs_proto_ver);
+    ck_assert(-1 == quorum.repl_proto_ver);
+    ck_assert(-1 == quorum.appl_proto_ver);
 
     /* Now make node0 to be joined at least once */
     gcs_state_msg_destroy (st[0]);
@@ -342,22 +342,22 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                   "node0", "",
                                   0, 1, 1, 0, 0, 0,
                                   3, 0);
-    fail_if(NULL == st[0]);
-    fail_if(3 != gcs_state_msg_get_desync_count(st[0]));
+    ck_assert(NULL != st[0]);
+    ck_assert(3 == gcs_state_msg_get_desync_count(st[0]));
 
     gu_info ("                  Remerged 2");
     ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
                                     sizeof(st)/sizeof(gcs_state_msg_t*),
                                     &quorum);
-    fail_if (0 != ret);
-    fail_if (QUORUM_VERSION != quorum.version);
-    fail_if (true != quorum.primary);
-    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group2_uuid));
-    fail_if (act2_seqno - 1 != quorum.act_id);
-    fail_if (prim2_seqno - 1 != quorum.conf_id);
-    fail_if (0 != quorum.gcs_proto_ver);
-    fail_if (1 != quorum.repl_proto_ver);
-    fail_if (0 != quorum.appl_proto_ver);
+    ck_assert(0 == ret);
+    ck_assert(QUORUM_VERSION == quorum.version);
+    ck_assert(true == quorum.primary);
+    ck_assert(0 == gu_uuid_compare(&quorum.group_uuid, &group2_uuid));
+    ck_assert(act2_seqno - 1 == quorum.act_id);
+    ck_assert(prim2_seqno - 1 == quorum.conf_id);
+    ck_assert(0 == quorum.gcs_proto_ver);
+    ck_assert(1 == quorum.repl_proto_ver);
+    ck_assert(0 == quorum.appl_proto_ver);
 
     /* Now make node2 to be joined too */
     gcs_state_msg_destroy (st[2]);
@@ -367,21 +367,21 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                   "node2", "",
                                   0, 1, 1, 0, 0, 0,
                                   0, 1);
-    fail_if(NULL == st[2]);
+    ck_assert(NULL != st[2]);
 
     gu_info ("                  Remerged 3");
     ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
                                     sizeof(st)/sizeof(gcs_state_msg_t*),
                                     &quorum);
-    fail_if (0 != ret);
-    fail_if (QUORUM_VERSION != quorum.version);
-    fail_if (true != quorum.primary);
-    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group2_uuid));
-    fail_if (act2_seqno != quorum.act_id);
-    fail_if (prim2_seqno != quorum.conf_id);
-    fail_if (0 != quorum.gcs_proto_ver);
-    fail_if (1 != quorum.repl_proto_ver);
-    fail_if (0 != quorum.appl_proto_ver);
+    ck_assert(0 == ret);
+    ck_assert(QUORUM_VERSION == quorum.version);
+    ck_assert(true == quorum.primary);
+    ck_assert(0 == gu_uuid_compare(&quorum.group_uuid, &group2_uuid));
+    ck_assert(act2_seqno == quorum.act_id);
+    ck_assert(prim2_seqno == quorum.conf_id);
+    ck_assert(0 == quorum.gcs_proto_ver);
+    ck_assert(1 == quorum.repl_proto_ver);
+    ck_assert(0 == quorum.appl_proto_ver);
 
     /* now make node1 joined too: conflict */
     gcs_state_msg_destroy (st[1]);
@@ -391,21 +391,21 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                   "node1", "",
                                   0, 1, 0, 0, 0, 0,
                                   0, 0);
-    fail_if(NULL == st[1]);
+    ck_assert(NULL != st[1]);
 
     gu_info ("                  Remerged 4");
     ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
                                     sizeof(st)/sizeof(gcs_state_msg_t*),
                                     &quorum);
-    fail_if (0 != ret);
-    fail_if (QUORUM_VERSION != quorum.version);
-    fail_if (false != quorum.primary);
-    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &GU_UUID_NIL));
-    fail_if (GCS_SEQNO_ILL != quorum.act_id);
-    fail_if (GCS_SEQNO_ILL != quorum.conf_id);
-    fail_if (-1 != quorum.gcs_proto_ver);
-    fail_if (-1 != quorum.repl_proto_ver);
-    fail_if (-1 != quorum.appl_proto_ver);
+    ck_assert(0 == ret);
+    ck_assert(QUORUM_VERSION == quorum.version);
+    ck_assert(false == quorum.primary);
+    ck_assert(0 == gu_uuid_compare(&quorum.group_uuid, &GU_UUID_NIL));
+    ck_assert(GCS_SEQNO_ILL == quorum.act_id);
+    ck_assert(GCS_SEQNO_ILL == quorum.conf_id);
+    ck_assert(-1 == quorum.gcs_proto_ver);
+    ck_assert(-1 == quorum.repl_proto_ver);
+    ck_assert(-1 == quorum.appl_proto_ver);
 
     /* now make node1 current joiner: should be ignored */
     gcs_state_msg_destroy (st[1]);
@@ -415,21 +415,21 @@ START_TEST (gcs_state_msg_test_quorum_remerge)
                                   "node1", "",
                                   0, 1, 0, 0, 0, 0,
                                   0, 0);
-    fail_if(NULL == st[1]);
+    ck_assert(NULL != st[1]);
 
     gu_info ("                  Remerged 5");
     ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
                                     sizeof(st)/sizeof(gcs_state_msg_t*),
                                     &quorum);
-    fail_if (0 != ret);
-    fail_if (QUORUM_VERSION != quorum.version);
-    fail_if (true != quorum.primary);
-    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group2_uuid));
-    fail_if (act2_seqno != quorum.act_id);
-    fail_if (prim2_seqno != quorum.conf_id);
-    fail_if (0 != quorum.gcs_proto_ver);
-    fail_if (1 != quorum.repl_proto_ver);
-    fail_if (0 != quorum.appl_proto_ver);
+    ck_assert(0 == ret);
+    ck_assert(QUORUM_VERSION == quorum.version);
+    ck_assert(true == quorum.primary);
+    ck_assert(0 == gu_uuid_compare(&quorum.group_uuid, &group2_uuid));
+    ck_assert(act2_seqno == quorum.act_id);
+    ck_assert(prim2_seqno == quorum.conf_id);
+    ck_assert(0 == quorum.gcs_proto_ver);
+    ck_assert(1 == quorum.repl_proto_ver);
+    ck_assert(0 == quorum.appl_proto_ver);
 
     gcs_state_msg_destroy (st[0]);
     gcs_state_msg_destroy (st[1]);
@@ -463,7 +463,7 @@ START_TEST(gcs_state_msg_test_gh24)
                                  "home0", "",
                                  0, 4, 2, 0, 0, 0,
                                  0, 2);
-    fail_unless(st[0] != 0);
+    ck_assert(st[0] != 0);
     st[1] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid2,
                                  prim_seqno2, received, cached, prim_joined2,
                                  GCS_NODE_STATE_SYNCED,
@@ -471,7 +471,7 @@ START_TEST(gcs_state_msg_test_gh24)
                                  "home1", "",
                                  0, 4, 2, 0, 0, 0,
                                  0, 2);
-    fail_unless(st[1] != 0);
+    ck_assert(st[1] != 0);
     st[2] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid2,
                                  prim_seqno2, received, cached, prim_joined2,
                                  GCS_NODE_STATE_SYNCED,
@@ -479,7 +479,7 @@ START_TEST(gcs_state_msg_test_gh24)
                                  "home2", "",
                                  0, 4, 2, 0, 0, 0,
                                  0, 2);
-    fail_unless(st[2] != 0);
+    ck_assert(st[2] != 0);
 
     // last four are 37.
     st[3] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
@@ -489,7 +489,7 @@ START_TEST(gcs_state_msg_test_gh24)
                                  "home3", "",
                                  0, 4, 2, 0, 0, 0,
                                  0, 3);
-    fail_unless(st[3] != 0);
+    ck_assert(st[3] != 0);
     st[4] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
                                  prim_seqno1, received, cached, prim_joined1,
                                  GCS_NODE_STATE_SYNCED,
@@ -497,7 +497,7 @@ START_TEST(gcs_state_msg_test_gh24)
                                  "home4", "",
                                  0, 4, 2, 0, 0, 0,
                                  0, 2);
-    fail_unless(st[4] != 0);
+    ck_assert(st[4] != 0);
     st[5] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
                                  prim_seqno1, received, cached, prim_joined1,
                                  GCS_NODE_STATE_SYNCED,
@@ -505,7 +505,7 @@ START_TEST(gcs_state_msg_test_gh24)
                                  "home5", "",
                                  0, 4, 2, 0, 0, 0,
                                  0, 2);
-    fail_unless(st[5] != 0);
+    ck_assert(st[5] != 0);
     st[6] = gcs_state_msg_create(&state_uuid, &group_uuid, &prim_uuid1,
                                  prim_seqno1, received, cached, prim_joined1,
                                  GCS_NODE_STATE_PRIM,
@@ -513,19 +513,19 @@ START_TEST(gcs_state_msg_test_gh24)
                                  "home6", "",
                                  0, 4, 2, 0, 0, 0,
                                  0, 2);
-    fail_unless(st[6] != 0);
+    ck_assert(st[6] != 0);
     int ret = gcs_state_msg_get_quorum((const gcs_state_msg_t**)st, 7,
                                        &quorum);
-    fail_unless(ret == 0);
-    fail_unless(quorum.primary == true);
-    fail_unless(quorum.conf_id == prim_seqno1);
+    ck_assert(ret == 0);
+    ck_assert(quorum.primary == true);
+    ck_assert(quorum.conf_id == prim_seqno1);
 
     // // but we just have first five nodes, we don't have prim.
     // // because prim_joined=3 but there are only 2 joined nodes.
     // ret = gcs_state_msg_get_quorum((const gcs_state_msg_t**)st, 5,
     //                                &quorum);
-    // fail_unless(ret == 0);
-    // fail_unless(quorum.primary == false);
+    // ck_assert(ret == 0);
+    // ck_assert(quorum.primary == false);
 
     for(int i=0;i<7;i++)
         gcs_state_msg_destroy(st[i]);
@@ -561,7 +561,7 @@ START_TEST (gcs_state_msg_test_v6_upgrade)
                                   "node0", "",
                                   4, 4, 4, 0, 0, 0,
                                   0, 0);
-    fail_if(NULL == st[0]);
+    ck_assert(NULL != st[0]);
 
     st[1] = gcs_state_msg_create (&state_uuid, &group_uuid, &prim_uuid,
                                   prim_seqno, act_seqno, act_seqno - 3,
@@ -570,7 +570,7 @@ START_TEST (gcs_state_msg_test_v6_upgrade)
                                   "node1", "",
                                   3, 3, 3, 0, 0, 0,
                                   0, 0);
-    fail_if(NULL == st[1]);
+    ck_assert(NULL != st[1]);
 
     st[2] = gcs_state_msg_create (&state_uuid, &group_uuid, &prim_uuid,
                                   prim_seqno, act_seqno, act_seqno - 3,
@@ -579,7 +579,7 @@ START_TEST (gcs_state_msg_test_v6_upgrade)
                                   "node2", "",
                                   1, 1, 1, 0, 0, 0,
                                   0, 0);
-    fail_if(NULL == st[2]);
+    ck_assert(NULL != st[2]);
     st[2]->version = 4;
 
     gu_info ("                  proto_ver I");
@@ -587,15 +587,15 @@ START_TEST (gcs_state_msg_test_v6_upgrade)
     ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
                                     sizeof(st)/sizeof(gcs_state_msg_t*),
                                     &quorum);
-    fail_if (0 != ret);
-    fail_if (4 != quorum.version);
-    fail_if (true != quorum.primary);
-    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group_uuid));
-    fail_if (act_seqno  != quorum.act_id);
-    fail_if (prim_seqno != quorum.conf_id);
-    fail_if (1 != quorum.gcs_proto_ver);
-    fail_if (1 != quorum.repl_proto_ver);
-    fail_if (1 != quorum.appl_proto_ver);
+    ck_assert(0 == ret);
+    ck_assert(4 == quorum.version);
+    ck_assert(true == quorum.primary);
+    ck_assert(0 == gu_uuid_compare(&quorum.group_uuid, &group_uuid));
+    ck_assert(act_seqno  == quorum.act_id);
+    ck_assert(prim_seqno == quorum.conf_id);
+    ck_assert(1 == quorum.gcs_proto_ver);
+    ck_assert(1 == quorum.repl_proto_ver);
+    ck_assert(1 == quorum.appl_proto_ver);
 
 #define UPDATE_STATE_MSG(x)                       \
     st[x]->prim_seqno = prim_seqno;               \
@@ -613,15 +613,15 @@ START_TEST (gcs_state_msg_test_v6_upgrade)
     ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
                                     2,
                                     &quorum);
-    fail_if (0 != ret);
-    fail_if (QUORUM_VERSION != quorum.version);
-    fail_if (true != quorum.primary);
-    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group_uuid));
-    fail_if (act_seqno  != quorum.act_id);
-    fail_if (prim_seqno != quorum.conf_id);
-    fail_if (3 != quorum.gcs_proto_ver);
-    fail_if (3 != quorum.repl_proto_ver);
-    fail_if (3 != quorum.appl_proto_ver);
+    ck_assert(0 == ret);
+    ck_assert(QUORUM_VERSION == quorum.version);
+    ck_assert(true == quorum.primary);
+    ck_assert(0 == gu_uuid_compare(&quorum.group_uuid, &group_uuid));
+    ck_assert(act_seqno  == quorum.act_id);
+    ck_assert(prim_seqno == quorum.conf_id);
+    ck_assert(3 == quorum.gcs_proto_ver);
+    ck_assert(3 == quorum.repl_proto_ver);
+    ck_assert(3 == quorum.appl_proto_ver);
 
     /* reconnect node2: protocol versions should go down for backward
      * compatibility */
@@ -633,15 +633,15 @@ START_TEST (gcs_state_msg_test_v6_upgrade)
     ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
                                     3,
                                     &quorum);
-    fail_if (0 != ret);
-    fail_if (4 != quorum.version);
-    fail_if (true != quorum.primary);
-    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group_uuid));
-    fail_if (act_seqno  != quorum.act_id);
-    fail_if (prim_seqno != quorum.conf_id);
-    fail_if (1 != quorum.gcs_proto_ver);
-    fail_if (1 != quorum.repl_proto_ver);
-    fail_if (1 != quorum.appl_proto_ver);
+    ck_assert(0 == ret);
+    ck_assert(4 == quorum.version);
+    ck_assert(true == quorum.primary);
+    ck_assert(0 == gu_uuid_compare(&quorum.group_uuid, &group_uuid));
+    ck_assert(act_seqno  == quorum.act_id);
+    ck_assert(prim_seqno == quorum.conf_id);
+    ck_assert(1 == quorum.gcs_proto_ver);
+    ck_assert(1 == quorum.repl_proto_ver);
+    ck_assert(1 == quorum.appl_proto_ver);
 
 
     /* disconnect node2 */
@@ -653,15 +653,15 @@ START_TEST (gcs_state_msg_test_v6_upgrade)
     ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
                                     2,
                                     &quorum);
-    fail_if (0 != ret);
-    fail_if (QUORUM_VERSION != quorum.version);
-    fail_if (true != quorum.primary);
-    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group_uuid));
-    fail_if (act_seqno  != quorum.act_id);
-    fail_if (prim_seqno != quorum.conf_id);
-    fail_if (3 != quorum.gcs_proto_ver);
-    fail_if (3 != quorum.repl_proto_ver);
-    fail_if (3 != quorum.appl_proto_ver);
+    ck_assert(0 == ret);
+    ck_assert(QUORUM_VERSION == quorum.version);
+    ck_assert(true == quorum.primary);
+    ck_assert(0 == gu_uuid_compare(&quorum.group_uuid, &group_uuid));
+    ck_assert(act_seqno  == quorum.act_id);
+    ck_assert(prim_seqno == quorum.conf_id);
+    ck_assert(3 == quorum.gcs_proto_ver);
+    ck_assert(3 == quorum.repl_proto_ver);
+    ck_assert(3 == quorum.appl_proto_ver);
 
     /* upgrade node2 */
     st[2]->version = QUORUM_VERSION;
@@ -678,15 +678,15 @@ START_TEST (gcs_state_msg_test_v6_upgrade)
     ret = gcs_state_msg_get_quorum ((const gcs_state_msg_t**)st,
                                     3,
                                     &quorum);
-    fail_if (0 != ret);
-    fail_if (QUORUM_VERSION != quorum.version);
-    fail_if (true != quorum.primary);
-    fail_if (0 != gu_uuid_compare(&quorum.group_uuid, &group_uuid));
-    fail_if (act_seqno  != quorum.act_id);
-    fail_if (prim_seqno != quorum.conf_id);
-    fail_if (3 != quorum.gcs_proto_ver);
-    fail_if (3 != quorum.repl_proto_ver);
-    fail_if (3 != quorum.appl_proto_ver);
+    ck_assert(0 == ret);
+    ck_assert(QUORUM_VERSION == quorum.version);
+    ck_assert(true == quorum.primary);
+    ck_assert(0 == gu_uuid_compare(&quorum.group_uuid, &group_uuid));
+    ck_assert(act_seqno  == quorum.act_id);
+    ck_assert(prim_seqno == quorum.conf_id);
+    ck_assert(3 == quorum.gcs_proto_ver);
+    ck_assert(3 == quorum.repl_proto_ver);
+    ck_assert(3 == quorum.appl_proto_ver);
 
     gcs_state_msg_destroy (st[0]);
     gcs_state_msg_destroy (st[1]);

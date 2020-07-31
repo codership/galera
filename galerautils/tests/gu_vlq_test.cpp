@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2020 Codership Oy <info@codership.com>
 //
 
 #include "gu_vlq.hpp"
@@ -54,9 +54,9 @@ START_TEST(test_uleb128_size)
     for (size_t i(0); i < SizeOfArray(valarr); ++i)
     {
         size_t size(gu::uleb128_size(valarr[i].val));
-        fail_unless(size == valarr[i].size,
-                    "got size %z, expected %z for value 0x%llx",
-                    size, valarr[i].size, valarr[i].val);
+        ck_assert_msg(size == valarr[i].size,
+                      "got size %z, expected %z for value 0x%llx",
+                      size, valarr[i].size, valarr[i].val);
     }
 }
 END_TEST
@@ -70,9 +70,9 @@ START_TEST(test_uleb128_encode)
         buf.resize(valarr[i].size);
         size_t offset(gu::uleb128_encode(valarr[i].val, &buf[0],
                                          buf.size(), 0));
-        fail_unless(offset == valarr[i].size,
-                    "got offset %zu, expected %zu for value 0x%llx",
-                    offset, valarr[i].size, valarr[i].val);
+        ck_assert_msg(offset == valarr[i].size,
+                      "got offset %zu, expected %zu for value 0x%llx",
+                      offset, valarr[i].size, valarr[i].val);
     }
 }
 END_TEST
@@ -90,17 +90,17 @@ START_TEST(test_uleb128_decode)
         try
         {
             offset = gu::uleb128_decode(&buf[0], buf.size(), 0, val);
-            fail_unless(offset == valarr[i].size,
-                        "got offset %zu, expected %zu for value 0x%llx",
-                        offset, valarr[i].size, valarr[i].val);
-            fail_unless(val == valarr[i].val,
-                        "got value 0x%llx, expected 0x%llx",
-                        val, valarr[i].val);
+            ck_assert_msg(offset == valarr[i].size,
+                          "got offset %zu, expected %zu for value 0x%llx",
+                          offset, valarr[i].size, valarr[i].val);
+            ck_assert_msg(val == valarr[i].val,
+                          "got value 0x%llx, expected 0x%llx",
+                          val, valarr[i].val);
         }
         catch (gu::Exception& e)
         {
-            fail("Exception in round %zu for encoding of size %zu: %s",
-                 i, valarr[i].size, e.what());
+            ck_abort_msg("Exception in round %zu for encoding of size %zu: %s",
+                         i, valarr[i].size, e.what());
         }
     }
 }
@@ -118,7 +118,7 @@ START_TEST(test_uleb128_misc)
                                           buf.size(), 0);
         uint8_t val;
         (void)gu::uleb128_decode(&buf[0], buf.size(), 0, val);
-        if (i != val) fail("0x%x != 0x%x", i, val);
+        if (i != val) ck_abort_msg("0x%x != 0x%x", i, val);
     }
 
     // check uint16_t whole range
@@ -128,7 +128,7 @@ START_TEST(test_uleb128_misc)
                                            &buf[0], buf.size(), 0);
         uint16_t val;
         (void)gu::uleb128_decode(&buf[0], buf.size(), 0, val);
-        if (i != val) fail("0x%x != 0x%x", i, val);
+        if (i != val) ck_abort_msg("0x%x != 0x%x", i, val);
     }
 
     // check uint32_t: 0 -> 1^20
@@ -138,7 +138,7 @@ START_TEST(test_uleb128_misc)
                                            &buf[0], buf.size(), 0);
         uint32_t val;
         (void)gu::uleb128_decode(&buf[0], buf.size(), 0, val);
-        if (i != val) fail("0x%x != 0x%x", i, val);
+        if (i != val) ck_abort_msg("0x%x != 0x%x", i, val);
     }
 
     // check uin32_t: max - 1^20 -> max
@@ -149,7 +149,7 @@ START_TEST(test_uleb128_misc)
                                            &buf[0], buf.size(), 0);
         uint32_t val;
         (void)gu::uleb128_decode(&buf[0], buf.size(), 0, val);
-        if (i != val) fail("0x%x != 0x%x", i, val);
+        if (i != val) ck_abort_msg("0x%x != 0x%x", i, val);
     }
 
 
@@ -162,7 +162,7 @@ START_TEST(test_uleb128_misc)
         (void)gu::uleb128_encode(val, &buf[0], buf.size(), 0);
         unsigned long long val2;
         (void)gu::uleb128_decode(&buf[0], buf.size(), 0, val2);
-        if (val != val2) fail("0x%llx != 0x%llx", val, val2);
+        if (val != val2) ck_abort_msg("0x%llx != 0x%llx", val, val2);
     }
 
     {
@@ -178,7 +178,7 @@ START_TEST(test_uleb128_misc)
         {
             uint8_t cval;
             (void)gu::uleb128_decode(&buf[0], buf.size(), 0, cval);
-            fail("exception was not thrown");
+            ck_abort_msg("exception was not thrown");
         }
         catch (gu::Exception& e)
         {
@@ -193,7 +193,7 @@ START_TEST(test_uleb128_misc)
         {
             uint16_t cval;
             (void)gu::uleb128_decode(&buf[0], buf.size(), 0, cval);
-            fail("exception was not thrown");
+            ck_abort_msg("exception was not thrown");
         }
         catch (gu::Exception& e)
         {
@@ -208,7 +208,7 @@ START_TEST(test_uleb128_misc)
         {
             uint32_t cval;
             (void)gu::uleb128_decode(&buf[0], buf.size(), 0, cval);
-            fail("exception was not thrown");
+            ck_abort_msg("exception was not thrown");
         }
         catch (gu::Exception& e)
         {
@@ -221,7 +221,7 @@ START_TEST(test_uleb128_misc)
         {
             uint64_t cval;
             (void)gu::uleb128_decode(&buf[0], buf.size(), 0, cval);
-            fail("exception was not thrown");
+            ck_abort_msg("exception was not thrown");
         }
         catch (gu::Exception& e)
         {
@@ -240,7 +240,7 @@ START_TEST(test_uleb128_misc)
         {
             uint64_t cval;
             (void)gu::uleb128_decode(b, SizeOfArray(b), 0, cval);
-            fail("exception was not thrown");
+            ck_abort_msg("exception was not thrown");
         }
         catch (gu::Exception& e)
         {

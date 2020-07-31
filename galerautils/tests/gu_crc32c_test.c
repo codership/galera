@@ -63,8 +63,9 @@ test_function(void)
 
         uint32_t ret = gu_crc32c(input, strlen(input));
 
-        fail_if(ret != output, "Input '%s' resulted in %#08x, expected %#08x\n",
-                input, ret, output);
+        ck_assert_msg(ret == output,
+                      "Input '%s' resulted in %#08x, expected %#08x\n",
+                      input, ret, output);
     }
 
     const char* const input = long_input;
@@ -91,13 +92,14 @@ test_function(void)
     CRC_APPEND(64);
 
     int tail = size - offset;
-    fail_if (tail < 0);
+    ck_assert(tail >= 0);
 
     CRC_APPEND(tail);
 
     uint32_t ret = gu_crc32c_get (crc);
 
-    fail_if (ret != output, "Generated %#08x, expected %#08x\n", ret, output);
+    ck_assert_msg(ret == output,
+                  "Generated %#08x, expected %#08x\n", ret, output);
 }
 
 START_TEST(test_gu_crc32c_sarwate)

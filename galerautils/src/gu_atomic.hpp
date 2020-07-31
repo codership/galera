@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2020 Codership Oy <info@codership.com>
 //
 
 //
@@ -74,6 +74,11 @@ namespace gu
         bool operator!=(I i)
         {
             return (operator()() != i);
+        }
+
+        bool operator==(I i)
+        {
+            return (!operator!=(i));
         }
 
     private:

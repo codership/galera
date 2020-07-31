@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Codership Oy <info@codership.com>
+ * Copyright (C) 2019-2020 Codership Oy <info@codership.com>
  */
 
 #include "check_gcomm.hpp"
@@ -76,10 +76,10 @@ public:
         else
         {
             // log_debug << "received message: " << um.get_to_seq();
-            fail_unless(rb.len() - rb.offset() == 16);
+            ck_assert(rb.len() - rb.offset() == 16);
             if (um.source() == tp_->uuid())
             {
-                fail_unless(um.user_type() == my_type_);
+                ck_assert(um.user_type() == my_type_);
             }
         }
     }
@@ -192,7 +192,7 @@ START_TEST(test_set_param)
                 "node.name=n1");
     pu1.start();
     // no such a parameter
-    fail_unless(net->set_param("foo.bar", "1", sync_param_cb) == false);
+    ck_assert(net->set_param("foo.bar", "1", sync_param_cb) == false);
 
     const evs::seqno_t send_window(
         gu::from_string<evs::seqno_t>(conf.get("evs.send_window")));
@@ -202,34 +202,34 @@ START_TEST(test_set_param)
     try
     {
         net->set_param("evs.send_window", gu::to_string(user_send_window - 1), sync_param_cb);
-        fail("exception not thrown");
+        ck_abort_msg("exception not thrown");
     }
     catch (gu::Exception& e)
     {
-        fail_unless(e.get_errno() == ERANGE, "%d: %s", e.get_errno(), e.what());
+        ck_assert_msg(e.get_errno() == ERANGE, "%d: %s",e.get_errno(),e.what());
     }
 
     try
     {
         net->set_param("evs.user_send_window",
-                      gu::to_string(send_window + 1), sync_param_cb);
-        fail("exception not thrown");
+                       gu::to_string(send_window + 1), sync_param_cb);
+        ck_abort_msg("exception not thrown");
     }
     catch (gu::Exception& e)
     {
-        fail_unless(e.get_errno() == ERANGE, "%d: %s", e.get_errno(), e.what());
+        ck_assert_msg(e.get_errno() == ERANGE, "%d: %s",e.get_errno(),e.what());
     }
 
     // Note: These checks may have to change if defaults are changed
-    fail_unless(net->set_param(
+    ck_assert(net->set_param(
                     "evs.send_window",
                     gu::to_string(send_window - 1), sync_param_cb) == true);
-    fail_unless(gu::from_string<evs::seqno_t>(conf.get("evs.send_window")) ==
-                send_window - 1);
-    fail_unless(net->set_param(
+    ck_assert(gu::from_string<evs::seqno_t>(conf.get("evs.send_window")) ==
+              send_window - 1);
+    ck_assert(net->set_param(
                     "evs.user_send_window",
                     gu::to_string(user_send_window + 1), sync_param_cb) == true);
-    fail_unless(gu::from_string<evs::seqno_t>(
+    ck_assert(gu::from_string<evs::seqno_t>(
                     conf.get("evs.user_send_window")) == user_send_window + 1);
     pu1.stop();
 }
@@ -263,16 +263,16 @@ START_TEST(test_trac_599)
     Datagram dg(buf);
     int err;
     err = tp->send_down(dg, gcomm::ProtoDownMeta());
-    fail_unless(err == ENOTCONN, "%d", err);
+    ck_assert_msg(err == ENOTCONN, "%d", err);
     tp->connect(true);
     buf.resize(tp->mtu());
     Datagram dg2(buf);
     err = tp->send_down(dg2, gcomm::ProtoDownMeta());
-    fail_unless(err == 0, "%d", err);
+    ck_assert_msg(err == 0, "%d", err);
     buf.resize(buf.size() + 1);
     Datagram dg3(buf);
     err = tp->send_down(dg3, gcomm::ProtoDownMeta());
-    fail_unless(err == EMSGSIZE, "%d", err);
+    ck_assert_msg(err == EMSGSIZE, "%d", err);
     pnet->event_loop(gu::datetime::Sec);
     tp->close();
 }
@@ -286,12 +286,12 @@ START_TEST(test_trac_620)
     gcomm::Conf::register_params(conf);
     auto_ptr<Protonet> net(Protonet::create(conf));
     Transport* tp(Transport::create(*net, "pc://?"
-				    "evs.info_log_mask=0xff&"
-				    "gmcast.listen_addr=tcp://127.0.0.1:0&"
-				    "gmcast.group=pc&"
-				    "gmcast.time_wait=PT0.5S&"
-                    "pc.recovery=0&"
-				    "node.name=n1"));
+                                    "evs.info_log_mask=0xff&"
+                                    "gmcast.listen_addr=tcp://127.0.0.1:0&"
+                                    "gmcast.group=pc&"
+                                    "gmcast.time_wait=PT0.5S&"
+                                    "pc.recovery=0&"
+                                    "node.name=n1"));
     class D : public gcomm::Toplay
     {
     public:

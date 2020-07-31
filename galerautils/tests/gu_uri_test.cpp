@@ -1,4 +1,4 @@
-// Copyright (C) 2007 Codership Oy <info@codership.com>
+// Copyright (C) 2007-2020 Codership Oy <info@codership.com>
 
 // $Id$
 
@@ -42,103 +42,103 @@ START_TEST (uri_test1) // checking normal URI
 
         try
         {
-            fail_if (scheme != uri.get_scheme(), "Scheme '%s' != '%s'",
+            ck_assert_msg(scheme == uri.get_scheme(), "Scheme '%s' != '%s'",
                      scheme.c_str(), uri.get_scheme().c_str());
         }
         catch (NotSet&)
         {
-            fail ("Scheme not set in '%s'", uri_str.c_str());
+            ck_abort_msg("Scheme not set in '%s'", uri_str.c_str());
         }
 
         try
         {
-            fail_if (user != uri.get_user(), "User info '%s' != '%s'",
+            ck_assert_msg(user == uri.get_user(), "User info '%s' != '%s'",
                      user.c_str(), uri.get_user().c_str());
         }
         catch (NotSet&)
         {
-            fail ("User info not set in '%s'", uri_str.c_str());
+            ck_abort_msg("User info not set in '%s'", uri_str.c_str());
         }
 
         try
         {
-            fail_if (host != uri.get_host(), "Host '%s' != '%s'",
+            ck_assert_msg(host == uri.get_host(), "Host '%s' != '%s'",
                      host.c_str(), uri.get_host().c_str());
         }
         catch (NotSet&)
         {
-            fail ("Host not set in '%s'", uri_str.c_str());
+            ck_abort_msg("Host not set in '%s'", uri_str.c_str());
         }
 
         try
         {
-            fail_if (port != uri.get_port(), "Port '%s' != '%s'",
+            ck_assert_msg(port == uri.get_port(), "Port '%s' != '%s'",
                      port.c_str(), uri.get_port().c_str());
         }
         catch (NotSet&)
         {
-            fail ("Port not set in '%s'", uri_str.c_str());
+            ck_abort_msg("Port not set in '%s'", uri_str.c_str());
         }
 
         try
         {
-            fail_if (path != uri.get_path(), "Path '%s' != '%s'",
+            ck_assert_msg(path == uri.get_path(), "Path '%s' != '%s'",
                      path.c_str(), uri.get_path().c_str());
         }
         catch (NotSet&)
         {
-            fail ("Path not set in '%s'", uri_str.c_str());
+            ck_abort_msg("Path not set in '%s'", uri_str.c_str());
         }
 
         try
         {
-            fail_if (frag != uri.get_fragment(), "Fragment '%s' != '%s'",
+            ck_assert_msg(frag == uri.get_fragment(), "Fragment '%s' != '%s'",
                      frag.c_str(), uri.get_fragment().c_str());
         }
         catch (NotSet&)
         {
-            fail ("Fragment not set in '%s'", uri_str.c_str());
+            ck_abort_msg("Fragment not set in '%s'", uri_str.c_str());
         }
 
         try
         {
-            fail_if (auth != uri.get_authority(), "Authority '%s' != '%s'",
+            ck_assert_msg(auth == uri.get_authority(), "Authority '%s' != '%s'",
                      auth.c_str(), uri.get_authority().c_str());
         }
         catch (NotSet&)
         {
-            fail ("Authority not set in '%s'", uri_str.c_str());
+            ck_abort_msg("Authority not set in '%s'", uri_str.c_str());
         }
 
         URIQueryList ql = uri.get_query_list();
 
-        fail_if (ql.size() != 2, "Query list size %zu, expected 2", ql.size());
+        ck_assert_msg(ql.size() == 2, "Query list size %zu, expected 2", ql.size());
 
         URIQueryList::const_iterator i = ql.begin();
 
-        fail_if (i->first != opt1, "got option '%s', expected '%s'",
+        ck_assert_msg(i->first == opt1, "got option '%s', expected '%s'",
                  i->first.c_str(), opt1.c_str());
-        fail_if (i->second != val1, "got value '%s', expected '%s'",
+        ck_assert_msg(i->second == val1, "got value '%s', expected '%s'",
                  i->second.c_str(), val1.c_str());
 
         ++i;
 
-        fail_if (i->first != opt2, "got option '%s', expected '%s'",
+        ck_assert_msg(i->first == opt2, "got option '%s', expected '%s'",
                  i->first.c_str(), opt2.c_str());
-        fail_if (i->second != val2, "got value '%s', expected '%s'",
+        ck_assert_msg(i->second == val2, "got value '%s', expected '%s'",
                  i->second.c_str(), val2.c_str());
 
-        fail_if (val1 != uri.get_option(opt1));
-        fail_if (val2 != uri.get_option(opt2));
+        ck_assert(val1 == uri.get_option(opt1));
+        ck_assert(val2 == uri.get_option(opt2));
 
-        try { uri.get_option("xxx"); fail ("Expected NotFound exception"); }
+        try { uri.get_option("xxx"); ck_abort_msg("Expected NotFound exception"); }
         catch (NotFound&) {}
 
         URI simple ("gcomm+pc://192.168.0.1");
     }
     catch (Exception& e)
     {
-        fail (e.what());
+        ck_abort_msg(e.what());
     }
 }
 END_TEST
@@ -146,32 +146,32 @@ END_TEST
 START_TEST (uri_test2) // checking corner cases
 {
 #ifdef NDEBUG
-    try { URI uri(""); fail ("URI should have failed."); }
+    try { URI uri(""); ck_abort_msg("URI should have failed."); }
     catch (Exception& e) {}
 #endif
     mark_point();
 
     try { URI uri("scheme:"); }
-    catch (Exception& e) { fail ("URI should be valid."); }
+    catch (Exception& e) { ck_abort_msg("URI should be valid."); }
 
     mark_point();
 #ifdef NDEBUG
-    try { URI uri(":path"); fail ("URI should have failed."); }
+    try { URI uri(":path"); ck_abort_msg("URI should have failed."); }
     catch (Exception& e) {}
 #endif
     mark_point();
 
-    try { URI uri("a://b:c?d=e#f"); fail ("URI should have failed."); }
+    try { URI uri("a://b:c?d=e#f"); ck_abort_msg("URI should have failed."); }
     catch (Exception& e) {}
 
     mark_point();
 
-    try { URI uri("a://b:99999?d=e#f"); fail ("URI should have failed."); }
+    try { URI uri("a://b:99999?d=e#f"); ck_abort_msg("URI should have failed."); }
     catch (Exception& e) {}
 
     mark_point();
 #ifdef NDEBUG
-    try { URI uri("?query"); fail ("URI should have failed."); }
+    try { URI uri("?query"); ck_abort_msg("URI should have failed."); }
     catch (Exception& e) {}
 #endif
     mark_point();
@@ -180,26 +180,26 @@ START_TEST (uri_test2) // checking corner cases
     {
         URI uri("scheme:path");
 
-        try             { uri.get_user(); fail ("User should be unset"); }
+        try             { uri.get_user(); ck_abort_msg("User should be unset"); }
         catch (NotSet&) {}
 
-        try             { uri.get_host(); fail ("Host should be unset"); }
+        try             { uri.get_host(); ck_abort_msg("Host should be unset"); }
         catch (NotSet&) {}
 
-        try             { uri.get_port(); fail ("Port should be unset"); }
+        try             { uri.get_port(); ck_abort_msg("Port should be unset"); }
         catch (NotSet&) {}
 
-        try { uri.get_authority(); fail ("Authority should be unset"); }
+        try { uri.get_authority(); ck_abort_msg("Authority should be unset"); }
         catch (NotSet&) {}
 
-        try { uri.get_fragment(); fail ("Fragment should be unset"); }
+        try { uri.get_fragment(); ck_abort_msg("Fragment should be unset"); }
         catch (NotSet&) {}
 
-        fail_if (uri.get_query_list().size() != 0, "Query list must be empty");
+        ck_assert_msg(uri.get_query_list().size() == 0, "Query list must be empty");
     }
     catch (Exception& e)
     {
-        fail (e.what());
+        ck_abort_msg(e.what());
     }
 
     mark_point();
@@ -208,24 +208,24 @@ START_TEST (uri_test2) // checking corner cases
     {
         URI uri("scheme:///path");
 
-        try             { fail_if (uri.get_authority() != ""); }
-        catch (NotSet&) { fail ("Authority should be set"); }
+        try             { ck_assert(uri.get_authority() == ""); }
+        catch (NotSet&) { ck_abort_msg("Authority should be set"); }
 
-        try { uri.get_host(); fail("Host should be unset"); }
+        try { uri.get_host(); ck_abort_msg("Host should be unset"); }
         catch (NotSet&) { }
 
-        try             { uri.get_user(); fail ("User should be unset"); }
+        try             { uri.get_user(); ck_abort_msg("User should be unset"); }
         catch (NotSet&) {}
 
-        try             { uri.get_port(); fail ("Port should be unset"); }
+        try             { uri.get_port(); ck_abort_msg("Port should be unset"); }
         catch (NotSet&) {}
 
-        try             { fail_if (uri.get_path().length() != 5); }
-        catch (NotSet&) { fail ("Path should be 5 characters long"); }
+        try             { ck_assert(uri.get_path().length() == 5); }
+        catch (NotSet&) { ck_abort_msg("Path should be 5 characters long"); }
     }
     catch (Exception& e)
     {
-        fail (e.what());
+        ck_abort_msg(e.what());
     }
 
     mark_point();
@@ -234,21 +234,21 @@ START_TEST (uri_test2) // checking corner cases
     {
         URI uri("scheme://@/path");
 
-        try             { fail_if (uri.get_authority() != "@"); }
-        catch (NotSet&) { fail ("Authority should be set"); }
+        try             { ck_assert(uri.get_authority() == "@"); }
+        catch (NotSet&) { ck_abort_msg("Authority should be set"); }
 
-        try             { fail_if (uri.get_user() != ""); }
-        catch (NotSet&) { fail ("User should be set"); }
+        try             { ck_assert_msg(uri.get_user() == ""); }
+        catch (NotSet&) { ck_abort_msg("User should be set"); }
 
-        try             { fail_if (uri.get_host() != ""); }
-        catch (NotSet&) { fail ("Host should be set"); }
+        try             { ck_assert_msg(uri.get_host() == ""); }
+        catch (NotSet&) { ck_abort_msg("Host should be set"); }
 
-        try             { uri.get_port(); fail ("Port should be unset"); }
+        try             { uri.get_port(); ck_abort_msg("Port should be unset"); }
         catch (NotSet&) {}
     }
     catch (Exception& e)
     {
-        fail (e.what());
+        ck_abort_msg(e.what());
     }
 
     mark_point();
@@ -257,21 +257,21 @@ START_TEST (uri_test2) // checking corner cases
     {
         URI uri("scheme://@:/path");
 
-        try             { fail_if (uri.get_authority() != "@"); }
-        catch (NotSet&) { fail ("Authority should be set"); }
+        try             { ck_assert_msg(uri.get_authority() == "@"); }
+        catch (NotSet&) { ck_abort_msg("Authority should be set"); }
 
-        try             { fail_if (uri.get_user() != ""); }
-        catch (NotSet&) { fail ("User should be set"); }
+        try             { ck_assert_msg(uri.get_user() == ""); }
+        catch (NotSet&) { ck_abort_msg("User should be set"); }
 
-        try             { fail_if (uri.get_host() != ""); }
-        catch (NotSet&) { fail ("Host should be set"); }
+        try             { ck_assert_msg(uri.get_host() == ""); }
+        catch (NotSet&) { ck_abort_msg("Host should be set"); }
 
-        try             { uri.get_port(); fail ("Port should be unset"); }
+        try             { uri.get_port(); ck_abort_msg("Port should be unset"); }
         catch (NotSet&) {}
     }
     catch (Exception& e)
     {
-        fail (e.what());
+        ck_abort_msg(e.what());
     }
 
     mark_point();
@@ -280,25 +280,25 @@ START_TEST (uri_test2) // checking corner cases
     {
         URI uri("scheme://");
 
-        try             { fail_if (uri.get_authority() != ""); }
-        catch (NotSet&) { fail ("Authority should be set"); }
+        try             { ck_assert_msg(uri.get_authority() == ""); }
+        catch (NotSet&) { ck_abort_msg("Authority should be set"); }
 
-        try             { uri.get_user(); fail ("User should be unset"); }
+        try             { uri.get_user(); ck_abort_msg("User should be unset"); }
         catch (NotSet&) {}
 
-        try { uri.get_host(); fail("Host should be unset"); }
+        try { uri.get_host(); ck_abort_msg("Host should be unset"); }
         catch (NotSet&) { }
 
-        try             { uri.get_port(); fail ("Port should be unset"); }
+        try             { uri.get_port(); ck_abort_msg("Port should be unset"); }
         catch (NotSet&) {}
 
         // According to http://tools.ietf.org/html/rfc3986#section-3.3
-        try             { fail_if (uri.get_path() != ""); }
-        catch (NotSet&) { fail ("Path should be set to empty"); }
+        try             { ck_assert_msg(uri.get_path() == ""); }
+        catch (NotSet&) { ck_abort_msg("Path should be set to empty"); }
     }
     catch (Exception& e)
     {
-        fail (e.what());
+        ck_abort_msg(e.what());
     }
 }
 END_TEST
@@ -309,69 +309,69 @@ START_TEST (uri_test3) // Test from gcomm
     try
     {
         URI too_simple("http");
-        fail("too simple accepted");
+        ck_abort_msg("too simple accepted");
     }
     catch (gu::Exception& e)
     {
-        fail_if (e.get_errno() != EINVAL);
+        ck_assert_msg(e.get_errno() == EINVAL);
     }
 #endif
     URI empty_auth("http://");
-    fail_unless(empty_auth.get_scheme()    == "http");
-    fail_unless(empty_auth.get_authority() == "");
+    ck_assert(empty_auth.get_scheme()    == "http");
+    ck_assert(empty_auth.get_authority() == "");
 
     URI simple_valid1("http://example.com");
-    fail_unless(simple_valid1.get_scheme()    == "http");
-    fail_unless(simple_valid1.get_authority() == "example.com");
-    fail_unless(simple_valid1.get_path()      == "");
-    fail_unless(simple_valid1.get_query_list().size() == 0);
+    ck_assert(simple_valid1.get_scheme()    == "http");
+    ck_assert(simple_valid1.get_authority() == "example.com");
+    ck_assert(simple_valid1.get_path()      == "");
+    ck_assert(simple_valid1.get_query_list().size() == 0);
 
     URI with_path("http://example.com/path/to/file.html");
-    fail_unless(with_path.get_scheme()    == "http");
-    fail_unless(with_path.get_authority() == "example.com");
-    fail_unless(with_path.get_path()      == "/path/to/file.html");
-    fail_unless(with_path.get_query_list().size() == 0);
+    ck_assert(with_path.get_scheme()    == "http");
+    ck_assert(with_path.get_authority() == "example.com");
+    ck_assert(with_path.get_path()      == "/path/to/file.html");
+    ck_assert(with_path.get_query_list().size() == 0);
 
     URI with_query("http://example.com?key1=val1&key2=val2");
-    fail_unless(with_query.get_scheme()    == "http");
-    fail_unless(with_query.get_authority() == "example.com");
-    fail_unless(with_query.get_path()      == "");
+    ck_assert(with_query.get_scheme()    == "http");
+    ck_assert(with_query.get_authority() == "example.com");
+    ck_assert(with_query.get_path()      == "");
 
     const URIQueryList& qlist = with_query.get_query_list();
-    fail_unless(qlist.size() == 2);
+    ck_assert(qlist.size() == 2);
 
     URIQueryList::const_iterator i;
     i = qlist.find("key1");
-    fail_unless(i != qlist.end() && i->second == "val1");
+    ck_assert(i != qlist.end() && i->second == "val1");
     i = qlist.find("key2");
-    fail_unless(i != qlist.end() && i->second == "val2");
+    ck_assert(i != qlist.end() && i->second == "val2");
 
     URI with_uri_in_query("gcomm+gmcast://localhost:10001?gmcast.node=gcomm+tcp://localhost:10002&gmcast.node=gcomm+tcp://localhost:10003");
-    fail_unless(with_uri_in_query.get_scheme()    == "gcomm+gmcast");
-    fail_unless(with_uri_in_query.get_authority() == "localhost:10001");
+    ck_assert(with_uri_in_query.get_scheme()    == "gcomm+gmcast");
+    ck_assert(with_uri_in_query.get_authority() == "localhost:10001");
 
     const URIQueryList& qlist2 = with_uri_in_query.get_query_list();
-    fail_unless(qlist2.size() == 2);
+    ck_assert(qlist2.size() == 2);
 
     pair<URIQueryList::const_iterator, URIQueryList::const_iterator> ii;
     ii = qlist2.equal_range("gmcast.node");
-    fail_unless(ii.first != qlist2.end());
+    ck_assert(ii.first != qlist2.end());
     for (i = ii.first; i != ii.second; ++i)
     {
-        fail_unless(i->first == "gmcast.node");
+        ck_assert(i->first == "gmcast.node");
         URI quri(i->second);
-        fail_unless(quri.get_scheme() == "gcomm+tcp");
-        fail_unless(quri.get_authority().substr(0, string("localhost:1000").size()) == "localhost:1000");
+        ck_assert(quri.get_scheme() == "gcomm+tcp");
+        ck_assert(quri.get_authority().substr(0, string("localhost:1000").size()) == "localhost:1000");
     }
 
     try
     {
         URI invalid1("http://example.com/?key1");
-        fail("invalid query accepted");
+        ck_abort_msg("invalid query accepted");
     }
     catch (gu::Exception& e)
     {
-        fail_if (e.get_errno() != EINVAL);
+        ck_assert(e.get_errno() == EINVAL);
     }
 }
 END_TEST
@@ -385,11 +385,11 @@ START_TEST(uri_non_strict)
     try
     {
         URI u(ip);
-        fail("Strict mode passed without scheme");
+        ck_abort_msg("Strict mode passed without scheme");
     }
     catch (gu::Exception& e)
     {
-        fail_if (e.get_errno() != EINVAL, "Expected errno %d, got %d",
+        ck_assert_msg(e.get_errno() == EINVAL, "Expected errno %d, got %d",
                  EINVAL, e.get_errno());
     }
 
@@ -397,19 +397,19 @@ START_TEST(uri_non_strict)
     {
         URI u(addr, false);
 
-        fail_if (u.get_host() != ip);
-        fail_if (u.get_port() != port);
+        ck_assert_msg(u.get_host() == ip);
+        ck_assert_msg(u.get_port() == port);
 
         try
         {
             u.get_scheme();
-            fail("Scheme is '%s', should be unset", u.get_scheme().c_str());
+            ck_abort_msg("Scheme is '%s', should be unset", u.get_scheme().c_str());
         }
         catch (gu::NotSet&) {}
     }
     catch (gu::Exception& e)
     {
-        fail_if (e.get_errno() != EINVAL);
+        ck_assert_msg(e.get_errno() == EINVAL);
     }
 }
 END_TEST
@@ -420,47 +420,47 @@ START_TEST(uri_test_multihost)
     {
         gu::URI uri("tcp://host1,host2");
 
-        fail_unless(uri.get_authority_list().size() == 2);
+        ck_assert(uri.get_authority_list().size() == 2);
         try
         {
             uri.get_authority_list()[0].user();
-            fail("User should not be set");
+            ck_abort_msg("User should not be set");
         }
         catch (NotSet&) { }
-        fail_unless(uri.get_authority_list()[0].host() == "host1");
+        ck_assert(uri.get_authority_list()[0].host() == "host1");
         try
         {
             uri.get_authority_list()[0].port();
-            fail("Port should not be set");
+            ck_abort_msg("Port should not be set");
         }
         catch (NotSet&) { }
 
-        fail_unless(uri.get_authority_list()[1].host() == "host2");
+        ck_assert(uri.get_authority_list()[1].host() == "host2");
     }
     catch (gu::Exception& e)
     {
-        fail(e.what());
+        ck_abort_msg(e.what());
     }
 
     try
     {
         gu::URI uri("tcp://host1:1234,host2:,host3:3456");
 
-        fail_unless(uri.get_authority_list().size() == 3);
+        ck_assert(uri.get_authority_list().size() == 3);
         try
         {
             uri.get_authority_list()[0].user();
-            fail("User should not be set");
+            ck_abort_msg("User should not be set");
         }
         catch (NotSet&) { }
-        fail_unless(uri.get_authority_list()[0].host() == "host1");
-        fail_unless(uri.get_authority_list()[0].port() == "1234");
+        ck_assert(uri.get_authority_list()[0].host() == "host1");
+        ck_assert(uri.get_authority_list()[0].port() == "1234");
 
-        fail_unless(uri.get_authority_list()[1].host() == "host2");
+        ck_assert(uri.get_authority_list()[1].host() == "host2");
     }
     catch (gu::Exception& e)
     {
-        fail(e.what());
+        ck_abort_msg(e.what());
     }
 
 
@@ -482,83 +482,83 @@ START_TEST(uri_IPv6)
     try
     {
         URI u(ip, false);
-        fail_unless (u.get_host() == ip);
+        ck_assert(u.get_host() == ip);
     }
     catch (gu::Exception& e)
     {
-        fail(e.what());
+        ck_abort_msg(e.what());
     }
 
     try
     {
         URI u(ip_unescaped, false);
-        fail_unless (u.get_host() == ip_unescaped);
+        ck_assert(u.get_host() == ip_unescaped);
     }
     catch (gu::Exception& e)
     {
-        fail(e.what());
+        ck_abort_msg(e.what());
     }
 
     try
     {
         URI u(addr, false);
-        fail_unless (u.get_host() == ip);
-        fail_unless (u.get_port() == port);
+        ck_assert(u.get_host() == ip);
+        ck_assert(u.get_port() == port);
     }
     catch (gu::Exception& e)
     {
-        fail(e.what());
+        ck_abort_msg(e.what());
     }
 
     try
     {
         URI u(localhost, false);
-        fail_unless (u.get_host() == localhost);
+        ck_assert(u.get_host() == localhost);
     }
     catch (gu::Exception& e)
     {
-        fail(e.what());
+        ck_abort_msg(e.what());
     }
 
     try
     {
         URI u(localhost_unescaped, false);
-        fail_unless (u.get_host() == localhost_unescaped);
+        ck_assert(u.get_host() == localhost_unescaped);
         log_info << "host: " <<  u.get_host();
     }
     catch (gu::Exception& e)
     {
-        fail(e.what());
+        ck_abort_msg(e.what());
     }
 
     try
     {
         URI u(default_unescaped, false);
-        fail_unless (u.get_host() == default_unescaped);
+        ck_assert(u.get_host() == default_unescaped);
     }
     catch (gu::Exception& e)
     {
-        fail(e.what());
+        ck_abort_msg(e.what());
     }
 
     try
     {
         URI u(invalid, false);
-        fail("invalid uri accepted");
+        ck_abort_msg("invalid uri accepted");
     }
     catch (gu::Exception& e)
     {
-        fail_if (e.get_errno() != EINVAL);
+        ck_assert_msg(e.get_errno() == EINVAL);
     }
 
     try
     {
         URI u(link_local_with_scheme, false);
-        fail_unless(u.get_host() == link_local_with_scheme);
+        ck_assert(u.get_host() == link_local_with_scheme);
     }
     catch (const gu::Exception& e)
     {
-        fail(e.what());
+        ck_abort_msg(e.what());
     }
 }
 END_TEST

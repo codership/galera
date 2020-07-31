@@ -7,6 +7,7 @@
 #include "gu_string_utils.hpp" // strsplit()
 #include "gu_exception.hpp"
 #include "gu_logger.hpp"
+#include "gu_crc32c.h" // gu_crc32c_configure()
 
 #include <string>
 #include <vector>
@@ -40,7 +41,6 @@ static GCommSuite suites[] = {
 
 int main(int argc, char* argv[])
 {
-
     SRunner* sr = srunner_create(0);
     vector<string>* suits = 0;
     FILE* log_file(0);
@@ -69,7 +69,9 @@ int main(int argc, char* argv[])
         //gu::Logger::enable_debug(true);
     }
 
-    log_info << "check_gcomm, start tests";
+    gu_crc32c_configure();
+
+    log_info << "check_gcomm_nondet, start tests";
     if (::getenv("CHECK_GCOMM_SUITES"))
     {
         suits = new vector<string>(gu::strsplit(::getenv("CHECK_GCOMM_SUITES"), ','));

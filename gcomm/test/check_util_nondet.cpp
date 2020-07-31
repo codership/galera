@@ -1,9 +1,5 @@
 /*
- * Copyright (C) 2019 Codership Oy <info@codership.com>
- */
-
-/*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2020 Codership Oy <info@codership.com>
  */
 
 #include "gcomm/util.hpp"
@@ -53,7 +49,7 @@ START_TEST(test_asio)
     pn.event_loop(gu::datetime::Sec);
 
     SocketPtr sr = acc->accept();
-    fail_unless(sr->state() == Socket::S_CONNECTED);
+    ck_assert(sr->state() == Socket::S_CONNECTED);
 
     vector<byte_t> buf(cl->mtu());
     for (size_t i = 0; i < buf.size(); ++i)
@@ -79,8 +75,12 @@ START_TEST(test_protonet)
     gu::Config conf;
     gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
+    mark_point();
     Protonet* pn(Protonet::create(conf));
+    ck_assert(pn != NULL);
     pn->event_loop(1);
+    mark_point();
+    delete pn;
 }
 END_TEST
 

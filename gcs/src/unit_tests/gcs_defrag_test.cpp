@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -18,12 +18,12 @@
 static void
 defrag_check_init (gcs_defrag_t* defrag)
 {
-    fail_if (defrag->sent_id  != GCS_SEQNO_ILL);
-    fail_if (defrag->head     != NULL);
-    fail_if (defrag->tail     != NULL);
-    fail_if (defrag->size     != 0);
-    fail_if (defrag->received != 0);
-    fail_if (defrag->frag_no  != 0);
+    ck_assert(defrag->sent_id  == GCS_SEQNO_ILL);
+    ck_assert(defrag->head     == NULL);
+    ck_assert(defrag->tail     == NULL);
+    ck_assert(defrag->size     == 0);
+    ck_assert(defrag->received == 0);
+    ck_assert(defrag->frag_no  == 0);
 }
 
 START_TEST (gcs_defrag_test)
@@ -94,24 +94,24 @@ START_TEST (gcs_defrag_test)
 
     // 1. Try fragment that is not the first
     ret = gcs_defrag_handle_frag (&defrag, &frg3, &recv_act, FALSE);
-    fail_if (ret != -EPROTO);
+    ck_assert(ret == -EPROTO);
     mark_point();
     defrag_check_init (&defrag); // should be no changes
 
     // 2. Try first fragment
     ret = gcs_defrag_handle_frag (&defrag, &frg1, &recv_act, FALSE);
-    fail_if (ret != 0);
-    fail_if (defrag.head == NULL);
-    fail_if (defrag.received != frag1_len);
-    fail_if (defrag.tail != defrag.head + defrag.received);
+    ck_assert(ret == 0);
+    ck_assert(defrag.head == NULL);
+    ck_assert(defrag.received == frag1_len);
+    ck_assert(defrag.tail == defrag.head + defrag.received);
     tail = defrag.tail;
 
 #define TRY_WRONG_2ND_FRAGMENT(frag)                                    \
     ret = gcs_defrag_handle_frag (&defrag, &frag, &recv_act, FALSE);    \
-    if (defrag.frag_no < frag.frag_no) fail_if (ret != -EPROTO);        \
-    else fail_if (ret != 0);                                            \
-    fail_if (defrag.received != frag1_len);                             \
-    fail_if (defrag.tail != tail);
+    if (defrag.frag_no < frag.frag_no) ck_assert(ret == -EPROTO);       \
+    else ck_assert(ret == 0);                                           \
+    ck_assert(defrag.received == frag1_len);                            \
+    ck_assert(defrag.tail == tail);
 
     // 3. Try first fragment again
     TRY_WRONG_2ND_FRAGMENT(frg1);
@@ -124,41 +124,41 @@ START_TEST (gcs_defrag_test)
 
     // 6. Try second fragment
     ret = gcs_defrag_handle_frag (&defrag, &frg2, &recv_act, FALSE);
-    fail_if (ret != 0);
-    fail_if (defrag.received != frag1_len + frag2_len);
-    fail_if (defrag.tail != defrag.head + defrag.received);
+    ck_assert(ret == 0);
+    ck_assert(defrag.received == frag1_len + frag2_len);
+    ck_assert(defrag.tail == defrag.head + defrag.received);
 
     // 7. Try third fragment, last one
     ret = gcs_defrag_handle_frag (&defrag, &frg3, &recv_act, FALSE);
-    fail_if (ret != (long)act_len);
+    ck_assert(ret == (long)act_len);
 
     // 8. Check the action
-    fail_if (recv_act.buf == NULL);
-    fail_if (recv_act.buf_len != (long)act_len);
-    fail_if (strncmp((const char*)recv_act.buf, act_buf, act_len),
-             "Action received: '%s', expected '%s'",recv_act.buf,act_buf);
+    ck_assert(recv_act.buf == NULL);
+    ck_assert(recv_act.buf_len == (long)act_len);
+    ck_assert_msg(!strncmp((const char*)recv_act.buf, act_buf, act_len),
+                  "Action received: '%s', expected '%s'",recv_act.buf,act_buf);
     defrag_check_init (&defrag); // should be empty
 
     gcs_gcache_free(defrag.cache, recv_act.buf);
 
     // 9. Try the same with local action
     ret = gcs_defrag_handle_frag (&defrag, &frg1, &recv_act, TRUE);
-    fail_if (ret != 0);
-//    fail_if (defrag.head != NULL); (and now we may allocate it for cache)
+    ck_assert(ret == 0);
+//    ck_assert(defrag.head == NULL); (and now we may allocate it for cache)
 
     ret = gcs_defrag_handle_frag (&defrag, &frg2, &recv_act, TRUE);
-    fail_if (ret != 0);
-//    fail_if (defrag.head != NULL); (and now we may allocate it for cache)
+    ck_assert(ret == 0);
+//    ck_assert(defrag.head == NULL); (and now we may allocate it for cache)
 
     ret = gcs_defrag_handle_frag (&defrag, &frg3, &recv_act, TRUE);
-    fail_if (ret != (long)act_len);
-//    fail_if (defrag.head != NULL); (and now we may allocate it for cache)
+    ck_assert(ret == (long)act_len);
+//    ck_assert(defrag.head == NULL); (and now we may allocate it for cache)
 
 
     // 10. Check the action
-    fail_if (recv_act.buf == NULL);
-    fail_if (recv_act.buf_len != (long)act_len);
-//    fail_if (recv_act.buf != NULL); (and now we may allocate it for cache)
+    ck_assert(recv_act.buf == NULL);
+    ck_assert(recv_act.buf_len == (long)act_len);
+//    ck_assert(recv_act.buf == NULL); (and now we may allocate it for cache)
 
     defrag_check_init (&defrag); // should be empty
 

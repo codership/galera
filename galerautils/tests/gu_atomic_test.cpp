@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2014-2020 Codership Oy <info@codership.com>
  */
 
 #include "../src/gu_atomic.hpp"
@@ -14,22 +14,22 @@ START_TEST(test_sanity_c)
     int64_t i, j, k;
 
     i = 1; j = 0; k = 3;
-    gu_atomic_set(&i, &j); fail_if(j != 0); fail_if(i != 0);
-    gu_atomic_get(&i, &k); fail_if(i != 0); fail_if(k != 0);
+    gu_atomic_set(&i, &j); ck_assert(j == 0); ck_assert(i == 0);
+    gu_atomic_get(&i, &k); ck_assert(i == 0); ck_assert(k == 0);
 
-    j = gu_atomic_fetch_and_add (&i,  7); fail_if(j !=  0); fail_if(i !=  7);
-    j = gu_atomic_fetch_and_sub (&i, 10); fail_if(j !=  7); fail_if(i != -3);
-    j = gu_atomic_fetch_and_or  (&i, 15); fail_if(j != -3); fail_if(i != -1);
-    j = gu_atomic_fetch_and_and (&i,  5); fail_if(j != -1); fail_if(i !=  5);
-    j = gu_atomic_fetch_and_xor (&i,  3); fail_if(j !=  5); fail_if(i !=  6);
-    j = gu_atomic_fetch_and_nand(&i, 15); fail_if(j !=  6); fail_if(i != -7);
+    j = gu_atomic_fetch_and_add (&i,  7); ck_assert(j ==  0); ck_assert(i ==  7);
+    j = gu_atomic_fetch_and_sub (&i, 10); ck_assert(j ==  7); ck_assert(i == -3);
+    j = gu_atomic_fetch_and_or  (&i, 15); ck_assert(j == -3); ck_assert(i == -1);
+    j = gu_atomic_fetch_and_and (&i,  5); ck_assert(j == -1); ck_assert(i ==  5);
+    j = gu_atomic_fetch_and_xor (&i,  3); ck_assert(j ==  5); ck_assert(i ==  6);
+    j = gu_atomic_fetch_and_nand(&i, 15); ck_assert(j ==  6); ck_assert(i == -7);
 
-    j = gu_atomic_add_and_fetch (&i,  7); fail_if(j !=  0); fail_if(i !=  0);
-    j = gu_atomic_sub_and_fetch (&i, -2); fail_if(j !=  2); fail_if(i !=  2);
-    j = gu_atomic_or_and_fetch  (&i,  5); fail_if(j !=  7); fail_if(i !=  7);
-    j = gu_atomic_and_and_fetch (&i, 13); fail_if(j !=  5); fail_if(i !=  5);
-    j = gu_atomic_xor_and_fetch (&i, 15); fail_if(j != 10); fail_if(i != 10);
-    j = gu_atomic_nand_and_fetch(&i,  7); fail_if(j != -3); fail_if(i != -3);
+    j = gu_atomic_add_and_fetch (&i,  7); ck_assert(j ==  0); ck_assert(i ==  0);
+    j = gu_atomic_sub_and_fetch (&i, -2); ck_assert(j ==  2); ck_assert(i ==  2);
+    j = gu_atomic_or_and_fetch  (&i,  5); ck_assert(j ==  7); ck_assert(i ==  7);
+    j = gu_atomic_and_and_fetch (&i, 13); ck_assert(j ==  5); ck_assert(i ==  5);
+    j = gu_atomic_xor_and_fetch (&i, 15); ck_assert(j == 10); ck_assert(i == 10);
+    j = gu_atomic_nand_and_fetch(&i,  7); ck_assert(j == -3); ck_assert(i == -3);
 }
 END_TEST
 
@@ -38,17 +38,17 @@ START_TEST(test_sanity_cxx)
     gu::Atomic<int64_t> i(1);
     int64_t const k(3);
 
-    fail_if(i() != 1);
-    fail_if(i() == k);
-    fail_if((i = k) != k);
-    fail_if(i() != k);
+    ck_assert(i() == 1);
+    ck_assert(i() != k);
+    ck_assert((i = k) == k);
+    ck_assert(i() == k);
 
-    fail_if(i.fetch_and_zero() != k); fail_if(i() != 0);
-    fail_if(i.fetch_and_add(5) != 0); fail_if(i() != 5);
-    fail_if(i.add_and_fetch(3) != 8); fail_if(i() != 8);
-    fail_if((++i)() != 9); fail_if(i() != 9);
-    fail_if((--i)() != 8); fail_if(i() != 8);
-    i += 3; fail_if(i() != 11);
+    ck_assert(i.fetch_and_zero() == k); ck_assert(i() == 0);
+    ck_assert(i.fetch_and_add(5) == 0); ck_assert(i() == 5);
+    ck_assert(i.add_and_fetch(3) == 8); ck_assert(i() == 8);
+    ck_assert((++i)() == 9); ck_assert(i() == 9);
+    ck_assert((--i)() == 8); ck_assert(i() == 8);
+    i += 3; ck_assert(i() == 11);
 }
 END_TEST
 
@@ -127,14 +127,14 @@ static int join_threads(pthread_t* threads)
 // (if there are any).
 START_TEST(test_concurrency)
 {
-    fail_if(iterations < 1000000);
+    ck_assert(iterations >= 1000000);
 
     int64_t   var(0);
     pthread_t threads[n_threads * 2];
 
-    fail_if(start_threads(threads, &var));
-    fail_if(join_threads(threads));
-    fail_if(0 != var);
+    ck_assert(0 == start_threads(threads, &var));
+    ck_assert(0 == join_threads(threads));
+    ck_assert(0 == var);
 }
 END_TEST
 

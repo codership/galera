@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -20,16 +20,16 @@ START_TEST (gu_uuid_test)
 
     uuid[0] = GU_UUID_NIL;
     gu_uuid_generate (&uuid[0], NULL, 0);
-    fail_if (!memcmp (&uuid[0], &GU_UUID_NIL, sizeof(gu_uuid_t)));
-    fail_if (!gu_uuid_compare(&uuid[0], &GU_UUID_NIL));
+    ck_assert(memcmp (&uuid[0], &GU_UUID_NIL, sizeof(gu_uuid_t)));
+    ck_assert(gu_uuid_compare(&uuid[0], &GU_UUID_NIL));
 
     for (i = 1; i < uuid_num; i++) {
         uuid[i] = GU_UUID_NIL;
         gu_uuid_generate (&uuid[i], NULL, 0);
-        fail_if (!gu_uuid_compare(&uuid[i], &GU_UUID_NIL));
-        fail_if (!gu_uuid_compare(&uuid[i], &uuid[i - 1]));
-        fail_if (1  != gu_uuid_older (&uuid[i - 1], &uuid[i]));
-        fail_if (-1 != gu_uuid_older (&uuid[i], &uuid[i - 1]));
+        ck_assert(gu_uuid_compare(&uuid[i], &GU_UUID_NIL));
+        ck_assert(gu_uuid_compare(&uuid[i], &uuid[i - 1]));
+        ck_assert(1  == gu_uuid_older (&uuid[i - 1], &uuid[i]));
+        ck_assert(-1 == gu_uuid_older (&uuid[i], &uuid[i - 1]));
     }
 }
 END_TEST

@@ -1,4 +1,4 @@
-// Copyright (C) 2010-2016 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2020 Codership Oy <info@codership.com>
 
 // $Id$
 
@@ -24,7 +24,7 @@ START_TEST (gcs_sm_test_basic)
     int ret;
 
     gcs_sm_t* sm = gcs_sm_create(2, 1);
-    fail_if(!sm);
+    ck_assert(sm != NULL);
 
     gu_cond_t cond;
     gu_cond_init (&cond, NULL);
@@ -32,16 +32,17 @@ START_TEST (gcs_sm_test_basic)
     int i;
     for (i = 1; i < 5; i++) {
         ret = gcs_sm_enter(sm, &cond, false, true);
-        fail_if(ret, "gcs_sm_enter() failed: %d (%s)", ret, strerror(-ret));
-        fail_if(sm->users != 1, "users = %ld, expected 1", sm->users);
-        fail_if(sm->entered != 1, "entered = %d, expected 1", sm->entered);
+        ck_assert_msg(0 == ret, "gcs_sm_enter() failed: %d (%s)",
+                      ret, strerror(-ret));
+        ck_assert_msg(sm->users == 1, "users = %ld, expected 1", sm->users);
+        ck_assert_msg(sm->entered == 1, "entered = %d, expected 1",sm->entered);
 
         gcs_sm_leave(sm);
-        fail_if(sm->entered != 0, "entered = %d, expected %d", sm->entered, 0);
+        ck_assert_msg(sm->entered == 0, "entered = %d, expected 0",sm->entered);
     }
 
     ret = gcs_sm_close(sm);
-    fail_if(ret);
+    ck_assert(0 == ret);
 
     gcs_sm_destroy(sm);
     gu_cond_destroy(&cond);
@@ -72,16 +73,17 @@ START_TEST (gcs_sm_test_simple)
     int ret;
 
     gcs_sm_t* sm = gcs_sm_create(4, 1);
-    fail_if(!sm);
+    ck_assert(sm != NULL);
 
     gu_cond_t cond;
     gu_cond_init (&cond, NULL);
 
     ret = gcs_sm_enter(sm, &cond, false, true);
-    fail_if(ret, "gcs_sm_enter() failed: %d (%s)", ret, strerror(-ret));
-    fail_if(sm->users != 1, "users = %ld, expected 1", sm->users);
-    fail_if(sm->entered != true, "entered = %d, expected %d",
-            sm->users, true);
+    ck_assert_msg(0 == ret, "gcs_sm_enter() failed: %d (%s)",
+                  ret, strerror(-ret));
+    ck_assert_msg(sm->users == 1, "users = %ld, expected 1", sm->users);
+    ck_assert_msg(sm->entered == true, "entered = %d, expected %d",
+                  sm->users, true);
 
     gu_thread_t t1, t2, t3, t4;
 
@@ -90,29 +92,29 @@ START_TEST (gcs_sm_test_simple)
     gu_thread_create (&t3, NULL, simple_thread, sm);
 
     WAIT_FOR ((long)sm->wait_q_len == sm->users);
-    fail_if((long)sm->wait_q_len != sm->users, "wait_q_len = %lu, users = %ld",
-            sm->wait_q_len, sm->users);
+    ck_assert_msg((long)sm->wait_q_len == sm->users,
+                  "wait_q_len = %lu, users = %ld", sm->wait_q_len, sm->users);
 
     gu_thread_create (&t4, NULL, simple_thread, sm);
 
     mark_point();
     gu_thread_join (t4, NULL); // there's no space in the queue
-    fail_if (simple_ret != -EAGAIN);
+    ck_assert(simple_ret == -EAGAIN);
 
-    fail_if (0 != sm->wait_q_tail, "wait_q_tail = %lu, expected 0",
-             sm->wait_q_tail);
-    fail_if (1 != sm->wait_q_head, "wait_q_head = %lu, expected 1",
-             sm->wait_q_head);
-    fail_if (4 != sm->users, "users = %lu, expected 4", sm->users);
+    ck_assert_msg(0 == sm->wait_q_tail, "wait_q_tail = %lu, expected 0",
+                  sm->wait_q_tail);
+    ck_assert_msg(1 == sm->wait_q_head, "wait_q_head = %lu, expected 1",
+                  sm->wait_q_head);
+    ck_assert_msg(4 == sm->users, "users = %lu, expected 4", sm->users);
 
     gu_info ("Calling gcs_sm_leave()");
     gcs_sm_leave(sm);
 
-    fail_unless(4 > sm->users, "users = %lu, expected 4", sm->users);
+    ck_assert_msg(4 > sm->users, "users = %lu, expected 4", sm->users);
 
     gu_info ("Calling gcs_sm_close()");
     ret = gcs_sm_close(sm);
-    fail_if(ret);
+    ck_assert(0 == ret);
 
     gu_thread_join(t1, NULL);
     gu_thread_join(t2, NULL);
@@ -130,13 +132,13 @@ static void* closing_thread (void* data)
 {
     gcs_sm_t* sm = (gcs_sm_t*)data;
 
-    fail_if(order != 0, "order is %d, expected 0", order);
+    ck_assert_msg(order == 0, "order is %d, expected 0", order);
 
     order = 1;
     int ret = gcs_sm_close(sm);
 
-    fail_if(ret);
-    fail_if(order != 2, "order is %d, expected 2", order);
+    ck_assert(0 == ret);
+    ck_assert_msg(order == 2, "order is %d, expected 2", order);
 
     gcs_sm_destroy(sm);
     return NULL;
@@ -147,35 +149,36 @@ START_TEST (gcs_sm_test_close)
     order = 0;
 
     gcs_sm_t* sm = gcs_sm_create(2, 1);
-    fail_if(!sm);
+    ck_assert(sm != NULL);
 
     gu_cond_t cond;
     gu_cond_init (&cond, NULL);
 
     int ret = gcs_sm_enter(sm, &cond, false, true);
-    fail_if(ret, "gcs_sm_enter() failed: %d (%s)", ret, strerror(-ret));
-    fail_if(sm->users != 1, "users = %ld, expected 1", sm->users);
-    fail_if(order != 0);
+    ck_assert_msg(0 == ret, "gcs_sm_enter() failed: %d (%s)",
+                  ret, strerror(-ret));
+    ck_assert_msg(sm->users == 1, "users = %ld, expected 1", sm->users);
+    ck_assert(order == 0);
 
-    fail_if(1 != sm->wait_q_head, "wait_q_head = %lu, expected 1",
-            sm->wait_q_head);
-    fail_if(1 != sm->wait_q_tail, "wait_q_tail = %lu, expected 1",
-            sm->wait_q_tail);
+    ck_assert_msg(1 == sm->wait_q_head, "wait_q_head = %lu, expected 1",
+                  sm->wait_q_head);
+    ck_assert_msg(1 == sm->wait_q_tail, "wait_q_tail = %lu, expected 1",
+                  sm->wait_q_tail);
 
     gu_thread_t thr;
     gu_thread_create (&thr, NULL, closing_thread, sm);
     WAIT_FOR(1 == order);
-    fail_if(order != 1, "order is %d, expected 1", order);
+    ck_assert_msg(order == 1, "order is %d, expected 1", order);
     usleep(TEST_USLEEP); // make sure closing_thread() blocks in gcs_sm_close()
 
-    fail_if(sm->users != 2, "users = %ld, expected 2", sm->users);
+    ck_assert_msg(sm->users == 2, "users = %ld, expected 2", sm->users);
     gu_info ("Started close thread, users = %ld", sm->users);
 
-    fail_if(1 != sm->wait_q_head, "wait_q_head = %lu, expected 1",
-            sm->wait_q_head);
-    fail_if(0 != sm->wait_q_tail, "wait_q_tail = %lu, expected 0",
-            sm->wait_q_tail);
-    fail_if(1 != sm->entered);
+    ck_assert_msg(1 == sm->wait_q_head, "wait_q_head = %lu, expected 1",
+                  sm->wait_q_head);
+    ck_assert_msg(0 == sm->wait_q_tail, "wait_q_tail = %lu, expected 0",
+                  sm->wait_q_tail);
+    ck_assert(1 == sm->entered);
 
     order = 2;
     gcs_sm_leave(sm);
@@ -199,11 +202,13 @@ static void* pausing_thread (void* data)
 
     gcs_sm_schedule (sm);
     gu_info ("pausing_thread scheduled, pause_order = %d", pause_order);
-    fail_if (pause_order != 0, "pause_order = %d, expected 0");
+    ck_assert_msg(pause_order == 0, "pause_order = %d, expected 0",
+                  pause_order);
     pause_order = 1;
     gcs_sm_enter (sm, &cond, true, true);
     gu_info ("pausing_thread entered, pause_order = %d", pause_order);
-    fail_if (pause_order != 2, "pause_order = %d, expected 2");
+    ck_assert_msg(pause_order == 2, "pause_order = %d, expected 2",
+                  pause_order);
     pause_order = 3;
     usleep(TEST_USLEEP);
     gcs_sm_leave (sm);
@@ -228,9 +233,9 @@ START_TEST (gcs_sm_test_pause)
 
     gcs_sm_t* sm = gcs_sm_create(4, 1);
 
-    fail_if(!sm);
-    fail_if(1 != sm->wait_q_head, "wait_q_head = %lu, expected 1",
-            sm->wait_q_head);
+    ck_assert(sm != NULL);
+    ck_assert_msg(1 == sm->wait_q_head, "wait_q_head = %lu, expected 1",
+                  sm->wait_q_head);
 
     gu_cond_t cond;
     gu_cond_init (&cond, NULL);
@@ -239,89 +244,90 @@ START_TEST (gcs_sm_test_pause)
 
     gcs_sm_stats_get (sm, &q_len, &q_len_max, &q_len_min, &q_len_avg,
                       &paused_ns, &paused_avg);
-    fail_if (paused_ns != 0,
-             "paused_ns: expected 0, got %lld", paused_ns);
-    fail_if (fabs(paused_avg) > EPS,
-             "paused_avg: expected <= %e, got %e", EPS, fabs(paused_avg));
-    fail_if (fabs(q_len_avg) > EPS,
-             "q_len_avg: expected <= %e, got %e", EPS, fabs(q_len_avg));
-    fail_if (q_len      != 0);
-    fail_if (q_len_max  != 0);
-    fail_if (q_len_min  != 0);
+    ck_assert_msg(paused_ns == 0,
+                  "paused_ns: expected 0, got %lld", paused_ns);
+    ck_assert_msg(fabs(paused_avg) <= EPS,
+                  "paused_avg: expected <= %e, got %e", EPS, fabs(paused_avg));
+    ck_assert_msg(fabs(q_len_avg) <= EPS,
+                  "q_len_avg: expected <= %e, got %e", EPS, fabs(q_len_avg));
+    ck_assert(q_len      == 0);
+    ck_assert(q_len_max  == 0);
+    ck_assert(q_len_min  == 0);
 
     // Test attempt to enter paused monitor
     pause_order = 0;
     gcs_sm_pause (sm);
     gu_thread_create (&thr, NULL, pausing_thread, sm);
     WAIT_FOR(1 == pause_order);
-    fail_if (pause_order != 1, "pause_order = %d, expected 1");
+    ck_assert_msg(pause_order == 1, "pause_order = %d, expected 1");
     usleep(TEST_USLEEP); // make sure pausing_thread blocked in gcs_sm_enter()
     pause_order = 2;
 
     // testing taking stats in the middle of the pause pt. 1
     gcs_sm_stats_get (sm, &q_len, &q_len_max, &q_len_min, &q_len_avg,
                       &paused_ns, &paused_avg);
-    fail_if (paused_ns  <= 0.0);
-    fail_if (paused_avg <= 0.0);
-    fail_if (fabs(q_len_avg) > EPS,
-             "q_len_avg: expected <= %e, got %e", EPS, fabs(q_len_avg));
+    ck_assert(paused_ns  > 0.0);
+    ck_assert(paused_avg > 0.0);
+    ck_assert_msg(fabs(q_len_avg) <= EPS,
+                  "q_len_avg: expected <= %e, got %e", EPS, fabs(q_len_avg));
 
     gu_info ("Calling gcs_sm_continue()");
     gcs_sm_continue (sm);
     gu_thread_join (thr, NULL);
-    fail_if (pause_order != 3, "pause_order = %d, expected 3");
+    ck_assert_msg(pause_order == 3, "pause_order = %d, expected 3");
 
-    fail_if(2 != sm->wait_q_head, "wait_q_head = %lu, expected 2",
-            sm->wait_q_head);
-    fail_if(1 != sm->wait_q_tail, "wait_q_tail = %lu, expected 1",
-            sm->wait_q_tail);
+    ck_assert_msg(2 == sm->wait_q_head, "wait_q_head = %lu, expected 2",
+                  sm->wait_q_head);
+    ck_assert_msg(1 == sm->wait_q_tail, "wait_q_tail = %lu, expected 1",
+                  sm->wait_q_tail);
 
     // testing taking stats in the middle of the pause pt. 2
     long long tmp;
     gcs_sm_stats_get (sm, &q_len, &q_len_max, &q_len_min, &q_len_avg,
                       &tmp, &paused_avg);
-    fail_if (tmp < paused_ns); paused_ns = tmp;
-    fail_if (paused_avg <= 0.0);
-    fail_if (fabs(q_len_avg) > EPS,
-             "q_len_avg: expected <= %e, got %e", EPS, fabs(q_len_avg));
+    ck_assert(tmp >= paused_ns); paused_ns = tmp;
+    ck_assert_msg(paused_avg > 0.0);
+    ck_assert_msg(fabs(q_len_avg) <= EPS,
+                  "q_len_avg: expected <= %e, got %e", EPS, fabs(q_len_avg));
     gcs_sm_stats_flush(sm);
 
     // Testing scheduling capability
     gcs_sm_schedule (sm);
-    fail_if(2 != sm->wait_q_tail, "wait_q_tail = %lu, expected 2",
-            sm->wait_q_tail);
+    ck_assert_msg(2 == sm->wait_q_tail, "wait_q_tail = %lu, expected 2",
+                  sm->wait_q_tail);
     gu_thread_create (&thr, NULL, pausing_thread, sm);
     usleep (TEST_USLEEP);
     // no changes in pause_order
-    fail_if (pause_order != 3, "pause_order = %d, expected 3");
+    ck_assert_msg(pause_order == 3, "pause_order = %d, expected 3",pause_order);
     pause_order = 0;
 
     int ret = gcs_sm_enter(sm, &cond, true, true);
-    fail_if (ret, "gcs_sm_enter() failed: %d (%s)", ret, strerror(-ret));
+    ck_assert_msg(0 == ret, "gcs_sm_enter() failed: %d (%s)",
+                  ret, strerror(-ret));
     // released monitor lock, thr should continue and schedule,
     // set pause_order to 1
     WAIT_FOR(1 == pause_order);
-    fail_if (pause_order != 1, "pause_order = %d, expected 1");
-    fail_if (sm->users != 2, "users = %ld, expected 2", sm->users);
+    ck_assert_msg(pause_order == 1, "pause_order = %d, expected 1");
+    ck_assert_msg(sm->users == 2, "users = %ld, expected 2", sm->users);
 
-    fail_if(2 != sm->wait_q_head, "wait_q_head = %lu, expected 2",
-            sm->wait_q_head);
-    fail_if(3 != sm->wait_q_tail, "wait_q_tail = %lu, expected 3",
-            sm->wait_q_tail);
+    ck_assert_msg(2 == sm->wait_q_head, "wait_q_head = %lu, expected 2",
+                  sm->wait_q_head);
+    ck_assert_msg(3 == sm->wait_q_tail, "wait_q_tail = %lu, expected 3",
+                  sm->wait_q_tail);
 
     gcs_sm_stats_get (sm, &q_len, &q_len_max, &q_len_min, &q_len_avg,
                       &tmp, &paused_avg);
-    fail_if (tmp < paused_ns); paused_ns = tmp;
-    fail_if (fabs(paused_avg) > EPS,
-             "paused_avg: expected <= %e, got %e", EPS, fabs(paused_avg));
-    fail_if (q_len != sm->users, "found q_len %d, expected = %d",
-             q_len, sm->users);
-    fail_if (q_len_max != q_len, "found q_len_max %d, expected = %d",
-             q_len_max, q_len);
-    fail_if (q_len_min != 0, "found q_len_min %d, expected = 0",
-             q_len_min);
-    fail_if (fabs(q_len_avg - 0.5) > EPS,
-             "q_len_avg: expected <= %e, got %e", EPS, fabs(q_len_avg));
+    ck_assert(tmp >= paused_ns); paused_ns = tmp;
+    ck_assert_msg(fabs(paused_avg) <= EPS,
+                  "paused_avg: expected <= %e, got %e", EPS, fabs(paused_avg));
+    ck_assert_msg(q_len == sm->users, "found q_len %d, expected = %d",
+                  q_len, sm->users);
+    ck_assert_msg(q_len_max == q_len, "found q_len_max %d, expected = %d",
+                  q_len_max, q_len);
+    ck_assert_msg(q_len_min == 0, "found q_len_min %d, expected = 0",
+                  q_len_min);
+    ck_assert_msg(fabs(q_len_avg - 0.5) <= EPS,
+                  "q_len_avg: expected <= %e, got %e", EPS, fabs(q_len_avg));
     gcs_sm_stats_flush(sm);
 
     gu_info ("Started pause thread, users = %ld", sm->users);
@@ -332,49 +338,49 @@ START_TEST (gcs_sm_test_pause)
     usleep (TEST_USLEEP);
     gcs_sm_continue (sm); // nothing should continue, since monitor is entered
     usleep (TEST_USLEEP);
-    fail_if (pause_order != 2, "pause_order = %d, expected 2");
-    fail_if (sm->entered != 1, "entered = %ld, expected 1", sm->entered);
+    ck_assert_msg(pause_order == 2, "pause_order = %d, expected 2");
+    ck_assert_msg(sm->entered == 1, "entered = %ld, expected 1", sm->entered);
 
     // Now test pausing when monitor is left
     gcs_sm_pause (sm);
-    fail_if (sm->users != 2, "users = %ld, expected 2", sm->users);
+    ck_assert_msg(sm->users == 2, "users = %ld, expected 2", sm->users);
 
     gcs_sm_leave (sm);
-    fail_if (sm->users   != 1, "users = %ld, expected 1", sm->users);
-    fail_if (sm->entered != 0, "entered = %ld, expected 1", sm->entered);
+    ck_assert_msg(sm->users   == 1, "users = %ld, expected 1", sm->users);
+    ck_assert_msg(sm->entered == 0, "entered = %ld, expected 1", sm->entered);
 
-    fail_if(3 != sm->wait_q_head, "wait_q_head = %lu, expected 3",
-            sm->wait_q_head);
-    fail_if(3 != sm->wait_q_tail, "wait_q_tail = %lu, expected 3",
-            sm->wait_q_tail);
+    ck_assert_msg(3 == sm->wait_q_head, "wait_q_head = %lu, expected 3",
+                  sm->wait_q_head);
+    ck_assert_msg(3 == sm->wait_q_tail, "wait_q_tail = %lu, expected 3",
+                  sm->wait_q_tail);
 
     usleep (TEST_USLEEP); // nothing should change, since monitor is paused
-    fail_if (pause_order != 2, "pause_order = %d, expected 2");
-    fail_if (sm->entered != 0, "entered = %ld, expected 0", sm->entered);
-    fail_if (sm->users   != 1, "users = %ld, expected 1", sm->users);
+    ck_assert_msg(pause_order == 2, "pause_order = %d, expected 2");
+    ck_assert_msg(sm->entered == 0, "entered = %ld, expected 0", sm->entered);
+    ck_assert_msg(sm->users   == 1, "users = %ld, expected 1", sm->users);
 
     gcs_sm_continue (sm); // paused thread should continue
     WAIT_FOR(3 == pause_order);
-    fail_if (pause_order != 3, "pause_order = %d, expected 3");
+    ck_assert_msg(pause_order == 3, "pause_order = %d, expected 3");
 
     gcs_sm_stats_get (sm, &q_len, &q_len_max, &q_len_min, &q_len_avg,
                       &tmp, &paused_avg);
-    fail_if (tmp <= paused_ns); paused_ns = tmp;
-    fail_if (paused_avg <= 0.0);
-    fail_if (fabs(q_len_avg) > EPS,
-             "q_len_avg: expected <= %e, got %e", EPS, fabs(q_len_avg));
+    ck_assert(tmp > paused_ns); paused_ns = tmp;
+    ck_assert(paused_avg > 0.0);
+    ck_assert_msg(fabs(q_len_avg) <= EPS,
+                  "q_len_avg: expected <= %e, got %e", EPS, fabs(q_len_avg));
 
     gcs_sm_enter (sm, &cond, false, true); // by now paused thread exited monitor
-    fail_if (sm->entered != 1, "entered = %ld, expected 1", sm->entered);
-    fail_if (sm->users   != 1, "users = %ld, expected 1", sm->users);
-    fail_if(0 != sm->wait_q_head, "wait_q_head = %lu, expected 0",
-            sm->wait_q_head);
-    fail_if(0 != sm->wait_q_tail, "wait_q_tail = %lu, expected 0",
-            sm->wait_q_tail);
+    ck_assert_msg(sm->entered == 1, "entered = %ld, expected 1", sm->entered);
+    ck_assert_msg(sm->users   == 1, "users = %ld, expected 1", sm->users);
+    ck_assert_msg(0 == sm->wait_q_head, "wait_q_head = %lu, expected 0",
+                  sm->wait_q_head);
+    ck_assert_msg(0 == sm->wait_q_tail, "wait_q_tail = %lu, expected 0",
+                  sm->wait_q_tail);
 
     gcs_sm_leave (sm);
-    fail_if(1 != sm->wait_q_head, "wait_q_head = %lu, expected 1",
-            sm->wait_q_head);
+    ck_assert_msg(1 == sm->wait_q_head, "wait_q_head = %lu, expected 1",
+                  sm->wait_q_head);
 
     mark_point();
     gu_cond_destroy(&cond);
@@ -413,24 +419,24 @@ static void* interrupt_thread(void* arg)
     global_handle = -1;                                                 \
     gu_thread_create (thr, NULL, interrupt_thread, sm);                 \
     WAIT_FOR(global_handle == h);                                       \
-    fail_if (sm->wait_q_tail != tail, "wait_q_tail = %lu, expected %lu", \
-             sm->wait_q_tail, tail);                                    \
-    fail_if (global_handle != h, "global_handle = %ld, expected %ld",   \
-             global_handle, h);                                         \
-    fail_if (sm->users != u, "users = %ld, expected %ld", sm->users, u);
+    ck_assert_msg(sm->wait_q_tail == tail, "wait_q_tail = %lu, expected %lu", \
+                  sm->wait_q_tail, tail);                               \
+    ck_assert_msg(global_handle == h, "global_handle = %ld, expected %ld", \
+                  global_handle, h);                                    \
+    ck_assert_msg(sm->users == u, "users = %ld, expected %ld", sm->users, u);
 
 #define TEST_INTERRUPT_THREAD(h, t)                                     \
     ret = gcs_sm_interrupt (sm, (h));                                   \
-    fail_if (ret != 0);                                                 \
+    ck_assert(ret == 0);                                                \
     gu_thread_join ((t), NULL);                                         \
-    fail_if (global_ret != -EINTR, "global_ret = %ld, expected %ld (-EINTR)", \
-             global_ret, -EINTR);
+    ck_assert_msg(global_ret == -EINTR, "global_ret = %ld, "            \
+                  "expected %ld (-EINTR)", global_ret, -EINTR);
 
 
 START_TEST (gcs_sm_test_interrupt)
 {
     gcs_sm_t* sm = gcs_sm_create(4, 1);
-    fail_if(!sm);
+    ck_assert(sm != NULL);
 
     gu_cond_t cond;
     gu_cond_init (&cond, NULL);
@@ -440,12 +446,12 @@ START_TEST (gcs_sm_test_interrupt)
     gu_thread_t thr3;
 
     long handle = gcs_sm_schedule (sm);
-    fail_if (handle != 0, "handle = %ld, expected 0");
-    fail_if (sm->wait_q_tail != 1, "wait_q_tail = %lu, expected 1",
-             sm->wait_q_tail);
+    ck_assert_msg(handle == 0, "handle = %ld, expected 0", handle);
+    ck_assert_msg(sm->wait_q_tail == 1, "wait_q_tail = %lu, expected 1",
+                  sm->wait_q_tail);
 
     long ret = gcs_sm_enter (sm, &cond, true, true);
-    fail_if (ret != 0);
+    ck_assert(ret == 0);
 
     /* 1. Test interrupting blocked by previous thread */
     TEST_CREATE_THREAD(&thr1, 2, 3, 2);
@@ -456,11 +462,11 @@ START_TEST (gcs_sm_test_interrupt)
 
     gcs_sm_leave (sm); // this should let 2nd enter monitor
     gu_thread_join (thr2, NULL);
-    fail_if (global_ret != 0, "global_ret = %ld, expected 0", global_ret);
-    fail_if (sm->users  != 0, "users = %ld, expected 0", sm->users);
+    ck_assert_msg(global_ret == 0, "global_ret = %ld, expected 0", global_ret);
+    ck_assert_msg(sm->users  == 0, "users = %ld, expected 0", sm->users);
 
     ret = gcs_sm_interrupt (sm, 4); // try to interrupt 2nd which has exited
-    fail_if (ret != -ESRCH);
+    ck_assert(ret == -ESRCH);
 
     /* 2. Test interrupting blocked by pause */
     gcs_sm_pause (sm);
@@ -478,7 +484,7 @@ START_TEST (gcs_sm_test_interrupt)
     gcs_sm_continue (sm);
 
     gu_thread_join (thr2, NULL);
-    fail_if (global_ret != 0, "global_ret = %ld, expected 0", global_ret);
+    ck_assert_msg(global_ret == 0, "global_ret = %ld, expected 0", global_ret);
 
     /* 3. Unpausing totally interrupted monitor */
     gcs_sm_pause (sm);
@@ -493,20 +499,20 @@ START_TEST (gcs_sm_test_interrupt)
 
     /* check that monitor is still functional */
     ret = gcs_sm_enter (sm, &cond, false, true);
-    fail_if (ret != 0);
+    ck_assert(ret == 0);
 
-    fail_if(1 != sm->wait_q_head, "wait_q_head = %lu, expected 1",
-            sm->wait_q_head);
-    fail_if(1 != sm->wait_q_tail, "wait_q_tail = %lu, expected 1",
-            sm->wait_q_tail);
-    fail_if (sm->users != 1, "users = %ld, expected 1", sm->users);
+    ck_assert_msg(1 == sm->wait_q_head, "wait_q_head = %lu, expected 1",
+                  sm->wait_q_head);
+    ck_assert_msg(1 == sm->wait_q_tail, "wait_q_tail = %lu, expected 1",
+                  sm->wait_q_tail);
+    ck_assert_msg(sm->users == 1, "users = %ld, expected 1", sm->users);
 
     TEST_CREATE_THREAD(&thr1, 2, 3, 2);
 
     gu_info ("Calling gcs_sm_leave()");
     gcs_sm_leave (sm);
     pthread_join (thr1, NULL);
-    fail_if (global_ret != 0, "global_ret = %ld, expected 0", global_ret);
+    ck_assert_msg(global_ret == 0, "global_ret = %ld, expected 0", global_ret);
 
     pthread_cond_destroy (&cond);
     gcs_sm_close (sm);

@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2020 Codership Oy <info@codership.com>
 //
 
 #include "trx_handle.hpp"
@@ -22,22 +22,22 @@ START_TEST(test_states)
     TrxHandle* trx(TrxHandle::New(tp, TrxHandle::Defaults, uuid, -1, 1));
 
     log_info << *trx;
-    fail_unless(trx->state() == TrxHandle::S_EXECUTING);
+    ck_assert(trx->state() == TrxHandle::S_EXECUTING);
 
 #if 0 // now setting wrong state results in abort
     try
     {
         trx->set_state(TrxHandle::S_COMMITTED);
-        fail("");
+        ck_abort_msg("");
     }
     catch (...)
     {
-        fail_unless(trx->state() == TrxHandle::S_EXECUTING);
+        ck_assert(trx->state() == TrxHandle::S_EXECUTING);
     }
 #endif
 
     trx->set_state(TrxHandle::S_REPLICATING);
-    fail_unless(trx->state() == TrxHandle::S_REPLICATING);
+    ck_assert(trx->state() == TrxHandle::S_REPLICATING);
     trx->unref();
 
     // abort before replication
@@ -144,46 +144,46 @@ START_TEST(test_serialization)
     gu_uuid_generate(reinterpret_cast<gu_uuid_t*>(&uuid), 0, 0);
     TrxHandle* trx(TrxHandle::New(lp, trx_params, uuid, 4567, 8910));
 
-    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
+    ck_assert(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
 
     trx->set_flags(trx->flags() | TrxHandle::F_MAC_HEADER);
-    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8 + 2);
+    ck_assert(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8 + 2);
     trx->set_flags(trx->flags() & ~TrxHandle::F_MAC_HEADER);
-    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
+    ck_assert(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
 
     trx->append_annotation(reinterpret_cast<const gu::byte_t*>("foobar"),
                            strlen("foobar"));
     trx->set_flags(trx->flags() | TrxHandle::F_ANNOTATION);
-    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8 + 4 + 6);
+    ck_assert(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8 + 4 + 6);
     trx->set_flags(trx->flags() & ~TrxHandle::F_ANNOTATION);
-    fail_unless(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
+    ck_assert(trx->serial_size() == 4 + 16 + 8 + 8 + 8 + 8);
 
     trx->set_last_seen_seqno(0);
 
     TrxHandle* trx2(TrxHandle::New(sp));
 
     std::vector<gu::byte_t> buf(trx->serial_size());
-    fail_unless(trx->serialize(&buf[0], buf.size(), 0) > 0);
-    fail_unless(trx2->unserialize(&buf[0], buf.size(), 0) > 0);
+    ck_assert(trx->serialize(&buf[0], buf.size(), 0) > 0);
+    ck_assert(trx2->unserialize(&buf[0], buf.size(), 0) > 0);
 
     trx2->unref();
     trx2 = TrxHandle::New(sp);
 
     trx->set_flags(trx->flags() | TrxHandle::F_MAC_PAYLOAD);
     buf.resize(trx->serial_size());
-    fail_unless(trx->serialize(&buf[0], buf.size(), 0) > 0);
-    fail_unless(trx2->unserialize(&buf[0], buf.size(), 0) > 0);
+    ck_assert(trx->serialize(&buf[0], buf.size(), 0) > 0);
+    ck_assert(trx2->unserialize(&buf[0], buf.size(), 0) > 0);
 
     trx2->unref();
     trx2 = TrxHandle::New(sp);
 
     trx->set_flags(trx->flags() | TrxHandle::F_ANNOTATION);
     buf.resize(trx->serial_size());
-    fail_unless(trx->serialize(&buf[0], buf.size(), 0) > 0);
-    fail_unless(trx2->unserialize(&buf[0], buf.size(), 0) > 0);
-    fail_unless(trx2->serial_size() == trx->serial_size(),
-                "got serial_size(*trx2) = %zu, serial_size(*trx) = %zu",
-                trx2->serial_size(), trx->serial_size());
+    ck_assert(trx->serialize(&buf[0], buf.size(), 0) > 0);
+    ck_assert(trx2->unserialize(&buf[0], buf.size(), 0) > 0);
+    ck_assert_msg(trx2->serial_size() == trx->serial_size(),
+                  "got serial_size(*trx2) = %zu, serial_size(*trx) = %zu",
+                  trx2->serial_size(), trx->serial_size());
 
     trx2->unref();
     trx->unref();

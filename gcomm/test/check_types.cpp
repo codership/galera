@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2020 Codership Oy <info@codership.com>
  */
 
 
@@ -26,8 +26,8 @@ using namespace gcomm;
 START_TEST(test_uuid)
 {
     UUID uuid;
-    fail_unless(uuid.full_str() == "00000000-0000-0000-0000-000000000000",
-                "%s", uuid.full_str().c_str());
+    ck_assert_msg(uuid.full_str() == "00000000-0000-0000-0000-000000000000",
+                  "%s", uuid.full_str().c_str());
     for (size_t i = 0; i < 159; ++i)
     {
         UUID uuidrnd(0, 0);
@@ -37,15 +37,15 @@ START_TEST(test_uuid)
     UUID uuid1(0, 0);
     UUID uuid2(0, 0);
 
-    fail_unless(uuid1 < uuid2);
+    ck_assert(uuid1 < uuid2);
 
     // Verify that short UUID notation matches with first 8 chars
     // of full uuid string.
     std::string full(uuid1.full_str());
     std::ostringstream os;
     os << uuid1;
-    fail_unless(full.compare(0, 8, os.str()) == 0,
-                "%s != %s", full.c_str(), os.str().c_str());
+    ck_assert_msg(full.compare(0, 8, os.str()) == 0,
+                  "%s != %s", full.c_str(), os.str().c_str());
 
 }
 END_TEST
@@ -71,24 +71,24 @@ START_TEST(test_view)
     ViewId v6(V_REG,   uuid1, 2);
     ViewId v7(V_TRANS, uuid1, 2);
 
-    fail_unless(v1 < v2);
-    fail_unless(v2 < v3);
-    fail_unless(v3 < v4);
-    fail_unless(v4 < v5);
-    fail_unless(v5 < v6);
-    fail_unless(v6 < v7);
+    ck_assert(v1 < v2);
+    ck_assert(v2 < v3);
+    ck_assert(v3 < v4);
+    ck_assert(v4 < v5);
+    ck_assert(v5 < v6);
+    ck_assert(v6 < v7);
 
 
 
     ViewId vid;
-    fail_unless(vid.uuid() == UUID());
-    fail_unless(vid.seq() == 0);
+    ck_assert(vid.uuid() == UUID());
+    ck_assert(vid.seq() == 0);
 
     UUID uuid(0, 0);
 
     vid = ViewId(V_REG, uuid, 7);
-    fail_unless(vid.uuid() == uuid);
-    fail_unless(vid.seq() == 7);
+    ck_assert(vid.uuid() == uuid);
+    ck_assert(vid.seq() == 7);
 
 
     NodeList nl;
@@ -98,7 +98,7 @@ START_TEST(test_view)
         nl.insert(make_pair(UUID(0, 0), Node(0)));
     }
 
-    fail_unless(nl.size() == 7);
+    ck_assert(nl.size() == 7);
 
 }
 END_TEST

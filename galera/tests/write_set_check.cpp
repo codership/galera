@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2018 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2020 Codership Oy <info@codership.com>
  */
 
 #include "write_set.hpp"
@@ -104,17 +104,17 @@ START_TEST(test_key1)
     expected_size += gu::uleb128_size(expected_size);
 #endif
 
-    fail_unless(key.serial_size() == expected_size, "%ld <-> %ld",
-                key.serial_size(), expected_size);
+    ck_assert_msg(key.serial_size() == expected_size, "%ld <-> %ld",
+                  key.serial_size(), expected_size);
 
     KeyPartSequence kp(key.key_parts<KeyPartSequence>());
-    fail_unless(kp.size() == 4);
+    ck_assert(kp.size() == 4);
 
     gu::Buffer buf(key.serial_size());
     key.serialize(&buf[0], buf.size(), 0);
     KeyOS key2(1);
     key2.unserialize(&buf[0], buf.size(), 0);
-    fail_unless(key2 == key);
+    ck_assert(key2 == key);
 }
 END_TEST
 
@@ -156,17 +156,17 @@ START_TEST(test_key2)
     expected_size += gu::uleb128_size(expected_size);
 #endif
 
-    fail_unless(key.serial_size() == expected_size, "%ld <-> %ld",
-                key.serial_size(), expected_size);
+    ck_assert_msg(key.serial_size() == expected_size, "%ld <-> %ld",
+                  key.serial_size(), expected_size);
 
     KeyPartSequence kp(key.key_parts<KeyPartSequence>());
-    fail_unless(kp.size() == 4);
+    ck_assert(kp.size() == 4);
 
     gu::Buffer buf(key.serial_size());
     key.serialize(&buf[0], buf.size(), 0);
     KeyOS key2(2);
     key2.unserialize(&buf[0], buf.size(), 0);
-    fail_unless(key2 == key);
+    ck_assert(key2 == key);
 }
 END_TEST
 
@@ -214,14 +214,14 @@ START_TEST(test_write_set1)
         + 1 + 1 + 6 + 1 + 4 // key2
 #endif
         + 4 + 6; // rbr
-    fail_unless(buf.size() == expected_size, "%zd <-> %zd <-> %zd",
-                buf.size(), expected_size, ws.serial_size());
+    ck_assert_msg(buf.size() == expected_size, "%zd <-> %zd <-> %zd",
+                  buf.size(), expected_size, ws.serial_size());
 
 
     WriteSet ws2(0);
 
     size_t ret = ws2.unserialize(&buf[0], buf.size(), 0);
-    fail_unless(ret == expected_size);
+    ck_assert(ret == expected_size);
 
     WriteSet::KeySequence rks;
     ws.get_keys(rks);
@@ -229,9 +229,9 @@ START_TEST(test_write_set1)
     WriteSet::KeySequence rks2;
     ws.get_keys(rks2);
 
-    fail_unless(rks2 == rks);
+    ck_assert(rks2 == rks);
 
-    fail_unless(ws2.get_data() == ws.get_data());
+    ck_assert(ws2.get_data() == ws.get_data());
 
 }
 END_TEST
@@ -280,14 +280,14 @@ START_TEST(test_write_set2)
         + 1 + 1 + 6 + 1 + 4 // key2
 #endif
         + 4 + 6; // rbr
-    fail_unless(buf.size() == expected_size, "%zd <-> %zd <-> %zd",
-                buf.size(), expected_size, ws.serial_size());
+    ck_assert_msg(buf.size() == expected_size, "%zd <-> %zd <-> %zd",
+                  buf.size(), expected_size, ws.serial_size());
 
 
     WriteSet ws2(2);
 
     size_t ret = ws2.unserialize(&buf[0], buf.size(), 0);
-    fail_unless(ret == expected_size);
+    ck_assert(ret == expected_size);
 
     WriteSet::KeySequence rks;
     ws.get_keys(rks);
@@ -295,9 +295,9 @@ START_TEST(test_write_set2)
     WriteSet::KeySequence rks2;
     ws2.get_keys(rks2);
 
-    fail_unless(rks2 == rks);
+    ck_assert(rks2 == rks);
 
-    fail_unless(ws2.get_data() == ws.get_data());
+    ck_assert(ws2.get_data() == ws.get_data());
 
 }
 END_TEST
@@ -317,7 +317,7 @@ START_TEST(test_mapped_buffer)
     mb.resize(1 << 8);
     for (size_t i = 0; i < 16; ++i)
     {
-        fail_unless(mb[i] == static_cast<gu::byte_t>(i));
+        ck_assert(mb[i] == static_cast<gu::byte_t>(i));
     }
 
     for (size_t i = 16; i < (1 << 8); ++i)
@@ -329,7 +329,7 @@ START_TEST(test_mapped_buffer)
 
     for (size_t i = 0; i < (1 << 8); ++i)
     {
-        fail_unless(mb[i] == static_cast<gu::byte_t>(i));
+        ck_assert(mb[i] == static_cast<gu::byte_t>(i));
     }
 
     for (size_t i = 0; i < (1 << 20); ++i)
@@ -437,12 +437,12 @@ START_TEST(test_cert_hierarchical_v1)
 
         trx->set_received(0, wsi[i].local_seqno, wsi[i].global_seqno);
         Certification::TestResult result(cert.append_trx(trx));
-        fail_unless(result == wsi[i].result, "wsi: %zu, g: %lld r: %d er: %d",
-                    i, trx->global_seqno(), result, wsi[i].result);
-        fail_unless(trx->depends_seqno() == wsi[i].expected_depends_seqno,
-                    "wsi: %zu g: %lld ld: %lld eld: %lld",
-                    i, trx->global_seqno(), trx->depends_seqno(),
-                    wsi[i].expected_depends_seqno);
+        ck_assert_msg(result == wsi[i].result, "wsi: %zu, g: %lld r: %d er: %d",
+                      i, trx->global_seqno(), result, wsi[i].result);
+        ck_assert_msg(trx->depends_seqno() == wsi[i].expected_depends_seqno,
+                      "wsi: %zu g: %lld ld: %lld eld: %lld",
+                      i, trx->global_seqno(), trx->depends_seqno(),
+                      wsi[i].expected_depends_seqno);
         cert.set_trx_committed(trx);
         trx->unref();
     }
@@ -561,12 +561,12 @@ START_TEST(test_cert_hierarchical_v2)
 
         trx->set_received(0, wsi[i].local_seqno, wsi[i].global_seqno);
         Certification::TestResult result(cert.append_trx(trx));
-        fail_unless(result == wsi[i].result, "g: %lld res: %d exp: %d",
-                    trx->global_seqno(), result, wsi[i].result);
-        fail_unless(trx->depends_seqno() == wsi[i].expected_depends_seqno,
-                    "wsi: %zu g: %lld ld: %lld eld: %lld",
-                    i, trx->global_seqno(), trx->depends_seqno(),
-                    wsi[i].expected_depends_seqno);
+        ck_assert_msg(result == wsi[i].result, "g: %lld res: %d exp: %d",
+                      trx->global_seqno(), result, wsi[i].result);
+        ck_assert_msg(trx->depends_seqno() == wsi[i].expected_depends_seqno,
+                      "wsi: %zu g: %lld ld: %lld eld: %lld",
+                      i, trx->global_seqno(), trx->depends_seqno(),
+                      wsi[i].expected_depends_seqno);
         cert.set_trx_committed(trx);
         trx->unref();
     }
@@ -613,7 +613,7 @@ START_TEST(test_trac_726)
 
         trx->set_received(0, 1, 1);
         Certification::TestResult result(cert.append_trx(trx));
-        fail_unless(result == Certification::TEST_OK);
+        ck_assert(result == Certification::TEST_OK);
         cert.set_trx_committed(trx);
         trx->unref();
     }
@@ -639,7 +639,7 @@ START_TEST(test_trac_726)
 
         trx->set_received(0, 2, 2);
         Certification::TestResult result(cert.append_trx(trx));
-        fail_unless(result == Certification::TEST_FAILED);
+        ck_assert(result == Certification::TEST_FAILED);
         cert.set_trx_committed(trx);
         trx->unref();
     }

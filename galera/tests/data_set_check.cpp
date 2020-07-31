@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Codership Oy <info@codership.com>
+/* Copyright (C) 2013-2020 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -77,7 +77,7 @@ public:
 private:
 
     size_t const            size_;
-    const void* const buf_;
+    const void* const       buf_;
     const char* const       str_;
     bool const              own_;
 
@@ -135,30 +135,30 @@ static void test_ver(gu::RecordSet::Version const rsv)
 
     // this should be allocated inside current page
     offset += dset_out.append (rout0.buf(), rout0.serial_size(), true);
-    fail_if (dset_out.size() != offset,
-             "expected: %zu, got %zu", offset, dset_out.size());
+    ck_assert_msg(dset_out.size() == offset,
+                  "expected: %zu, got %zu", offset, dset_out.size());
 
     // this should trigger new page since not stored
     offset += dset_out.append (rout1.buf(), rout1.serial_size(), false);
-    fail_if (dset_out.size() != offset);
+    ck_assert(dset_out.size() == offset);
 
     // this should trigger new page since previous one was not stored
     offset += dset_out.append (rout2.buf(), rout2.serial_size(), true);
-    fail_if (dset_out.size() != offset);
+    ck_assert(dset_out.size() == offset);
 
     // this should trigger a new page, since not stored
     offset += dset_out.append (rout3.buf(), rout3.serial_size(), false);
-    fail_if (dset_out.size() != offset);
+    ck_assert(dset_out.size() == offset);
 
     // this should trigger new page, because won't fit in the current page
     offset += dset_out.append (rout4.buf(), rout4.serial_size(), true);
-    fail_if (dset_out.size() != offset);
+    ck_assert(dset_out.size() == offset);
 
     // this should trigger new page, because 4MB RAM limit exceeded
     offset += dset_out.append (rout5.buf(), rout5.serial_size(), false);
-    fail_if (dset_out.size() != offset);
+    ck_assert(dset_out.size() == offset);
 
-    fail_if (1 != size_t(dset_out.count()));
+    ck_assert(1 == size_t(dset_out.count()));
 
     DataSetOut::GatherVector out_bufs;
     out_bufs().reserve (dset_out.page_count());
@@ -171,14 +171,14 @@ static void test_ver(gu::RecordSet::Version const rsv)
     }
 
     size_t const out_size (dset_out.gather (out_bufs));
-    fail_if(out_size % alignment, "out size %zu not aligned by %d",
-            out_size,  alignment);
+    ck_assert_msg(0 == out_size % alignment, "out size %zu not aligned by %d",
+                  out_size,  alignment);
 
-    fail_if (out_size <= min_out_size || out_size > offset);
-    fail_if (out_bufs->size() > size_t(dset_out.page_count()) ||
-             out_bufs->size() < size_t(dset_out.page_count() - padding_page),
-             "Expected %zu buffers, got: %zd",
-             dset_out.page_count(), out_bufs->size());
+    ck_assert(out_size > min_out_size && out_size <= offset);
+    ck_assert_msg(out_bufs->size() <= size_t(dset_out.page_count()) &&
+                  out_bufs->size() >= size_t(dset_out.page_count() - padding_page),
+                  "Expected %zu buffers, got: %zd",
+                  dset_out.page_count(), out_bufs->size());
 
     /* concatenate all buffers into one */
     std::vector<gu::byte_t> in_buf;
@@ -186,7 +186,7 @@ static void test_ver(gu::RecordSet::Version const rsv)
     mark_point();
     for (size_t i = 0; i < out_bufs->size(); ++i)
     {
-        fail_if (0 == out_bufs[i].ptr);
+        ck_assert(0 != out_bufs[i].ptr);
 
         log_info << "\nadding buf " << i << ": "
                  << gu::Hexdump(out_bufs[i].ptr,
@@ -198,12 +198,12 @@ static void test_ver(gu::RecordSet::Version const rsv)
             (reinterpret_cast<const gu::byte_t*>(out_bufs[i].ptr));
         in_buf.insert (in_buf.end(), ptr, ptr + out_bufs[i].size);
 
-        fail_if (old_size + out_bufs[i].size != in_buf.size());
+        ck_assert(old_size + out_bufs[i].size == in_buf.size());
     }
 
-    fail_if (in_buf.size() != out_size,
-             "Sent buf size: %zu, recvd buf size: %zu",
-             out_size, in_buf.size());
+    ck_assert_msg(in_buf.size() == out_size,
+                  "Sent buf size: %zu, recvd buf size: %zu",
+                  out_size, in_buf.size());
 
     log_info << "Resulting DataSet buffer:\n"
              << gu::Hexdump(in_buf.data(), 32, false) << '\n'
@@ -212,31 +212,33 @@ static void test_ver(gu::RecordSet::Version const rsv)
     galera::DataSetIn const dset_in(dset_out.version(),
                                     in_buf.data(), in_buf.size());
 
-    fail_if (dset_in.size()  != dset_out.size());
-    fail_if (dset_in.count() != dset_out.count());
+    ck_assert(dset_in.size()  == dset_out.size());
+    ck_assert(dset_in.count() == dset_out.count());
     try { dset_in.checksum(); }
-    catch(gu::Exception& e) { fail(e.what()); }
+    catch(gu::Exception& e) { ck_abort_msg(e.what()); }
 
     for (ssize_t i = 0; i < dset_in.count(); ++i)
     {
         gu::Buf data = dset_in.next();
         TestRecord const rin(data.ptr, data.size);
-        fail_if (rin != *records[i], "Record %d failed: expected %s, found %s",
-                 i, records[i]->c_str(), rin.c_str());
+        ck_assert_msg(rin == *records[i],
+                      "Record %d failed: expected %s, found %s",
+                      i, records[i]->c_str(), rin.c_str());
     }
 
     galera::DataSetIn dset_in_empty;
     dset_in_empty.init(dset_out.version(), in_buf.data(), in_buf.size());
 
-    fail_if (dset_in_empty.size()  != dset_out.size());
-    fail_if (dset_in_empty.count() != dset_out.count());
+    ck_assert(dset_in_empty.size()  == dset_out.size());
+    ck_assert(dset_in_empty.count() == dset_out.count());
 
     for (ssize_t i = 0; i < dset_in_empty.count(); ++i)
     {
         gu::Buf data = dset_in_empty.next();
         TestRecord const rin(data.ptr, data.size);
-        fail_if (rin != *records[i], "Record %d failed: expected %s, found %s",
-                 i, records[i]->c_str(), rin.c_str());
+        ck_assert_msg(rin == *records[i],
+                      "Record %d failed: expected %s, found %s",
+                      i, records[i]->c_str(), rin.c_str());
     }
 }
 

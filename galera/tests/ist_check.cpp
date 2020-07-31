@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2017 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2020 Codership Oy <info@codership.com>
 //
 
 
@@ -26,11 +26,11 @@ START_TEST(test_ist_message)
 
 #if 0 /* This is a check for the old (broken) format */
 #if GU_WORDSIZE == 32
-    fail_unless(serial_size(m3) == 20, "serial size %zu != 20",
-                serial_size(m3));
+    ck_assert_msg(serial_size(m3) == 20, "serial size %zu != 20",
+                  serial_size(m3));
 #elif GU_WORDSIZE == 64
-    fail_unless(serial_size(m3) == 24, "serial size %zu != 24",
-                serial_size(m3));
+    ck_assert_msg(serial_size(m3) == 24, "serial size %zu != 24",
+                  serial_size(m3));
 #endif
 #endif /* 0 */
 
@@ -39,14 +39,14 @@ START_TEST(test_ist_message)
     Message mu3(3);
     mu3.unserialize(&buf[0], buf.size(), 0);
 
-    fail_unless(mu3.version() == 3);
-    fail_unless(mu3.type()    == Message::T_HANDSHAKE);
-    fail_unless(mu3.flags()   == 0x2);
-    fail_unless(mu3.ctrl()    == 3);
-    fail_unless(mu3.len()     == 1001);
+    ck_assert(mu3.version() == 3);
+    ck_assert(mu3.type()    == Message::T_HANDSHAKE);
+    ck_assert(mu3.flags()   == 0x2);
+    ck_assert(mu3.ctrl()    == 3);
+    ck_assert(mu3.len()     == 1001);
 
     Message m4(4, Message::T_HANDSHAKE, 0x2, 3, 1001);
-    fail_unless(m4.serial_size() == 12);
+    ck_assert(m4.serial_size() == 12);
 
     buf.clear();
     buf.resize(m4.serial_size());
@@ -54,11 +54,11 @@ START_TEST(test_ist_message)
 
     Message mu4(4);
     mu4.unserialize(&buf[0], buf.size(), 0);
-    fail_unless(mu4.version() == 4);
-    fail_unless(mu4.type()    == Message::T_HANDSHAKE);
-    fail_unless(mu4.flags()   == 0x2);
-    fail_unless(mu4.ctrl()    == 3);
-    fail_unless(mu4.len()     == 1001);
+    ck_assert(mu4.version() == 4);
+    ck_assert(mu4.type()    == Message::T_HANDSHAKE);
+    ck_assert(mu4.flags()   == 0x2);
+    ck_assert(mu4.ctrl()    == 3);
+    ck_assert(mu4.len()     == 1001);
 }
 END_TEST
 
@@ -235,7 +235,7 @@ static int select_trx_version(int protocol_version)
     case 5:
         return 3;
     }
-    fail("unknown protocol version %i", protocol_version);
+    ck_abort_msg("unknown protocol version %i", protocol_version);
     return -1;
 }
 

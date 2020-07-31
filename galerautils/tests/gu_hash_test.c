@@ -1,4 +1,4 @@
-// Copyright (C) 2012 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2020 Codership Oy <info@codership.com>
 
 /*
  * This unit test is mostly to check that Galera hash definitions didn't change:
@@ -62,20 +62,20 @@ START_TEST (gu_hash_test)
 
     uint8_t res128[16];
     gu_hash_get128 (&h, res128);
-    fail_if (check (gu_hash128_check, res128, sizeof(res128)),
-             "gu_hash_get128() failed.");
+    ck_assert_msg(!check(gu_hash128_check, res128, sizeof(res128)),
+                  "gu_hash_get128() failed.");
 
     uint64_t res64 = gu_hash_get64(&h);
-    fail_if (gu_hash64(test_msg, GU_HASH_TEST_LENGTH) != res64);
+    ck_assert(gu_hash64(test_msg, GU_HASH_TEST_LENGTH) == res64);
     res64 = gu_le64(res64);
-    fail_if (check (gu_hash64_check, &res64, sizeof(res64)),
-             "gu_hash_get64() failed.");
+    ck_assert_msg(!check(gu_hash64_check, &res64, sizeof(res64)),
+                  "gu_hash_get64() failed.");
 
     uint32_t res32 = gu_hash_get32(&h);
-    fail_if (gu_hash32(test_msg, GU_HASH_TEST_LENGTH) != res32);
+    ck_assert(gu_hash32(test_msg, GU_HASH_TEST_LENGTH) == res32);
     res32 = gu_le32(res32);
-    fail_if (check (gu_hash32_check, &res32, sizeof(res32)),
-             "gu_hash_get32() failed.");
+    ck_assert_msg(!check(gu_hash32_check, &res32, sizeof(res32)),
+                  "gu_hash_get32() failed.");
 }
 END_TEST
 
@@ -124,56 +124,56 @@ START_TEST (gu_fast_hash_test)
     uint8_t res128[16];
 
     gu_fast_hash128 (test_msg, 0, res128);
-    fail_if (check (fast_hash128_check0, res128, sizeof(res128)));
+    ck_assert(!check(fast_hash128_check0, res128, sizeof(res128)));
 
     gu_fast_hash128 (test_msg, 511, res128);
-    fail_if (check (fast_hash128_check511, res128, sizeof(res128)));
+    ck_assert(!check(fast_hash128_check511, res128, sizeof(res128)));
 
     gu_fast_hash128 (test_msg, 512, res128);
-    fail_if (check (fast_hash128_check512, res128, sizeof(res128)));
+    ck_assert(!check(fast_hash128_check512, res128, sizeof(res128)));
 
     gu_fast_hash128 (test_msg, 2011, res128);
-    fail_if (check (fast_hash128_check2011, res128, sizeof(res128)));
+    ck_assert(!check(fast_hash128_check2011, res128, sizeof(res128)));
 
     uint64_t res64;
 
     res64 = gu_fast_hash64 (test_msg, 0); res64 = gu_le64(res64);
-    fail_if (check (fast_hash64_check0, &res64, sizeof(res64)));
+    ck_assert(!check(fast_hash64_check0, &res64, sizeof(res64)));
 
     res64 = gu_fast_hash64 (test_msg, 15); res64 = gu_le64(res64);
-    fail_if (check (fast_hash64_check15, &res64, sizeof(res64)));
+    ck_assert(!check(fast_hash64_check15, &res64, sizeof(res64)));
 
     res64 = gu_fast_hash64 (test_msg, 16); res64 = gu_le64(res64);
-    fail_if (check (fast_hash64_check16, &res64, sizeof(res64)));
+    ck_assert(!check(fast_hash64_check16, &res64, sizeof(res64)));
 
     res64 = gu_fast_hash64 (test_msg, 511); res64 = gu_le64(res64);
-    fail_if (check (fast_hash64_check511, &res64, sizeof(res64)));
+    ck_assert(!check(fast_hash64_check511, &res64, sizeof(res64)));
 
     res64 = gu_fast_hash64 (test_msg, 512); res64 = gu_le64(res64);
-    fail_if (check (fast_hash64_check512, &res64, sizeof(res64)));
+    ck_assert(!check(fast_hash64_check512, &res64, sizeof(res64)));
 
     res64 = gu_fast_hash64 (test_msg, 2011); res64 = gu_le64(res64);
-    fail_if (check (fast_hash64_check2011, &res64, sizeof(res64)));
+    ck_assert(!check(fast_hash64_check2011, &res64, sizeof(res64)));
 
     uint32_t res32;
 
     res32 = gu_fast_hash32 (test_msg, 0); res32 = gu_le32(res32);
-    fail_if (check (fast_hash32_check0, &res32, sizeof(res32)));
+    ck_assert(!check(fast_hash32_check0, &res32, sizeof(res32)));
 
     res32 = gu_fast_hash32 (test_msg, 31); res32 = gu_le32(res32);
-    fail_if (check (fast_hash32_check31, &res32, sizeof(res32)));
+    ck_assert(!check(fast_hash32_check31, &res32, sizeof(res32)));
 
     res32 = gu_fast_hash32 (test_msg, 32); res32 = gu_le32(res32);
-    fail_if (check (fast_hash32_check32, &res32, sizeof(res32)));
+    ck_assert(!check(fast_hash32_check32, &res32, sizeof(res32)));
 
     res32 = gu_fast_hash32 (test_msg, 511); res32 = gu_le32(res32);
-    fail_if (check (fast_hash32_check511, &res32, sizeof(res32)));
+    ck_assert(!check(fast_hash32_check511, &res32, sizeof(res32)));
 
     res32 = gu_fast_hash32 (test_msg, 512); res32 = gu_le32(res32);
-    fail_if (check (fast_hash32_check512, &res32, sizeof(res32)));
+    ck_assert(!check(fast_hash32_check512, &res32, sizeof(res32)));
 
     res32 = gu_fast_hash32 (test_msg, 2011); res32 = gu_le32(res32);
-    fail_if (check (fast_hash32_check2011, &res32, sizeof(res32)));
+    ck_assert(!check(fast_hash32_check2011, &res32, sizeof(res32)));
 }
 END_TEST
 
@@ -187,25 +187,25 @@ START_TEST (gu_table_hash_test)
 {
     size_t res;
 
-    fail_if (sizeof(res) > 8);
+    ck_assert(sizeof(res) <= 8);
 
     res = gu_table_hash (test_msg, 0); res = gu_le64(res);
-    fail_if (check (fast_hash64_check0, &res, sizeof(res)));
+    ck_assert(!check(fast_hash64_check0, &res, sizeof(res)));
 
     res = gu_table_hash (test_msg, 15); res = gu_le64(res);
-    fail_if (check (fast_hash64_check15, &res, sizeof(res)));
+    ck_assert(!check(fast_hash64_check15, &res, sizeof(res)));
 
     res = gu_table_hash (test_msg, 16); res = gu_le64(res);
-    fail_if (check (fast_hash64_check16, &res, sizeof(res)));
+    ck_assert(!check(fast_hash64_check16, &res, sizeof(res)));
 
     res = gu_table_hash (test_msg, 511); res = gu_le64(res);
-    fail_if (check (fast_hash64_check511, &res, sizeof(res)));
+    ck_assert(!check(fast_hash64_check511, &res, sizeof(res)));
 
     res = gu_table_hash (test_msg, 512); res = gu_le64(res);
-    fail_if (check (fast_hash64_check512, &res, sizeof(res)));
+    ck_assert(!check(fast_hash64_check512, &res, sizeof(res)));
 
     res = gu_table_hash (test_msg, 2011); res = gu_le64(res);
-    fail_if (check (fast_hash64_check2011, &res, sizeof(res)));
+    ck_assert(!check(fast_hash64_check2011, &res, sizeof(res)));
 }
 END_TEST
 
@@ -219,16 +219,16 @@ START_TEST (gu_table_hash_test)
 {
     size_t res;
 
-    fail_if (sizeof(res) > 4);
+    ck_assert(sizeof(res) <= 4);
 
     res = gu_table_hash (test_msg, 0); res = gu_le32(res);
-    fail_if (check (table_hash32_check0, &res, sizeof(res)));
+    ck_assert(!check(table_hash32_check0, &res, sizeof(res)));
 
     res = gu_table_hash (test_msg, 32); res = gu_le32(res);
-    fail_if (check (table_hash32_check32, &res, sizeof(res)));
+    ck_assert(!check(table_hash32_check32, &res, sizeof(res)));
 
     res = gu_table_hash (test_msg, 2011); res = gu_le32(res);
-    fail_if (check (table_hash32_check2011, &res, sizeof(res)));
+    ck_assert(!check(table_hash32_check2011, &res, sizeof(res)));
 }
 END_TEST
 

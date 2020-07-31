@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2011-2020 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -42,30 +42,30 @@ deliver_component_msg (struct group* group, bool prim)
             for (j = 0; j < group->nodes_num; j++) {
                 const struct node* const node = group->nodes[j];
                 long ret = gcs_comp_msg_add (msg, node->id, j);
-                fail_if (j != ret, "Failed to add %d member: %ld (%s)",
-                         j, ret, strerror(-ret));
+                ck_assert_msg(j == ret, "Failed to add %d member: %ld (%s)",
+                              j, ret, strerror(-ret));
             }
 
             /* check component message */
-            fail_if (i != gcs_comp_msg_self(msg));
-            fail_if (group->nodes_num != gcs_comp_msg_num(msg));
+            ck_assert(i == gcs_comp_msg_self(msg));
+            ck_assert(group->nodes_num == gcs_comp_msg_num(msg));
             for (j = 0; j < group->nodes_num; j++) {
                 const char* const src_id = group->nodes[j]->id;
                 const char* const dst_id = gcs_comp_msg_member(msg, j)->id;
-                fail_if (strcmp(src_id, dst_id),
-                         "%d node id %s, recorded in comp msg as %s",
-                         j, src_id, dst_id);
+                ck_assert_msg(!strcmp(src_id, dst_id),
+                              "%d node id %s, recorded in comp msg as %s",
+                              j, src_id, dst_id);
 //                gcs_segment_t const src_seg = group->nodes[j]->segment;
                 gcs_segment_t const dst_seg = gcs_comp_msg_member(msg, j)->segment;
-                fail_if (j != dst_seg,
-                         "%d node segment %d, recorded in comp msg as %d",
-                         j, j, (int)dst_seg);
+                ck_assert_msg(j == dst_seg,
+                              "%d node segment %d, recorded in comp msg as %d",
+                              j, j, (int)dst_seg);
             }
 
             gcs_group_state_t ret =
                 gcs_group_handle_comp_msg (&(group->nodes[i]->group), msg);
 
-            fail_if (ret != GCS_GROUP_WAIT_STATE_UUID);
+            ck_assert(ret == GCS_GROUP_WAIT_STATE_UUID);
 
             gcs_comp_msg_delete (msg);
 
@@ -73,9 +73,9 @@ deliver_component_msg (struct group* group, bool prim)
             for (j = 0; j < group->nodes_num; j++) {
                 const char* src_id = group->nodes[j]->id;
                 const char* dst_id = group->nodes[i]->group.nodes[j].id;
-                fail_if (strcmp(src_id, dst_id),
-                         "%d node id %s, recorded at node %d as %s",
-                         j, src_id, i, dst_id);
+                ck_assert_msg(!strcmp(src_id, dst_id),
+                              "%d node id %s, recorded at node %d as %s",
+                              j, src_id, i, dst_id);
             }
         }
         else {
@@ -112,9 +112,9 @@ perform_state_exchange (struct group* group)
     int i;
     for (i = 0; i < group->nodes_num; i++) {
         state = gcs_group_handle_uuid_msg (&(group->nodes[i]->group),&uuid_msg);
-        fail_if (state != GCS_GROUP_WAIT_STATE_MSG,
-                 "Wrong group state after STATE_UUID message. "
-                 "Expected: %d, got: %d", GCS_GROUP_WAIT_STATE_MSG, state);
+        ck_assert_msg(state == GCS_GROUP_WAIT_STATE_MSG,
+                      "Wrong group state after STATE_UUID message. "
+                      "Expected: %d, got: %d", GCS_GROUP_WAIT_STATE_MSG, state);
     }
 
     /* complete state message exchange */
@@ -123,7 +123,7 @@ perform_state_exchange (struct group* group)
         /* create state message from node i */
         gcs_state_msg_t* state =
             gcs_group_get_state (&(group->nodes[i]->group));
-        fail_if (NULL == state);
+        ck_assert(NULL != state);
 
         ssize_t state_len = gcs_state_msg_len (state);
         uint8_t state_buf[state_len];
@@ -143,14 +143,14 @@ perform_state_exchange (struct group* group)
                                             &state_msg);
 
             if (group->nodes_num - 1 == i) { // a message from the last node
-                fail_if (ret != GCS_GROUP_PRIMARY,
-                         "Handling state msg failed: sender %d, receiver %d",
-                         i, j);
+                ck_assert_msg(ret == GCS_GROUP_PRIMARY,
+                              "Handling state msg failed: sender %d, "
+                              "receiver %d", i, j);
             }
             else {
-                fail_if (ret != GCS_GROUP_WAIT_STATE_MSG,
-                         "Handling state msg failed: sender %d, receiver %d",
-                         i, j);
+                ck_assert_msg(ret == GCS_GROUP_WAIT_STATE_MSG,
+                              "Handling state msg failed: sender %d, "
+                              "receiver %d", i, j);
             }
         }
 
@@ -178,22 +178,22 @@ group_add_node (struct group* group, struct node* node, bool new_id)
     for (i = 0; i < group->nodes_num; i++) {
         int j;
         for (j = i+1; j < group->nodes_num; j++) {
-            fail_if (!strcmp (group->nodes[i]->id, group->nodes[j]->id),
-                     "%d (%p) and %d (%p) have the same id: %s/%s",
-                     i, group->nodes[i], j,group->nodes[j],
-                     group->nodes[i]->id, group->nodes[j]->id);
+            ck_assert_msg(strcmp(group->nodes[i]->id, group->nodes[j]->id),
+                          "%d (%p) and %d (%p) have the same id: %s/%s",
+                          i, group->nodes[i], j,group->nodes[j],
+                          group->nodes[i]->id, group->nodes[j]->id);
         }
     }
 
     /* deliver new component message to all nodes */
     long ret = deliver_component_msg (group, true);
-    fail_if (ret != 0, "Component message delivery failed: %d (%s)",
-             ret, strerror(-ret));
+    ck_assert_msg(ret == 0, "Component message delivery failed: %d (%s)",
+                  ret, strerror(-ret));
 
     /* deliver state exchange uuid */
     ret = perform_state_exchange (group);
-    fail_if (ret != 0, "State exchange failed: %d (%s)",
-             ret, strerror(-ret));
+    ck_assert_msg(ret == 0, "State exchange failed: %d (%s)",
+                  ret, strerror(-ret));
 
     return 0;
 }
@@ -246,32 +246,32 @@ deliver_join_sync_msg (struct group* const group, int const src,
             ret = gcs_group_handle_join_msg(gr, &msg);
             mark_point();
             if (i == src) {
-                fail_if (ret != 1,
-                         "%d failed to handle own JOIN message: %d (%s)",
-                         i, ret, strerror (-ret));
+                ck_assert_msg(ret == 1,
+                              "%d failed to handle own JOIN message: %d (%s)",
+                              i, ret, strerror (-ret));
             }
             else {
-                fail_if (ret != 0,
-                         "%d failed to handle other JOIN message: %d (%s)",
-                         i, ret, strerror (-ret));
+                ck_assert_msg(ret == 0,
+                              "%d failed to handle other JOIN message: %d (%s)",
+                              i, ret, strerror (-ret));
             }
             break;
         case GCS_MSG_SYNC:
             ret = gcs_group_handle_sync_msg(gr, &msg);
             if (i == src) {
-                fail_if (ret != 1 &&
-                         gr->nodes[src].status == GCS_NODE_STATE_JOINED,
-                         "%d failed to handle own SYNC message: %d (%s)",
-                         i, ret, strerror (-ret));
+                ck_assert_msg(ret == 1 ||
+                              gr->nodes[src].status != GCS_NODE_STATE_JOINED,
+                              "%d failed to handle own SYNC message: %d (%s)",
+                              i, ret, strerror (-ret));
             }
             else {
-                fail_if (ret != 0,
-                         "%d failed to handle other SYNC message: %d (%s)",
-                         i, ret, strerror (-ret));
+                ck_assert_msg(ret == 0,
+                              "%d failed to handle other SYNC message: %d (%s)",
+                              i, ret, strerror (-ret));
             }
             break;
         default:
-            fail ("wrong message type: %d", type);
+            ck_abort_msg("wrong message type: %d", type);
         }
     }
 
@@ -310,7 +310,7 @@ group_sst_start (struct group* group, int const src_idx, const char* donor)
     {
         // sst request is expected to be dynamically allocated
         char* req_buf = (char*)malloc (req_len);
-        fail_if (NULL == req_buf);
+        ck_assert_msg(NULL != req_buf);
         sprintf (req_buf, "%s", donor);
 
         struct gcs_act_rcvd req(
@@ -330,52 +330,54 @@ group_sst_start (struct group* group, int const src_idx, const char* donor)
         }
 
         if (i == src_idx) {
-            fail_if (ret != req_len);
+            ck_assert_msg(ret == req_len);
             free (req_buf); // passed to joiner
         }
         else {
             if (ret > 0) {
                 if (donor_idx < 0) {
-                    fail_if (req.id != i);
+                    ck_assert_msg(req.id == i);
                     donor_idx = i;
                     free (req_buf); // passed to donor
                 }
                 else {
-                    fail ("More than one donor selected: %d, first donor: %d",
-                          i, donor_idx);
+                    ck_abort_msg("More than one donor selected: %d, first "
+                                 "donor: %d", i, donor_idx);
                 }
             }
         }
     }
 
-    fail_if (donor_idx < 0, "Failed to select donor");
+    ck_assert_msg(donor_idx >= 0, "Failed to select donor");
 
     for (i = 0; i < group->nodes_num; i++) {
         gcs_group_t* const gr = &group->nodes[i]->group;
         gcs_node_t* const donor = &gr->nodes[donor_idx];
         gcs_node_state_t state = donor->status;
-        fail_if (state != GCS_NODE_STATE_DONOR, "%d is not donor at %d",
-                 donor_idx, i);
+        ck_assert_msg(state == GCS_NODE_STATE_DONOR, "%d is not donor at %d",
+                      donor_idx, i);
         int dc = donor->desync_count;
-        fail_if (dc < 1, "donor %d at %d has desync_count %d", donor_idx, i,dc);
+        ck_assert_msg(dc >= 1, "donor %d at %d has desync_count %d",
+                      donor_idx, i, dc);
 
         gcs_node_t* const joiner = &gr->nodes[src_idx];
         state = joiner->status;
-        fail_if (state != GCS_NODE_STATE_JOINER, "%d is not joiner at %d",
-                 src_idx, i);
+        ck_assert_msg(state == GCS_NODE_STATE_JOINER, "%d is not joiner at %d",
+                      src_idx, i);
         dc = joiner->desync_count;
-        fail_if (dc != 0, "joiner %d at %d has desync_count %d",donor_idx,i,dc);
+        ck_assert_msg(dc == 0, "joiner %d at %d has desync_count %d",
+                      donor_idx, i, dc);
 
         /* check that donor and joiner point at each other */
-        fail_if (memcmp (gr->nodes[donor_idx].joiner, gr->nodes[src_idx].id,
-                         GCS_COMP_MEMB_ID_MAX_LEN+1),
-                 "Donor points at wrong joiner: expected %s, got %s",
-                 gr->nodes[src_idx].id, gr->nodes[donor_idx].joiner);
+        ck_assert_msg(!memcmp(gr->nodes[donor_idx].joiner,gr->nodes[src_idx].id,
+                              GCS_COMP_MEMB_ID_MAX_LEN+1),
+                      "Donor points at wrong joiner: expected %s, got %s",
+                      gr->nodes[src_idx].id, gr->nodes[donor_idx].joiner);
 
-        fail_if (memcmp (gr->nodes[src_idx].donor, gr->nodes[donor_idx].id,
-                         GCS_COMP_MEMB_ID_MAX_LEN+1),
-                 "Joiner points at wrong donor: expected %s, got %s",
-                 gr->nodes[donor_idx].id, gr->nodes[src_idx].donor);
+        ck_assert_msg(!memcmp(gr->nodes[src_idx].donor, gr->nodes[donor_idx].id,
+                              GCS_COMP_MEMB_ID_MAX_LEN+1),
+                      "Joiner points at wrong donor: expected %s, got %s",
+                      gr->nodes[donor_idx].id, gr->nodes[src_idx].donor);
     }
 
     return 0;
@@ -406,64 +408,65 @@ START_TEST(gcs_memb_test_465)
 
     // bootstrap the cluster
     group_add_node (&group, &nodes[0], true);
-    fail_if (nodes[0].group.state != GCS_GROUP_PRIMARY);
+    ck_assert(nodes[0].group.state == GCS_GROUP_PRIMARY);
     node_state = get_node_state (&nodes[0]);
-    fail_if (node_state != GCS_NODE_STATE_JOINED);
+    ck_assert(node_state == GCS_NODE_STATE_JOINED);
 
     deliver_join_sync_msg (&group, 0, GCS_MSG_SYNC);
     node_state = get_node_state (&nodes[0]);
-    fail_if (node_state != GCS_NODE_STATE_SYNCED);
+    ck_assert(node_state == GCS_NODE_STATE_SYNCED);
 
     group_add_node (&group, &nodes[1], true);
-    fail_if (nodes[1].group.state != GCS_GROUP_PRIMARY);
+    ck_assert(nodes[1].group.state == GCS_GROUP_PRIMARY);
     node_state = get_node_state (&nodes[1]);
-    fail_if (node_state != GCS_NODE_STATE_PRIM); // need sst
+    ck_assert(node_state == GCS_NODE_STATE_PRIM); // need sst
 
     group_add_node (&group, &nodes[2], true);
-    fail_if (nodes[2].group.state != GCS_GROUP_PRIMARY);
+    ck_assert(nodes[2].group.state == GCS_GROUP_PRIMARY);
     node_state = get_node_state (&nodes[2]);
-    fail_if (node_state != GCS_NODE_STATE_PRIM); // need sst
+    ck_assert(node_state == GCS_NODE_STATE_PRIM); // need sst
 
-    fail_if (verify_node_state_across_group (&group, 0, GCS_NODE_STATE_SYNCED));
+    ck_assert(!verify_node_state_across_group(&group, 0,GCS_NODE_STATE_SYNCED));
 
     group_sst_start (&group, 2, nodes[0].group.nodes[0].name);
     mark_point();
     deliver_join_sync_msg (&group, 0, GCS_MSG_JOIN); // end of donor SST
     deliver_join_sync_msg (&group, 0, GCS_MSG_SYNC); // donor synced
     deliver_join_sync_msg (&group, 2, GCS_MSG_SYNC); // joiner can't sync
-    fail_if (verify_node_state_across_group (&group, 2, GCS_NODE_STATE_JOINER));
+    ck_assert(!verify_node_state_across_group(&group, 2,GCS_NODE_STATE_JOINER));
     deliver_join_sync_msg (&group, 2, GCS_MSG_JOIN); // end of joiner SST
     deliver_join_sync_msg (&group, 2, GCS_MSG_SYNC); // joiner synced
 
-    fail_if (verify_node_state_across_group (&group, 0, GCS_NODE_STATE_SYNCED));
-    fail_if (verify_node_state_across_group (&group, 1, GCS_NODE_STATE_PRIM));
-    fail_if (verify_node_state_across_group (&group, 2, GCS_NODE_STATE_SYNCED));
+    ck_assert(!verify_node_state_across_group(&group, 0,GCS_NODE_STATE_SYNCED));
+    ck_assert(!verify_node_state_across_group(&group, 1,GCS_NODE_STATE_PRIM));
+    ck_assert(!verify_node_state_across_group(&group, 2,GCS_NODE_STATE_SYNCED));
 
     group_sst_start (&group, 1, nodes[0].group.nodes[0].name);
     deliver_join_sync_msg (&group, 0, GCS_MSG_JOIN); // end of donor SST
     deliver_join_sync_msg (&group, 1, GCS_MSG_JOIN); // end of joiner SST
 
     struct node* dropped = group_drop_node (&group, 1);
-    fail_if (NULL == dropped);
+    ck_assert(NULL != dropped);
 
     /* After that, according to #465, node 1 shifted from SYNCED to PRIMARY */
 
-    fail_if (verify_node_state_across_group (&group, 1, GCS_NODE_STATE_SYNCED));
+    ck_assert(!verify_node_state_across_group(&group, 1,GCS_NODE_STATE_SYNCED));
     struct gcs_act act;
     int            proto_ver = -1;
     ret = gcs_group_act_conf (&group.nodes[1]->group, &act, &proto_ver);
-    fail_if (ret <= 0, "gcs_group_act_cnf() retruned %zd (%s)",
-             ret, strerror (-ret));
-    fail_if (ret != act.buf_len);
-    fail_if (proto_ver != 0 /* current version */, "proto_ver = %d", proto_ver);
+    ck_assert_msg(ret > 0, "gcs_group_act_cnf() retruned %zd (%s)",
+                  ret, strerror (-ret));
+    ck_assert(ret == act.buf_len);
+    ck_assert_msg(proto_ver == 0 /* current version */,
+                  "proto_ver = %d", proto_ver);
     const gcs_act_conf_t* conf = (const gcs_act_conf_t*)act.buf;
-    fail_if (NULL == conf);
-    fail_if (conf->my_idx != 1);
+    ck_assert(NULL != conf);
+    ck_assert(conf->my_idx == 1);
     /* according to #465 this was GCS_NODE_STATE_PRIM */
-    fail_if (conf->my_state != GCS_NODE_STATE_SYNCED);
+    ck_assert(conf->my_state == GCS_NODE_STATE_SYNCED);
 
     deliver_join_sync_msg (&group, 0, GCS_MSG_SYNC); // donor synced
-    fail_if (verify_node_state_across_group (&group, 0, GCS_NODE_STATE_SYNCED));
+    ck_assert(!verify_node_state_across_group(&group, 0,GCS_NODE_STATE_SYNCED));
 
     free(const_cast<void*>(act.buf));
     for (i = 0; i < MAX_NODES; i++) {

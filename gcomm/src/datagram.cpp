@@ -68,8 +68,7 @@ uint32_t
 gcomm::crc32(gcomm::NetHeader::checksum_t const type,
              const gcomm::Datagram& dg, size_t offset)
 {
-    boost::crc_32_type crc;
-    gu::byte_t         lenb[4];
+    gu::byte_t lenb[4];
 
     gu::serialize4(static_cast<int32_t>(dg.len() - offset),
                    lenb, sizeof(lenb), 0);
