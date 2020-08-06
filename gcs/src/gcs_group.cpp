@@ -1340,6 +1340,10 @@ group_select_donor (gcs_group_t* group,
 void
 gcs_group_ignore_action (gcs_group_t* group, struct gcs_act_rcvd* act)
 {
+    gu_debug("Ignoring action: buf: %p, len: %zd, type: %d, sender: %d, "
+             "seqno: %lld", act->act.buf, act->act.buf_len, act->act.type,
+             act->sender_idx, act->id);
+
     if (act->act.type <= GCS_ACT_STATE_REQ) {
         gcs_gcache_free (group->cache, act->act.buf);
     }

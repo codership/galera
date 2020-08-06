@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -89,17 +89,21 @@ gcs_node_handle_act_frag (gcs_node_t*           node,
                           struct gcs_act*       act,
                           bool                  local)
 {
+    ssize_t ret;
+
     if (gu_likely(GCS_ACT_SERVICE != frg->act_type)) {
-        return gcs_defrag_handle_frag (&node->app, frg, act, local);
+        ret = gcs_defrag_handle_frag (&node->app, frg, act, local);
     }
     else if (GCS_ACT_SERVICE == frg->act_type) {
-        return gcs_defrag_handle_frag (&node->oob, frg, act, local);
+        ret = gcs_defrag_handle_frag (&node->oob, frg, act, local);
     }
     else {
         gu_warn ("Unrecognised action type: %d", frg->act_type);
         assert(0);
-        return -EPROTO;
+        ret = -EPROTO;
     }
+
+    return ret;
 }
 
 static inline void

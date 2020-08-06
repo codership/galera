@@ -15,6 +15,7 @@
 
 #include <check.h>
 #include "gcs_group_test.hpp"
+#include "gcs_test_utils.hpp"
 
 #define TRUE (0 == 0)
 #define FALSE (!TRUE)
@@ -28,13 +29,13 @@ msg_write (gcs_recv_msg_t* msg,
            gcs_act_frag_t* frg,
            char*           buf,  size_t         buf_len,
            const char*     data, size_t         data_len,
-           long       sender_idx, gcs_msg_type_t type)
+           int       sender_idx, gcs_msg_type_t type)
 {
     long ret;
     ret = gcs_act_proto_write (frg, buf, buf_len);
-    ck_assert_msg(ret, "error code: %d", ret);
-    ck_assert(frg->frag == NULL);
-    ck_assert_msg(frg->frag_len < data_len,
+    ck_assert_msg(0 == ret, "error code: %d", ret);
+    ck_assert(frg->frag != NULL);
+    ck_assert_msg(frg->frag_len >= data_len,
                   "Resulting frag_len %lu is less than required act_len %lu\n"
                   "Refactor the test and increase buf_len.",
                   frg->frag_len, data_len);
@@ -52,7 +53,7 @@ new_component (gcs_group_t* group, const gcs_comp_msg_t* comp)
 {
     long ret = gcs_group_handle_comp_msg (group, comp);
     // modelling real state exchange is really tedious here, just fake it
-//    group->state = GCS_GROUP_PRIMARY;
+    group->state = GCS_GROUP_PRIMARY;
     return ret;
 }
 
@@ -68,7 +69,7 @@ START_TEST (gcs_group_configuration)
 {
     ssize_t     ret;
     gcs_group_t group;
-    gcs_seqno_t seqno = 1;
+    gcs_seqno_t seqno = 11;
 
     // The Action
     const char   act_buf[]   = "Test action smuction";
@@ -141,23 +142,26 @@ START_TEST (gcs_group_configuration)
 
     // Prepare first  primary component message containing only one node
     comp = gcs_comp_msg_new (TRUE, false, 0, 1, 0);
-    ck_assert(comp == NULL);
+    ck_assert(comp != NULL);
     ck_assert(!gcs_comp_msg_add (comp, LOCALHOST, 0));
 
     ret = new_component (&group, comp);
     ck_assert(ret >= 0);
-//    ck_assert(!gcs_group_is_primary(&group));
-//    ck_assert(!gcs_group_new_members(&group)); RECEIVE_SYNC();
+    ck_assert(gcs_group_is_primary(&group));
+    ck_assert(0 == group.act_id_);
+    group.act_id_ = seqno - 1;
+    ck_assert(GCS_NODE_STATE_JOINED == group.nodes[0].status);
 
-#define TRY_MESSAGE(msg) \
-    ret = gcs_act_proto_read (&frg, (msg).buf, (msg).size);     \
-    ret = gcs_group_handle_act_msg (&group, &frg, &(msg), &r_act, true);
+#define TRY_MESSAGE(msg)                                                \
+    ret = gcs_act_proto_read (&frg, (msg).buf, (msg).size);             \
+    if (0 == ret)                                                       \
+        ret = gcs_group_handle_act_msg (&group, &frg, &(msg), &r_act, true);
 
     // 1. Try fragment that is not the first
     r_act = gcs_act_rcvd();
     //    ret = gcs_group_handle_act_msg (&group, &frg, &msg3, &r_act);
     TRY_MESSAGE(msg3);
-    ck_assert(ret == -EPROTO);
+    ck_assert_msg(ret == -EPROTO, "expected ret = %d, got %zd", -EPROTO, ret);
     ck_assert(act->buf == NULL);
     ck_assert(act->buf_len == 0);
     mark_point();
@@ -169,70 +173,74 @@ START_TEST (gcs_group_configuration)
     ck_assert(act->buf == NULL);
     ck_assert(act->buf_len == 0);
 
-#define TRY_WRONG_2ND_FRAGMENT(frag)                      \
+#define TRY_WRONG_2ND_FRAGMENT(frag, res)                          \
     /*ret = gcs_group_handle_act_msg (&group, &frag, &r_act);*/    \
-    TRY_MESSAGE(frag);                                    \
-    ck_assert(ret == -EPROTO);                            \
-    ck_assert(act->buf_len == 0);
+        TRY_MESSAGE(frag);                                         \
+        ck_assert_msg(ret == res,                                  \
+                      "expected ret = %d, got %zd", res, ret);     \
+        ck_assert(act->buf_len == 0);
 
     // 3. Try first fragment again
-    gu_debug ("");
-    TRY_WRONG_2ND_FRAGMENT(msg1);
-    gu_debug ("");
+    gu_debug ("\n\nTRY_WRONG_2ND_FRAGMENT(msg1)");
+    TRY_WRONG_2ND_FRAGMENT(msg1, 0); // tolerate duplicate fragments
 
     // 4. Try third fragment
-    TRY_WRONG_2ND_FRAGMENT(msg3);
+    gu_debug ("\n\nTRY_WRONG_2ND_FRAGMENT(msg3)");
+    TRY_WRONG_2ND_FRAGMENT(msg3, -EPROTO);
 
-    // 5. Try fouth fragment
-    TRY_WRONG_2ND_FRAGMENT(msg4);
+    // 5. Try fourth fragment
+    gu_debug ("\n\nTRY_WRONG_2ND_FRAGMENT(msg4)");
+    TRY_WRONG_2ND_FRAGMENT(msg4, -EPROTO);
 
     // 6. Try fifth fragment
-    TRY_WRONG_2ND_FRAGMENT(msg5);
+    gu_debug ("\n\nTRY_WRONG_2ND_FRAGMENT(msg5)");
+    TRY_WRONG_2ND_FRAGMENT(msg5, -EPROTO);
 
     // 7. Try correct second fragment
-//    ret = gcs_group_handle_act_msg (&group, &msg2, &r_act);
     TRY_MESSAGE(msg2);
     ck_assert(ret == 0);
-    ck_assert(act->buf == NULL); act->buf = (void*)0x12354; // shall be NULLed
+    ck_assert(act->buf == NULL);
     ck_assert(act->buf_len == 0);
 
     // 8. Try third fragment, last one
-//    ret = gcs_group_handle_act_msg (&group, &msg3, &r_act);
     TRY_MESSAGE(msg3);
     ck_assert(ret == act_len);
     ck_assert(r_act.sender_idx == 0);
-    ck_assert(act->buf == NULL); // local action, must be fetched from local fifo
+    ck_assert(act->buf != NULL);
     ck_assert(act->buf_len == act_len);
-    ck_assert_msg(r_act.id == seqno, "Expected seqno %llu, found %llu",
+    ck_assert_msg(r_act.id == seqno, "Expected seqno %lld, found %lld",
                   seqno, r_act.id);
     seqno++;
     // cleanup
+    free ((void*)act->buf);
     r_act = gcs_act_rcvd();
 
     // 10. New component message
     gcs_comp_msg_delete (comp);
     comp = gcs_comp_msg_new (TRUE, false, 1, 2, 0);
-    ck_assert(comp == NULL);
+    ck_assert(comp != NULL);
     ck_assert(gcs_comp_msg_add (comp, REMOTEHOST, 1) >= 0);
     ck_assert(gcs_comp_msg_add (comp, LOCALHOST,  0) >= 0);
 
     ret = new_component (&group, comp);
     ck_assert(ret >= 0);
-//    ck_assert(gcs_group_is_primary(&group));
-//    ck_assert(gcs_group_new_members(&group)); RECEIVE_SYNC();
+    ck_assert(gcs_group_is_primary(&group));
+    ck_assert(GCS_NODE_STATE_JOINED == group.nodes[1].status);
+    ck_assert(GCS_NODE_STATE_JOINED >  group.nodes[0].status);
+    group.nodes[0].status = GCS_NODE_STATE_JOINED;
 
-    // 11. Try the same with foreign action (now my index is 1, sender is 0)
-//    ret = gcs_group_handle_act_msg (&group, &msg1, &r_act);
+    // 11. Try the same with foreign action (now my index is 1 and sender is 0)
     TRY_MESSAGE(msg1);
     ck_assert(ret == 0);
     ck_assert(act->buf_len == 0);
     ck_assert(act->buf == NULL);
-//    ret = gcs_group_handle_act_msg (&group, &msg2, &r_act);
+
     TRY_MESSAGE(msg2);
     ck_assert(ret == 0);
     ck_assert(act->buf_len == 0);
     ck_assert(act->buf == NULL);
-//    ret = gcs_group_handle_act_msg (&group, &msg3, &r_act);
+
+    gu_debug("\n\nTRY_MESSAGE(msg3)");
     TRY_MESSAGE(msg3);
     ck_assert_msg(ret == act_len, "Expected ret = %zd, got %zd", act_len, ret);
     ck_assert(act->buf_len == act_len);
@@ -249,36 +257,32 @@ START_TEST (gcs_group_configuration)
     r_act = gcs_act_rcvd();
 
     // 12. Try foreign action with a new node joined in the middle.
+    TRY_MESSAGE(msg1);
+    ck_assert(ret == 0);
+    ck_assert(act->buf_len == 0);
+    ck_assert(act->buf == NULL);
+
     gcs_comp_msg_delete (comp);
     comp = gcs_comp_msg_new (TRUE, false, 1, 3, 0);
-    ck_assert(comp == NULL);
+    ck_assert(comp != NULL);
     ck_assert(gcs_comp_msg_add (comp, REMOTEHOST, 1) >= 0);
     ck_assert(gcs_comp_msg_add (comp, LOCALHOST,  0) >= 0);
     ck_assert(gcs_comp_msg_add (comp, DISTANTHOST,2) >= 0);
-
-//    ret = gcs_group_handle_act_msg (&group, &msg1, &r_act);
-    TRY_MESSAGE(msg1);
-    ck_assert(ret == 0);
-    ck_assert(act->buf_len == 0);
-    ck_assert(act->buf == NULL);
-
     ret = new_component (&group, comp);
     ck_assert(ret >= 0);
-//    ck_assert(gcs_group_is_primary(&group));
-//    ck_assert(gcs_group_new_members(&group)); RECEIVE_SYNC();
+    ck_assert(gcs_group_is_primary(&group));
 
     // now I must be able to resend the action from scratch
-//    ret = gcs_group_handle_act_msg (&group, &msg1, &r_act);
     TRY_MESSAGE(msg1);
     ck_assert(ret == 0);
     ck_assert(act->buf_len == 0);
     ck_assert(act->buf == NULL);
-//    ret = gcs_group_handle_act_msg (&group, &msg2, &r_act);
+
     TRY_MESSAGE(msg2);
     ck_assert(ret == 0);
     ck_assert(act->buf_len == 0);
     ck_assert(act->buf == NULL);
-//    ret = gcs_group_handle_act_msg (&group, &msg3, &r_act);
+
     TRY_MESSAGE(msg3);
     ck_assert(ret == act_len);
     ck_assert(act->buf_len == act_len);
@@ -287,7 +291,7 @@ START_TEST (gcs_group_configuration)
                   "Action received: '%s', expected '%s'", act_buf);
     ck_assert(r_act.sender_idx == 0);
     ck_assert(act->type == GCS_ACT_TORDERED);
-    ck_assert_msg(r_act.id == seqno, "Expected seqno %llu, found %llu",
+    ck_assert_msg(r_act.id == seqno, "Expected seqno %lld, found %lld",
                   seqno, r_act.id);
     seqno++;
     // cleanup
@@ -298,21 +302,19 @@ START_TEST (gcs_group_configuration)
     //     and order of nodes changed
 
     // 13.1 Each node sends a message
-//    ret = gcs_group_handle_act_msg (&group, &msg1, &r_act);
+    msg_write (&msg1, &frg1, buf1, buf_len, frag1, frag1_len, 0,GCS_MSG_ACTION);
     TRY_MESSAGE(msg1);
     ck_assert(ret == 0);
     ck_assert(act->buf_len == 0);
     ck_assert(act->buf == NULL);
 
     msg_write (&msg1, &frg1, buf1, buf_len, frag1, frag1_len, 1,GCS_MSG_ACTION);
-//    ret = gcs_group_handle_act_msg (&group, &msg1, &r_act);
     TRY_MESSAGE(msg1);
     ck_assert(ret == 0);
     ck_assert(act->buf_len == 0);
     ck_assert(act->buf == NULL);
 
     msg_write (&msg1, &frg1, buf1, buf_len, frag1, frag1_len, 2,GCS_MSG_ACTION);
-//    ret = gcs_group_handle_act_msg (&group, &msg1, &r_act);
     TRY_MESSAGE(msg1);
     ck_assert(ret == 0);
     ck_assert(act->buf_len == 0);
@@ -322,67 +324,72 @@ START_TEST (gcs_group_configuration)
     // (REMOTEHOST, LOCALHOST, DISTANTHOST) -> (LOCALHOST, REMOTEHOST)
     gcs_comp_msg_delete (comp);
     comp = gcs_comp_msg_new (TRUE, false, 0, 2, 0);
-    ck_assert(comp == NULL);
+    ck_assert(comp != NULL);
     ck_assert(gcs_comp_msg_add (comp, LOCALHOST, 0) >= 0);
     ck_assert(gcs_comp_msg_add (comp, REMOTEHOST,1) >= 0);
     ret = new_component (&group, comp);
     ck_assert(ret >= 0);
-//    ck_assert(gcs_group_is_primary(&group));
-//    ck_assert(gcs_group_new_members(&group), "Nodes: %d: node0 - '%s', "
-//             "node1 - '%s'", group.num,
-//             group.nodes[0].id, group.nodes[1].id);
-    RECEIVE_SYNC();
-    gcs_comp_msg_delete (comp);
-return;
+    ck_assert(gcs_group_is_primary(&group));
+    ck_assert(group.act_id_ + 1 == seqno);
+    ck_assert(GCS_NODE_STATE_JOINED == group.nodes[1].status);
+    ck_assert(GCS_NODE_STATE_JOINED == group.nodes[0].status);
+
     // 13.3 now I just continue sending messages
-//    ret = gcs_group_handle_act_msg (&group, &msg2, &r_act); // local
     TRY_MESSAGE(msg2);
     ck_assert_msg(ret == 0, "%d (%s)", ret, strerror(-ret));
     ck_assert(act->buf_len == 0);
     ck_assert(act->buf == NULL);
+
     msg_write (&msg2, &frg2, buf2, buf_len, frag2, frag2_len, 1,GCS_MSG_ACTION);
-//    ret = gcs_group_handle_act_msg (&group, &msg2, &r_act); // foreign
     TRY_MESSAGE(msg2);
     ck_assert(ret == 0);
     ck_assert(act->buf_len == 0);
     ck_assert(act->buf == NULL);
-    act->buf = (void*)0x11111; // shall be NULLed below when local act is recvd
-//    ret = gcs_group_handle_act_msg (&group, &msg3, &r_act); // local
-    TRY_MESSAGE(msg3);
-    ck_assert(ret == act_len);
-    ck_assert(act->buf_len == act_len);
-    ck_assert(act->buf == NULL);
-    ck_assert(r_act.sender_idx == 0);
-    ck_assert(act->type == GCS_ACT_TORDERED);
-    ck_assert_msg(r_act.id == seqno, "Expected seqno %llu, found %llu",
-                  seqno, r_act.id);
-    seqno++;
 
-    msg_write (&msg3, &frg3, buf3, buf_len, frag3, frag3_len, 1,GCS_MSG_ACTION);
-//    ret = gcs_group_handle_act_msg (&group, &msg3, &r_act); // foreign
+    // local message - action must be resent
+    gu_debug("\n\nLocal message 3");
     TRY_MESSAGE(msg3);
     ck_assert(ret == act_len);
     ck_assert(act->buf_len == act_len);
     ck_assert(act->buf != NULL);
+    ck_assert(r_act.sender_idx == 0);
+    ck_assert(act->type == GCS_ACT_TORDERED);
     ck_assert_msg(!strncmp((const char*)act->buf, act_buf, act_len),
                   "Action received: '%s', expected '%s'", act_buf);
-    ck_assert(r_act.sender_idx == 1);
-    ck_assert(act->type == GCS_ACT_TORDERED);
-    ck_assert_msg(r_act.id == seqno, "Expected seqno %llu, found %llu",
-                  seqno, r_act.id);
-    seqno++;
+    ck_assert_msg(r_act.id == -ERESTART, "Expected seqno %lld, found %lld",
+                  -ERESTART, r_act.id);
+    // cleanup
+    free ((void*)act->buf);
+    r_act = gcs_act_rcvd();
+
+    // foreign message - action must be dropped (ignored)
+    gu_debug("\n\nForeign message 3");
+    msg_write (&msg3, &frg3, buf3, buf_len, frag3, frag3_len, 1,GCS_MSG_ACTION);
+    TRY_MESSAGE(msg3);
+    ck_assert_msg(ret == 0,
+                  "Expected ret 0, got %zd", ret);
+    ck_assert_msg(act->buf_len == 0,
+                  "Expected buf_len 0, got %zd", act->buf_len);
+    ck_assert(act->buf == NULL);
+    ck_assert_msg(r_act.sender_idx == -1,
+                  "Expected action sender -1, got %d", r_act.sender_idx);
+    ck_assert(act->type == GCS_ACT_ERROR);
+    ck_assert_msg(r_act.id == GCS_SEQNO_ILL, "Expected seqno %lld, found %lld",
+                  GCS_SEQNO_ILL, r_act.id);
+    ck_assert(group.act_id_ + 1 == seqno);
     // cleanup
     free ((void*)act->buf);
     r_act = gcs_act_rcvd();
 
     // Leave group
+    gcs_comp_msg_delete (comp);
     comp = gcs_comp_msg_new (FALSE, false, -1, 0, 0);
-    ck_assert(comp == NULL);
+    ck_assert(comp != NULL);
 
     ret = new_component (&group, comp);
     ck_assert(ret >= 0);
-//    ck_assert(gcs_group_is_primary(&group));
-    // comment until implemented: ck_assert(gcs_group_new_members(&group)); RECEIVE_SYNC();
+    gcs_comp_msg_delete (comp);
+    gcs_group_free(&group);
 }
 END_TEST
 
@@ -401,9 +408,6 @@ group_get_last_msg (gcs_recv_msg_t* msg)
 // This tests last applied functionality
 START_TEST(gcs_group_last_applied)
 {
-    long            ret;
-    gcs_group_t     group;
-    gcs_comp_msg_t* comp;
     gcs_recv_msg_t  msg0, msg1, msg2, msg3;
     uint8_t         buf0[sizeof(gcs_seqno_t)];
     uint8_t         buf1[sizeof(gcs_seqno_t)];
@@ -420,86 +424,59 @@ START_TEST(gcs_group_last_applied)
     msg2.sender_idx = 2; msg3.sender_idx = 3;
 
     // Create 4-node component
-    comp = gcs_comp_msg_new (TRUE, false, 0, 4, 0);
-    ck_assert(comp != NULL);
-    ck_assert(gcs_comp_msg_add (comp, LOCALHOST,     0) >= 0);
-    ck_assert(gcs_comp_msg_add (comp, REMOTEHOST,    1) >= 0);
-    ck_assert(gcs_comp_msg_add (comp, DISTANTHOST"1",2) >= 0);
-    ck_assert(gcs_comp_msg_add (comp, DISTANTHOST"2",2) >= 0);
-    ck_assert(gcs_comp_msg_add (comp, DISTANTHOST"2",2)  < 0);
-
-    gcs_group_init(&group, NULL, "", "", 0, 0, 1);
-    mark_point();
-    ret = new_component (&group, comp);
-    ck_assert(ret >= 0);
-//    ck_assert(gcs_group_is_primary(&group));
-//    ck_assert(gcs_group_new_members(&group)); RECEIVE_SYNC();
+    gt_group gt(4, true);
+    // group object of the 0th node
+    gcs_group_t& group(gt.nodes[0]->group);
 
     // 0, 0, 0, 0
-    ck_assert(group.last_applied == GCS_SEQNO_ILL);
-    group_set_last_msg (&msg0, 1);
-    ck_assert(1 == group_get_last_msg(&msg0));
+    ck_assert(group.last_applied == 0);
+    group_set_last_msg (&msg0, 11);
+    ck_assert(11 == group_get_last_msg(&msg0));
     gcs_group_handle_last_msg (&group, &msg0);
-    // 1, 0, 0, 0
-    ck_assert(group.last_applied == GCS_SEQNO_ILL);
-    group_set_last_msg (&msg1, 2);
+    // 11, 0, 0, 0
+    ck_assert_msg(group.last_applied == 0,
+                  "expected last_applied = 0, got %lld", group.last_applied);
+    group_set_last_msg (&msg1, 12);
     gcs_group_handle_last_msg (&group, &msg1);
-    // 1, 2, 0, 0
-    ck_assert(group.last_applied == GCS_SEQNO_ILL);
-    group_set_last_msg (&msg2, 3);
+    // 11, 12, 0, 0
+    ck_assert(group.last_applied == 0);
+    group_set_last_msg (&msg2, 13);
     gcs_group_handle_last_msg (&group, &msg2);
-    // 1, 2, 3, 0
-    ck_assert(group.last_applied == GCS_SEQNO_ILL);
-    group_set_last_msg (&msg3, 4);
+    // 11, 12, 13, 0
+    ck_assert(group.last_applied == 0);
+    group_set_last_msg (&msg3, 14);
     gcs_group_handle_last_msg (&group, &msg3);
-    // 1, 2, 3, 4
-    assert(group.last_applied == 1);
-    ck_assert(group.last_applied == 1); // now must be 1
-    group_set_last_msg (&msg1, 6);
+    // 11, 12, 13, 14
+    assert(group.last_applied == 11);
+    ck_assert(group.last_applied == 11); // now must be 11
+    group_set_last_msg (&msg1, 16);
     gcs_group_handle_last_msg (&group, &msg1);
-    // 1, 6, 3, 4
-    ck_assert(group.last_applied == 1); // now must still be 1
-    group_set_last_msg (&msg0, 7);
+    // 11, 16, 13, 14
+    ck_assert(group.last_applied == 11); // now must still be 11
+    group_set_last_msg (&msg0, 17);
     gcs_group_handle_last_msg (&group, &msg0);
-    // 7, 6, 3, 4
-    ck_assert(group.last_applied == 3); // now must be 3
-    group_set_last_msg (&msg3, 8);
+    // 17, 16, 13, 14
+    ck_assert(group.last_applied == 13); // now must be 13
+    group_set_last_msg (&msg3, 18);
     gcs_group_handle_last_msg (&group, &msg3);
-    // 7, 6, 3, 8
-    ck_assert(group.last_applied == 3); // must still be 3
+    // 17, 16, 13, 18
+    ck_assert(group.last_applied == 13); // must still be 13
 
     // remove the lagging node
-    gcs_comp_msg_delete(comp);
-    comp = gcs_comp_msg_new (TRUE, false, 0, 3, 0);
-    ck_assert(comp == NULL);
-    ck_assert(gcs_comp_msg_add (comp, LOCALHOST,     0) >= 0);
-    ck_assert(gcs_comp_msg_add (comp, REMOTEHOST,    1) >= 0);
-    ck_assert(gcs_comp_msg_add (comp, DISTANTHOST"2",2) >= 0);
+    struct gt_node* const gn(gt.drop_node(2));
+    ck_assert(gn != NULL);
+    delete gn;
 
-    ret = new_component (&group, comp);
-    ck_assert(ret >= 0);
-//    ck_assert(gcs_group_is_primary(&group));
-//    ck_assert(gcs_group_new_members(&group)); RECEIVE_SYNC();
-    // 7, 6, 8
-    ck_assert_msg(group.last_applied == 6,
+    // 17, 16, 18
+    ck_assert_msg(group.last_applied == 16,
                   "Expected %u, got %llu\nGroup: %d: %s, %s, %s",
-                  6, group.last_applied, group.num,
+                  16, group.last_applied, group.num,
                   group.nodes[0].id, group.nodes[1].id,group.nodes[2].id);
 
     // add new node
-    gcs_comp_msg_delete(comp);
-    comp = gcs_comp_msg_new (TRUE, false, 0, 4, 0);
-    ck_assert(comp == NULL);
-    ck_assert(gcs_comp_msg_add (comp, LOCALHOST,     0) >= 0);
-    ck_assert(gcs_comp_msg_add (comp, REMOTEHOST,    1) >= 0);
-    ck_assert(gcs_comp_msg_add (comp, DISTANTHOST"2",2) >= 0);
-    ck_assert(gcs_comp_msg_add (comp, DISTANTHOST"1",2) >= 0);
-
-    ret = new_component (&group, comp);
-    ck_assert(ret >= 0);
-//    ck_assert(gcs_group_is_primary(&group));
-//    ck_assert(gcs_group_new_members(&group));
-    // 7, 6, 8, 0
+    ck_assert(0 == gt.add_node(new gt_node(DISTANTHOST"1"), true));
+    ck_assert(0 == gt.sync_node(gt.nodes_num - 1));
+    // 17, 16, 18, 0
     ck_assert(group.last_applied == 0);
 
 }
@@ -616,14 +593,8 @@ Suite *gcs_group_suite(void)
 
     suite_add_tcase (suite, tcase);
 
-    // GCS group configuration is not executed completely with debug
-    // build and fails with assertion with release build.
-    // tcase_add_test  (tcase, gcs_group_configuration);
-    (void)gcs_group_configuration;
-    // Last applied test is failing. Disabling for now until
-    // it gets fixed.
-    // tcase_add_test  (tcase, gcs_group_last_applied);
-    (void)gcs_group_last_applied;
+    tcase_add_test  (tcase, gcs_group_configuration);
+    tcase_add_test  (tcase, gcs_group_last_applied);
     tcase_add_test  (tcase, test_gcs_group_find_donor);
 
     return suite;

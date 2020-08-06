@@ -555,7 +555,7 @@ core_handle_act_msg (gcs_core_t*          core,
 #else
             assert (NULL == act->act.buf);
 #endif
-            act->sender_idx = msg->sender_idx;
+            assert(act->sender_idx == msg->sender_idx);
 
             if (gu_likely(!my_msg)) {
                 /* foreign action, must be passed from gcs_group */

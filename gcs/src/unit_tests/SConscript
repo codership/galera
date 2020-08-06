@@ -24,6 +24,7 @@ if all_tests:
 
 gcs_tests_sources = Split('''
                              gcs_tests.cpp
+                             gcs_test_utils.cpp
                              gcs_fifo_test.cpp
                              ../gcs_fifo_lite.cpp
                              gcs_sm_test.cpp

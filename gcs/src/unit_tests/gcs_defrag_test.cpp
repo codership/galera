@@ -101,7 +101,7 @@ START_TEST (gcs_defrag_test)
     // 2. Try first fragment
     ret = gcs_defrag_handle_frag (&defrag, &frg1, &recv_act, FALSE);
     ck_assert(ret == 0);
-    ck_assert(defrag.head == NULL);
+    ck_assert(defrag.head != NULL);
     ck_assert(defrag.received == frag1_len);
     ck_assert(defrag.tail == defrag.head + defrag.received);
     tail = defrag.tail;
@@ -133,7 +133,7 @@ START_TEST (gcs_defrag_test)
     ck_assert(ret == (long)act_len);
 
     // 8. Check the action
-    ck_assert(recv_act.buf == NULL);
+    ck_assert(recv_act.buf != NULL);
     ck_assert(recv_act.buf_len == (long)act_len);
     ck_assert_msg(!strncmp((const char*)recv_act.buf, act_buf, act_len),
                   "Action received: '%s', expected '%s'",recv_act.buf,act_buf);
@@ -156,7 +156,7 @@ START_TEST (gcs_defrag_test)
 
 
     // 10. Check the action
-    ck_assert(recv_act.buf == NULL);
+    ck_assert(recv_act.buf != NULL);
     ck_assert(recv_act.buf_len == (long)act_len);
 //    ck_assert(recv_act.buf == NULL); (and now we may allocate it for cache)
 
