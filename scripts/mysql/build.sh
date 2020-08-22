@@ -451,7 +451,7 @@ then
             MYSQL_MM_VER="$MYSQL_MAJOR_VER$MYSQL_MINOR_VER"
 
             [ "$MYSQL_MM_VER" -ge "56" ] \
-            && MEMCACHED_OPT="-DWITH_LIBEVENT=yes -DWITH_INNODB_MEMCACHED=ON" \
+            && MEMCACHED_OPT="-DWITH_LIBEVENT=bundled -DWITH_INNODB_MEMCACHED=ON" \
             || MEMCACHED_OPT=""
 
             if [ "$MYSQL_MM_VER" -ge "57" ]
@@ -480,8 +480,8 @@ then
             ln -sf $(which ccache || which $CXX) $(basename $CXX)
 
             cmake \
-                  -DCMAKE_C_COMPILER=$(basename $CC) \
-                  -DCMAKE_CXX_COMPILER=$(basename $CXX) \
+                  -DCMAKE_C_COMPILER=$(pwd)/$(basename $CC) \
+                  -DCMAKE_CXX_COMPILER=$(pwd)/$(basename $CXX) \
                   -DCMAKE_C_FLAGS="$CFLAGS" \
                   -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
                   -DBUILD_CONFIG=mysql_release \
@@ -498,9 +498,15 @@ then
             && make -j $JOBS -S && popd || exit 1
         fi
     else  # just recompile and relink with old configuration
-        [ $MYSQL_MAJOR != "5.1" ] && pushd $MYSQL_BUILD_DIR
-        make -j $JOBS -S > /dev/null
-        [ $MYSQL_MAJOR != "5.1" ] && popd
+        if [ $MYSQL_MAJOR = "5.1" ]
+        then
+            make -j $JOBS -S > /dev/null
+        else
+            pushd $MYSQL_BUILD_DIR
+            CC=$(pwd)/$(basename $CC) CXX=$(pwd)/$(basename $CXX) \
+            make -j $JOBS -S > /dev/null
+            popd
+        fi
     fi
 fi # SKIP_BUILD
 
