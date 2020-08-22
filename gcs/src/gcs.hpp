@@ -444,6 +444,8 @@ struct gcs_stats
     int       send_q_len;     //! current send queue length
     int       send_q_len_max; //! maximum send queue length
     int       send_q_len_min; //! minimum send queue length
+    bool      fc_active;      //! flow control is currently active
+    bool      fc_requested;   //! flow control is requested by this node
     gcs_backend_stats_t backend_stats; //! backend stats.
 };
 
