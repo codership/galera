@@ -47,7 +47,7 @@ START_TEST (gcs_proto_test)
 
     // set up action header
     ret = gcs_act_proto_write (&frg_send, buf, buf_len);
-    ck_assert_msg(0 == ret, "error code: %d", ret);
+    ck_assert_msg(0 == ret, "error code: %ld", ret);
     ck_assert(frg_send.frag     != NULL);
     ck_assert(frg_send.frag_len != 0);
     ck_assert_msg(strlen(act_send) >= frg_send.frag_len,
@@ -60,13 +60,13 @@ START_TEST (gcs_proto_test)
 
     // message was sent and received, now parse the header
     ret = gcs_act_proto_read (&frg_recv, buf, buf_len);
-    ck_assert_msg(0 == ret, "error code: %d", ret);
+    ck_assert_msg(0 == ret, "error code: %ld", ret);
     ck_assert(frg_recv.frag     != NULL);
     ck_assert(frg_recv.frag_len != 0);
     ck_assert_msg(!frgcmp(&frg_send, &frg_recv),
                   "Sent and recvd headers are not identical");
     ck_assert_msg(frg_send.frag_no == frg_recv.frag_no,
-                  "Fragment numbers are not identical: %d %d",
+                  "Fragment numbers are not identical: %lu %lu",
                   frg_send.frag_no, frg_recv.frag_no);
 
     // read the fragment into receiving action buffer
@@ -84,11 +84,11 @@ START_TEST (gcs_proto_test)
 
     // message was sent and received, now parse the header
     ret = gcs_act_proto_read (&frg_recv, buf, buf_len);
-    ck_assert_msg(0 == ret, "error code: %d", ret);
+    ck_assert_msg(0 == ret, "error code: %ld", ret);
     ck_assert_msg(!frgcmp(&frg_send, &frg_recv),
                   "Sent and recvd headers are not identical");
     ck_assert_msg(frg_send.frag_no + 1 == frg_recv.frag_no,
-                  "Fragment numbers are not sequential: %d %d",
+                  "Fragment numbers are not sequential: %lu %lu",
                   frg_send.frag_no, frg_recv.frag_no);
 
     // read the fragment into receiving action buffer
@@ -96,8 +96,8 @@ START_TEST (gcs_proto_test)
     // the remaining buffer space with 0
     strncpy (act_recv_ptr, (const char*)frg_recv.frag, frg_recv.frag_len);
     ck_assert_msg(strlen(act_recv_ptr) < frg_send.frag_len,
-                  "Fragment does not seem to fit in buffer: '%s'(%d)",
-                  strlen(act_recv_ptr), act_recv_ptr);
+                  "Fragment does not seem to fit in buffer: '%s'(%zu)",
+                  act_recv_ptr, strlen(act_recv_ptr));
 
     // check that actions are identical
     ck_assert_msg(!strcmp(act_send, act_recv),

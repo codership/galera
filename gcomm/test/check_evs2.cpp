@@ -140,7 +140,8 @@ START_TEST(test_input_map_insert)
     try
     {
         im.insert(0, UserMessage(0, uuid1, view, 0));
-        ck_abort_msg("");
+        ck_abort_msg("Exception not thrown, input map has not been "
+                     "reset/initialized yet");
     }
     catch (...)
     {  }
@@ -275,7 +276,8 @@ START_TEST(test_input_map_erase)
     try
     {
         im.recover(index1, 9);
-        ck_abort_msg("");
+        ck_abort_msg("Exception not thrown, "
+                     "setting safe seq should purge index");
     }
     catch (...) { }
 }

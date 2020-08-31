@@ -1,14 +1,14 @@
 /*
  * Copyright (C) 2010-2020 Codership Oy <info@codership.com>
  */
-#define __STDC_FORMAT_MACROS
 
 #include "../src/galera_service_thd.hpp"
 #include "../src/replicator_smm.hpp"
+
+#include "gu_inttypes.hpp"
+
 #include <check.h>
 #include <errno.h>
-
-#include <inttypes.h>
 
 namespace
 {

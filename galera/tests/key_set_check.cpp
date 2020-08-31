@@ -231,7 +231,7 @@ static void test_ver(gu::RecordSet::Version const rsv, int ws_ver)
     size_t const out_size(kso.gather(out));
 
     log_info << "Gather size: " << out_size << ", buf count: " << out->size();
-    ck_assert_msg(0 == out_size % alignment, "out size not aligned by %d",
+    ck_assert_msg(0 == out_size % alignment, "out size not aligned by %zd",
                   out_size % alignment);
 
     std::vector<gu::byte_t> in;
@@ -247,7 +247,7 @@ static void test_ver(gu::RecordSet::Version const rsv, int ws_ver)
     KeySetIn ksi (kso.version(), in.data(), in.size());
 
     ck_assert_msg(ksi.count() == kso.count(),
-                  "Received keys: %zu, expected: %zu", ksi.count(), kso.count());
+                  "Received keys: %d, expected: %d", ksi.count(), kso.count());
     ck_assert_msg(ksi.size() == kso.size(),
                   "Received size: %zu, expected: %zu", ksi.size(), kso.size());
 
@@ -273,14 +273,14 @@ static void test_ver(gu::RecordSet::Version const rsv, int ws_ver)
     KeySetIn ksi_empty;
 
     ck_assert_msg(ksi_empty.count() == 0,
-                  "Received keys: %zu, expected: %zu", ksi_empty.count(), 0);
+                  "Received keys: %d, expected: %d", ksi_empty.count(), 0);
     ck_assert_msg(ksi_empty.size() == 0,
-                  "Received size: %zu, expected: %zu", ksi_empty.size(), 0);
+                  "Received size: %zu, expected: %d", ksi_empty.size(), 0);
 
     ksi_empty.init (kso.version(), in.data(), in.size());
 
     ck_assert_msg(ksi_empty.count() == kso.count(),
-                  "Received keys: %zu, expected: %zu",
+                  "Received keys: %d, expected: %d",
                   ksi_empty.count(),kso.count());
     ck_assert_msg(ksi_empty.size() == kso.size(),
                   "Received size: %zu, expected: %zu",

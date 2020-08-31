@@ -34,7 +34,7 @@ END_TEST
         for (i = 0; i < n_; ++i)                                        \
         {                                                               \
             long long ret = gcs_fc_process (fc_, 0);                    \
-            ck_assert_msg(ret == 0, "0-sized action #%d returned %d (%s)", \
+            ck_assert_msg(ret == 0, "0-sized action #%d returned %lld (%s)", \
                           i, ret, strerror(-ret));                      \
         }                                                               \
     }
@@ -103,7 +103,8 @@ START_TEST(gcs_fc_test_precise)
 
     nanosleep (&p10ms, NULL);
     ret = gcs_fc_process (&fc, 1000);
-    ck_assert_msg(ret > 0, "Soft limit trip returned %d (%s)", ret, strerror(-ret));
+    ck_assert_msg(ret > 0, "Soft limit trip returned %lld (%s)",
+                  ret, strerror(-ret));
 
     // measured data rate should be ~100000 b/s
     // slave queue length should be half-way between soft limit and hard limit

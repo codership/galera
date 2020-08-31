@@ -12,6 +12,8 @@
 #include "../src/gu_spooky.h"
 #include "../src/gu_hexdump.h"
 
+#include <inttypes.h>
+
 #define BUFSIZE 512
 static uint64_t const expected[BUFSIZE] = {
     0xa24295ec, 0xfe3a05ce, 0x257fd8ef, 0x3acd5217,
@@ -185,7 +187,7 @@ START_TEST (gu_spooky_test)
 
         if (res != expected[i])
         {
-            ck_abort_msg("%d: expected: 0x%.8lX, found: 0x%.8lX",
+            ck_abort_msg("%zu: expected: 0x%.8lX, found: 0x%.8" PRIX32,
                          i, expected[i], res);
         }
     }

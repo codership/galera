@@ -5,9 +5,9 @@
 #include "gu_vlq.hpp"
 #include "gu_vlq_test.hpp"
 #include "gu_logger.hpp"
+#include "gu_inttypes.hpp"
 
 #include <stdint.h>
-#include <inttypes.h>
 #include <cstdlib>
 #include <vector>
 #include <limits>
@@ -55,7 +55,7 @@ START_TEST(test_uleb128_size)
     {
         size_t size(gu::uleb128_size(valarr[i].val));
         ck_assert_msg(size == valarr[i].size,
-                      "got size %z, expected %z for value 0x%llx",
+                      "got size %zu, expected %zu for value 0x%llx",
                       size, valarr[i].size, valarr[i].val);
     }
 }
@@ -118,7 +118,7 @@ START_TEST(test_uleb128_misc)
                                           buf.size(), 0);
         uint8_t val;
         (void)gu::uleb128_decode(&buf[0], buf.size(), 0, val);
-        if (i != val) ck_abort_msg("0x%x != 0x%x", i, val);
+        if (i != val) ck_abort_msg("0x%zx != 0x%x", i, val);
     }
 
     // check uint16_t whole range
@@ -128,7 +128,7 @@ START_TEST(test_uleb128_misc)
                                            &buf[0], buf.size(), 0);
         uint16_t val;
         (void)gu::uleb128_decode(&buf[0], buf.size(), 0, val);
-        if (i != val) ck_abort_msg("0x%x != 0x%x", i, val);
+        if (i != val) ck_abort_msg("0x%zx != 0x%x", i, val);
     }
 
     // check uint32_t: 0 -> 1^20
@@ -138,7 +138,7 @@ START_TEST(test_uleb128_misc)
                                            &buf[0], buf.size(), 0);
         uint32_t val;
         (void)gu::uleb128_decode(&buf[0], buf.size(), 0, val);
-        if (i != val) ck_abort_msg("0x%x != 0x%x", i, val);
+        if (i != val) ck_abort_msg("0x%zx != 0x%x", i, val);
     }
 
     // check uin32_t: max - 1^20 -> max
@@ -149,7 +149,7 @@ START_TEST(test_uleb128_misc)
                                            &buf[0], buf.size(), 0);
         uint32_t val;
         (void)gu::uleb128_decode(&buf[0], buf.size(), 0, val);
-        if (i != val) ck_abort_msg("0x%x != 0x%x", i, val);
+        if (i != val) ck_abort_msg("0x%zx != 0x%x", i, val);
     }
 
 

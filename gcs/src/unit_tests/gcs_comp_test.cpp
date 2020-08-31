@@ -43,14 +43,16 @@ check_msg_identity (const gcs_comp_msg_t* m,
     ck_assert(n->memb_num == m->memb_num);
     for (i = 0; i < m->memb_num; i++) {
         ck_assert_msg(strlen(n->memb[i].id) == strlen(m->memb[i].id),
-                      "member %d id len does not match: %d vs %d",
+                      "member %ld id len does not match: %zu vs %zu",
                       i, strlen(n->memb[i].id), strlen(m->memb[i].id));
         ck_assert_msg(!strncmp(n->memb[i].id, m->memb[i].id,
                                GCS_COMP_MEMB_ID_MAX_LEN),
-                      "member %d IDs don't not match: got '%s', should be '%s'",
-                      i, members[i], m->memb[i].id);
+                      "member %ld IDs don't not match: got '%s', "
+                      "should be '%s'",
+                      i, members[i].id, m->memb[i].id);
         ck_assert_msg(n->memb[i].segment == m->memb[i].segment,
-                      "member %d segments don't not match: got '%d', should be '%d'",
+                      "member %ld segments don't not match: got '%d', "
+                      "should be '%d'",
                       i, (int)members[i].segment, (int)m->memb[i].segment);
     }
 }
@@ -74,7 +76,7 @@ START_TEST (gcs_comp_test)
     // add members except for the last
     for (i = 0; i < memb_num - 1; i++) {
         ret = gcs_comp_msg_add (m, members[i].id, members[i].segment);
-        ck_assert_msg(ret == i, "gcs_comp_msg_add() returned %d, expected %d",
+        ck_assert_msg(ret == i, "gcs_comp_msg_add() returned %ld, expected %ld",
                       ret, i);
     }
 
@@ -85,22 +87,23 @@ START_TEST (gcs_comp_test)
         j = i - 1;
     }
     ret = gcs_comp_msg_add (m, members[j].id, members[j].segment);
-    ck_assert_msg(ret == -ENOTUNIQ, "gcs_comp_msg_add() returned %d, expected "
+    ck_assert_msg(ret == -ENOTUNIQ, "gcs_comp_msg_add() returned %ld, expected "
                   "-ENOTUNIQ (%d)", ret, -ENOTUNIQ);
 
     // try to add empty id
     ret = gcs_comp_msg_add (m, "", 0);
-    ck_assert_msg(ret == -EINVAL, "gcs_comp_msg_add() returned %d, expected "
+    ck_assert_msg(ret == -EINVAL, "gcs_comp_msg_add() returned %ld, expected "
                   "-EINVAL (%d)", ret, -EINVAL);
 
     // try to add id that is too long
     ret = gcs_comp_msg_add (m, long_id, 3);
-    ck_assert_msg(ret == -ENAMETOOLONG, "gcs_comp_msg_add() returned %d, expected "
+    ck_assert_msg(ret == -ENAMETOOLONG,
+                  "gcs_comp_msg_add() returned %ld, expected "
                   "-ENAMETOOLONG (%d)", ret, -ENAMETOOLONG);
 
     // add final id
     ret = gcs_comp_msg_add (m, members[i].id, members[i].segment);
-    ck_assert_msg(ret == i, "gcs_comp_msg_add() returned %d, expected %d",
+    ck_assert_msg(ret == i, "gcs_comp_msg_add() returned %ld, expected %ld",
                   ret, i);
 
     // check that all added correctly

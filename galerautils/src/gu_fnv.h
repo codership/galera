@@ -25,9 +25,7 @@
 
 #include "gu_int128.h"
 
-#include <stdio.h>
 #include <stdint.h>
-#include <inttypes.h>
 #include <stdlib.h> // ssize_t
 #include <assert.h>
 

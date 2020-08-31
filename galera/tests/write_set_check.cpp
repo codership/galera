@@ -11,6 +11,8 @@
 #include "gcs_action_source.hpp"
 #include "galera_service_thd.hpp"
 
+#include "gu_inttypes.hpp"
+
 #include <cstdlib>
 #include <check.h>
 
@@ -437,10 +439,11 @@ START_TEST(test_cert_hierarchical_v1)
 
         trx->set_received(0, wsi[i].local_seqno, wsi[i].global_seqno);
         Certification::TestResult result(cert.append_trx(trx));
-        ck_assert_msg(result == wsi[i].result, "wsi: %zu, g: %lld r: %d er: %d",
+        ck_assert_msg(result == wsi[i].result,
+                      "wsi: %zu, g: %" PRId64 " r: %d er: %d",
                       i, trx->global_seqno(), result, wsi[i].result);
         ck_assert_msg(trx->depends_seqno() == wsi[i].expected_depends_seqno,
-                      "wsi: %zu g: %lld ld: %lld eld: %lld",
+                      "wsi: %zu g: %" PRId64 " ld: %" PRId64 " eld: %" PRId64,
                       i, trx->global_seqno(), trx->depends_seqno(),
                       wsi[i].expected_depends_seqno);
         cert.set_trx_committed(trx);
@@ -561,10 +564,10 @@ START_TEST(test_cert_hierarchical_v2)
 
         trx->set_received(0, wsi[i].local_seqno, wsi[i].global_seqno);
         Certification::TestResult result(cert.append_trx(trx));
-        ck_assert_msg(result == wsi[i].result, "g: %lld res: %d exp: %d",
+        ck_assert_msg(result == wsi[i].result, "g: %" PRId64 " res: %d exp: %d",
                       trx->global_seqno(), result, wsi[i].result);
         ck_assert_msg(trx->depends_seqno() == wsi[i].expected_depends_seqno,
-                      "wsi: %zu g: %lld ld: %lld eld: %lld",
+                      "wsi: %zu g: %" PRId64 " ld: %" PRId64 " eld: %" PRId64,
                       i, trx->global_seqno(), trx->depends_seqno(),
                       wsi[i].expected_depends_seqno);
         cert.set_trx_committed(trx);

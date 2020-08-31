@@ -825,7 +825,7 @@ START_TEST(random_test)
         if (!Map::not_set(map[idx]))
         {
             ck_assert_msg((map[idx]%SIZE) == idx, /* see filling loop above */
-                          "Expected %d, got %d %% %zu = %d",
+                          "Expected %d, got %d %% %d = %d",
                           idx, map[idx], SIZE, map[idx]%SIZE);
         }
 

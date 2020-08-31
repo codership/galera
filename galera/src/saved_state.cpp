@@ -5,11 +5,10 @@
 #include "saved_state.hpp"
 #include "gu_dbug.h"
 #include "uuid.hpp"
+#include "gu_inttypes.hpp"
 
 #include <fstream>
 
-#define __STDC_FORMAT_MACROS
-#include <inttypes.h>
 #include <sys/file.h>
 #include <fcntl.h>
 

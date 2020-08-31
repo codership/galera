@@ -4,6 +4,7 @@
 
 #include "gu_fnv_test.h"
 
+#include <inttypes.h>
 #include <string.h>
 
 static const char* const test_buf = "chongo <Landon Curt Noll> /\\../\\";
@@ -18,7 +19,7 @@ START_TEST (gu_fnv32_test)
     uint32_t ret = 0;
     gu_fnv32a_internal (test_buf, strlen(test_buf), &ret);
     ck_assert_msg(GU_FNV32_SEED == ret,
-                  "FNV32 failed: expected %"PRIu32", got %"PRIu32,
+                  "FNV32 failed: expected %lu, got %"PRIu32,
                   GU_FNV32_SEED, ret);
 }
 END_TEST
@@ -28,7 +29,7 @@ START_TEST (gu_fnv64_test)
     uint64_t ret = 0;
     gu_fnv64a_internal (test_buf, strlen(test_buf), &ret);
     ck_assert_msg(GU_FNV64_SEED == ret,
-                  "FNV64 failed: expected %"PRIu64", got %"PRIu64,
+                  "FNV64 failed: expected %llu, got %"PRIu64,
                   GU_FNV64_SEED, ret);
 }
 END_TEST
