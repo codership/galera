@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -21,16 +21,16 @@ START_TEST (gcs_node_test)
     gcs_node_init (&node1, NULL, NODE_ID, NODE_NAME, NODE_ADDR, 0, 0, 0, 0);
     gcs_node_init (&node2, NULL, "baka", NULL, NULL, 0, 0, 0, 0);
 
-    fail_if (strcmp(node1.id, NODE_ID), "Expected node id '%s', found '%s'",
-             NODE_ID, node1.id);
+    ck_assert_msg(!strcmp(node1.id, NODE_ID), "Expected node id '%s', "
+                  "found '%s'", NODE_ID, node1.id);
 
-    fail_if (strcmp(node1.name, NODE_NAME), "Expected node name '%s', "
-             "found '%s'", NODE_NAME, node1.name);
+    ck_assert_msg(!strcmp(node1.name, NODE_NAME), "Expected node name '%s', "
+                  "found '%s'", NODE_NAME, node1.name);
 
-    fail_if (strcmp(node1.inc_addr, NODE_ADDR), "Expected node id '%s', "
-             "found '%s'", NODE_ADDR, node1.inc_addr);
+    ck_assert_msg(!strcmp(node1.inc_addr, NODE_ADDR), "Expected node id '%s', "
+                  "found '%s'", NODE_ADDR, node1.inc_addr);
 
-    fail_if (gcs_node_get_last_applied(&node1));
+    ck_assert(!gcs_node_get_last_applied(&node1));
 
     gcs_node_set_last_applied (&node1, seqno);
 
@@ -38,11 +38,11 @@ START_TEST (gcs_node_test)
 
     gcs_node_move (&node2, &node1);
 
-    fail_if (seqno != gcs_node_get_last_applied (&node2),
-             "move didn't preserve last_applied");
+    ck_assert_msg(seqno == gcs_node_get_last_applied (&node2),
+                  "move didn't preserve last_applied");
 
-    fail_if (strcmp(node2.id, NODE_ID), "Expected node id '%s', found '%s'",
-             NODE_ID, node2.id);
+    ck_assert_msg(!strcmp(node2.id, NODE_ID),
+                  "Expected node id '%s', found '%s'", NODE_ID, node2.id);
 
     gcs_node_reset (&node1);
 

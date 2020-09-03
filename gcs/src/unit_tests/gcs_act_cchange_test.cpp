@@ -15,12 +15,12 @@ START_TEST (zero_cc)
 {
     gcs_act_cchange const cc;
 
-    fail_unless(cc.uuid == GU_UUID_NIL);
-    fail_if(cc.seqno != GCS_SEQNO_ILL);
-    fail_if(cc.conf_id != -1);
-    fail_if(cc.memb.size() != 0);
-    fail_if(cc.repl_proto_ver != -1);
-    fail_if(cc.appl_proto_ver != -1);
+    ck_assert(cc.uuid == GU_UUID_NIL);
+    ck_assert(cc.seqno == GCS_SEQNO_ILL);
+    ck_assert(cc.conf_id == -1);
+    ck_assert(cc.memb.size() == 0);
+    ck_assert(cc.repl_proto_ver == -1);
+    ck_assert(cc.appl_proto_ver == -1);
 }
 END_TEST
 
@@ -31,13 +31,13 @@ START_TEST (serialization)
     void* buf(NULL);
     int size(cc_src.write(&buf));
 
-    fail_if(NULL == buf);
-    fail_if(size <= 0);
+    ck_assert(NULL != buf);
+    ck_assert(size >  0);
 
     {
         gcs_act_cchange const cc_dst(buf, size);
 
-        fail_unless(cc_dst == cc_src);
+        ck_assert(cc_dst == cc_src);
     }
 
     /* try buffer corruption, exception must be thrown */
@@ -47,7 +47,7 @@ START_TEST (serialization)
 
         gcs_act_cchange const cc_dst(buf, size);
 
-        fail_if(true, "exception must be thrown");
+        ck_abort_msg("exception must be thrown");
     }
     catch (gu::Exception& e)
     {}
@@ -74,19 +74,19 @@ START_TEST (serialization)
 
     size = cc_src.write(&buf);
 
-    fail_if(NULL == buf);
-    fail_if(size <= 0);
+    ck_assert(NULL != buf);
+    ck_assert(size >  0);
 
     {
         gcs_act_cchange const cc_dst(buf, size);
 
-        fail_unless(cc_dst == cc_src);
+        ck_assert(cc_dst == cc_src);
 
-        fail_if(cc_dst.seqno          != cc_src.seqno);
-        fail_if(cc_dst.conf_id        != cc_src.conf_id);
-        fail_if(cc_dst.memb.size()    != cc_src.memb.size());
-        fail_if(cc_dst.repl_proto_ver != cc_src.repl_proto_ver);
-        fail_if(cc_dst.appl_proto_ver != cc_src.appl_proto_ver);
+        ck_assert(cc_dst.seqno          == cc_src.seqno);
+        ck_assert(cc_dst.conf_id        == cc_src.conf_id);
+        ck_assert(cc_dst.memb.size()    == cc_src.memb.size());
+        ck_assert(cc_dst.repl_proto_ver == cc_src.repl_proto_ver);
+        ck_assert(cc_dst.appl_proto_ver == cc_src.appl_proto_ver);
     }
 
     /* another buffer corruption, exception must be thrown */
@@ -96,7 +96,7 @@ START_TEST (serialization)
 
         gcs_act_cchange const cc_dst(buf, size);
 
-        fail_if(true, "exception must be thrown");
+        ck_abort_msg("exception must be thrown");
     }
     catch (gu::Exception& e)
     {}

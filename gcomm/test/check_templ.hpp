@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2020 Codership Oy <info@codership.com>
  */
 
 #ifndef GCOMM_CHECK_TEMPL_HPP
@@ -21,9 +21,9 @@ namespace gcomm
                              const T& default_c)
     {
 
-        fail_unless(c.serial_size() == expected_size,
-                    "size = %lu expected = %lu",
-                    c.serial_size(), expected_size);
+        ck_assert_msg(c.serial_size() == expected_size,
+                      "size = %lu expected = %lu",
+                      c.serial_size(), expected_size);
         gu::byte_t* buf = new gu::byte_t[expected_size + 7];
         size_t ret;
         // Check that what is written gets also read
@@ -32,13 +32,13 @@ namespace gcomm
             (void)c.serialize(buf, expected_size, 1);
             std::ostringstream os;
             os << c;
-            fail("exception not thrown for %s", os.str().c_str());
+            ck_abort_msg("exception not thrown for %s", os.str().c_str());
         }
         catch (gu::Exception& e)
         {
             // OK
         }
-        fail_unless(c.serialize(buf, expected_size, 0) == expected_size);
+        ck_assert(c.serialize(buf, expected_size, 0) == expected_size);
 
         T c2(default_c);
 
@@ -52,8 +52,8 @@ namespace gcomm
         //     size_t res(c2.unserialize(buf, expected_size, 1));
         //     std::ostringstream os;
         //     os << c;
-        //     fail("exception not thrown for %s, result %zu expected %zu",
-        //          os.str().c_str(), res, expected_size);
+        //     ck_abort_msg("exception not thrown for %s, result %zu expected %zu",
+        //                  os.str().c_str(), res, expected_size);
         // }
         // catch (gu::Exception& e)
         // {
@@ -61,20 +61,20 @@ namespace gcomm
         // }
 
         ret = c2.unserialize(buf, expected_size, 0);
-        fail_unless(ret == expected_size,
-                    "expected %zu ret %zu", expected_size, ret);
+        ck_assert_msg(ret == expected_size,
+                      "expected %zu ret %zu", expected_size, ret);
         if ((c == c2) == false)
         {
             log_warn << "\n\t" << c << " !=\n\t" << c2;
         }
-        fail_unless(c == c2);
+        ck_assert(c == c2);
 
         // Check that read/write return offset properly
 
-        fail_unless(c.serialize(buf, expected_size + 7, 5) == expected_size + 5);
-        fail_unless(c2.unserialize(buf, expected_size + 7, 5) == expected_size + 5);
+        ck_assert(c.serialize(buf, expected_size + 7, 5) == expected_size + 5);
+        ck_assert(c2.unserialize(buf, expected_size + 7, 5) == expected_size + 5);
 
-        fail_unless(c == c2);
+        ck_assert(c == c2);
 
         delete[] buf;
     }

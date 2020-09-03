@@ -14,7 +14,7 @@ struct gcs_act
     const void*    buf;
     ssize_t        buf_len;
     gcs_act_type_t type;
-    gcs_act() : buf(), buf_len(), type() { }
+    gcs_act() : buf(NULL), buf_len(0), type(GCS_ACT_ERROR) { }
     gcs_act(const void* b, ssize_t bl, gcs_act_type_t t)
         :
         buf(b),
@@ -29,7 +29,7 @@ struct gcs_act_rcvd
     const struct gu_buf* local; // local buffer vector if any
     gcs_seqno_t    id;          // global total order seqno
     int            sender_idx;
-    gcs_act_rcvd() : act(), local(), id(), sender_idx() { }
+    gcs_act_rcvd() : act(), local(NULL), id(GCS_SEQNO_ILL), sender_idx(-1) { }
     gcs_act_rcvd(const gcs_act& a, const struct gu_buf* loc,
                  gcs_seqno_t i, int si)
         :

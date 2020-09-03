@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2020 Codership Oy <info@codership.com>
  */
 
 #include "check_gcomm.hpp"
@@ -167,7 +167,7 @@ START_TEST(test_gmcast_w_user_messages)
 
     pnet->event_loop(Sec/10);
 
-    fail_unless(u1.recvd() == 0);
+    ck_assert(u1.recvd() == 0);
 
     log_info << "u2 start";
     User u2(*pnet, "127.0.0.1:0",
@@ -231,10 +231,10 @@ START_TEST(test_gmcast_w_user_messages)
         pnet->event_loop(Sec/10);
     }
 
-    fail_unless(u1.recvd() != 0);
-    fail_unless(u2.recvd() != 0);
-    fail_unless(u3.recvd() != 0);
-    fail_unless(u4.recvd() != 0);
+    ck_assert(u1.recvd() != 0);
+    ck_assert(u2.recvd() != 0);
+    ck_assert(u3.recvd() != 0);
+    ck_assert(u4.recvd() != 0);
 
     pnet->erase(&u4.pstack());
     pnet->erase(&u3.pstack());
@@ -373,9 +373,9 @@ START_TEST(test_trac_380)
     }
     catch (gu::Exception& e)
     {
-        fail_unless(e.get_errno() == EINVAL,
-                    "unexpected errno: %d, cause %s",
-                    e.get_errno(), e.what());
+        ck_assert_msg(e.get_errno() == EINVAL,
+                      "unexpected errno: %d, cause %s",
+                      e.get_errno(), e.what());
     }
     pnet->erase(&tp1->pstack());
     tp1->close();
@@ -407,8 +407,8 @@ START_TEST(test_trac_828)
     }
     catch (gu::Exception& e)
     {
-        fail("test_trac_828, expcetion thrown because of having own address "
-             "in address list");
+        ck_abort_msg("test_trac_828, expcetion thrown because of having own "
+                     "address in address list");
     }
 }
 END_TEST
@@ -472,7 +472,7 @@ START_TEST(test_gmcast_ipv6)
                                         "gmcast.listen_addr=tcp://[2001:db8:10:9464::233]:4567"));
         log_info << tp->configured_listen_addr();
         log_info << conf;
-        fail_unless(tp->configured_listen_addr() == "tcp://[2001:db8:10:9464::233]:4567");
+        ck_assert(tp->configured_listen_addr() == "tcp://[2001:db8:10:9464::233]:4567");
     }
     log_info << "END test_gmcast_ipv6";
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2017 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -33,54 +33,58 @@ START_TEST (gu_lock_step_test)
     gu_thread_t thr1, thr2;
 
     gu_lock_step_init (&LS);
-    fail_if (LS.wait    != 0);
-    fail_if (LS.enabled != false);
+    ck_assert(LS.wait    == 0);
+    ck_assert(LS.enabled == false);
 
     // first try with lock-stepping disabled
     ret = gu_thread_create (&thr1, NULL, lock_step_thread, NULL);
-    fail_if (ret != 0);
+    ck_assert(ret == 0);
     WAIT_FOR(0 == LS.wait); // 10ms
-    fail_if (LS.wait != 0); // by default lock-step is disabled
+    ck_assert(LS.wait == 0); // by default lock-step is disabled
 
     ret = gu_thread_join (thr1, NULL);
-    fail_if (ret != 0, "gu_thread_join() failed: %ld (%s)", ret, strerror(ret));
+    ck_assert_msg(ret == 0,
+                  "gu_thread_join() failed: %ld (%s)", ret, strerror(ret));
 
     ret = gu_lock_step_cont (&LS, timeout);
-    fail_if (-1 != ret);
+    ck_assert(-1 == ret);
 
     // enable lock-step
     gu_lock_step_enable (&LS, true);
-    fail_if (LS.enabled != true);
+    ck_assert(LS.enabled == true);
 
     ret = gu_lock_step_cont (&LS, timeout);
-    fail_if (0 != ret); // nobody's waiting
+    ck_assert(0 == ret); // nobody's waiting
 
     ret = gu_thread_create (&thr1, NULL, lock_step_thread, NULL);
-    fail_if (ret != 0);
+    ck_assert(ret == 0);
     WAIT_FOR(1 == LS.wait); // 10ms
-    fail_if (LS.wait != 1);
+    ck_assert(LS.wait == 1);
 
     ret = gu_thread_create (&thr2, NULL, lock_step_thread, NULL);
-    fail_if (ret != 0);
+    ck_assert(ret == 0);
     WAIT_FOR(2 == LS.wait); // 10ms
-    fail_if (LS.wait != 2);
+    ck_assert(LS.wait == 2);
 
     ret = gu_lock_step_cont (&LS, timeout);
-    fail_if (ret != 2);     // there were 2 waiters
-    fail_if (LS.wait != 1); // 1 waiter remains
+    ck_assert(ret == 2);     // there were 2 waiters
+    ck_assert(LS.wait == 1); // 1 waiter remains
 
     ret = gu_lock_step_cont (&LS, timeout);
-    fail_if (ret != 1); 
-    fail_if (LS.wait != 0); // 0 waiters remain
+    ck_assert(ret == 1); 
+    ck_assert(LS.wait == 0); // 0 waiters remain
 
     ret = gu_thread_join (thr1, NULL);
-    fail_if (ret != 0, "gu_thread_join() failed: %ld (%s)", ret, strerror(ret));
+    ck_assert_msg(ret == 0,
+                  "gu_thread_join() failed: %ld (%s)", ret, strerror(ret));
     ret = gu_thread_join (thr2, NULL);
-    fail_if (ret != 0, "gu_thread_join() failed: %ld (%s)", ret, strerror(ret));
+    ck_assert_msg(ret == 0,
+                  "gu_thread_join() failed: %ld (%s)", ret, strerror(ret));
 
     ret = gu_lock_step_cont (&LS, timeout);
-    fail_if (ret != 0);     // there were 0 waiters 
-    fail_if (LS.wait != 0, "Expected LS.wait to be 0, found: %ld", LS.wait);
+    ck_assert(ret == 0);     // there were 0 waiters 
+    ck_assert_msg(LS.wait == 0,
+                  "Expected LS.wait to be 0, found: %ld", LS.wait);
 
     gu_lock_step_destroy (&LS);
 }
@@ -107,22 +111,23 @@ START_TEST (gu_lock_step_race)
 
     gu_lock_step_init   (&LS);
     gu_lock_step_enable (&LS, true);
-    fail_if (LS.enabled != true);
+    ck_assert(LS.enabled == true);
 
     ret = gu_thread_create (&thr1, NULL, lock_step_race, NULL);
-    fail_if (ret != 0);
+    ck_assert(ret == 0);
 
     for (i = 0; i < RACE_ITERATIONS; i++) {
         ret = gu_lock_step_cont (&LS, timeout);
-        fail_if (ret != 1, "No waiter at iteration: %ld", i);
+        ck_assert_msg(ret == 1, "No waiter at iteration: %ld", i);
     }
-    fail_if (LS.wait != 0); // 0 waiters remain
+    ck_assert(LS.wait == 0); // 0 waiters remain
 
     ret = gu_thread_join (thr1, NULL);
-    fail_if (ret != 0, "gu_thread_join() failed: %ld (%s)", ret, strerror(ret));
+    ck_assert_msg(ret == 0,
+                  "gu_thread_join() failed: %ld (%s)", ret, strerror(ret));
 
     ret = gu_lock_step_cont (&LS, timeout);
-    fail_if (ret != 0);
+    ck_assert(ret == 0);
 }
 END_TEST
 

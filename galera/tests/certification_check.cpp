@@ -118,7 +118,7 @@ void run_wsinfo(const WSInfo* const wsi, size_t const nws, int const version)
 
         // serialize write set into gcache buffer
         gu::byte_t* buf(static_cast<gu::byte_t*>(env.gcache().malloc(size)));
-        fail_unless(out.serialize(buf, size) == size);
+        ck_assert(out.serialize(buf, size) == size);
 
 
         gcs_action act = {wsi[i].global_seqno,
@@ -128,15 +128,15 @@ void run_wsinfo(const WSInfo* const wsi, size_t const nws, int const version)
                           GCS_ACT_WRITESET};
         galera::TrxHandleSlavePtr ts(galera::TrxHandleSlave::New(false, sp),
                                      galera::TrxHandleSlaveDeleter());
-        fail_unless(ts->unserialize<true>(act) == size);
+        ck_assert(ts->unserialize<true>(act) == size);
 
         galera::Certification::TestResult result(cert.append_trx(ts));
-        fail_unless(result == wsi[i].result, "g: %lld res: %d exp: %d",
-                    ts->global_seqno(), result, wsi[i].result);
-        fail_unless(ts->depends_seqno() == wsi[i].expected_depends_seqno,
-                    "wsi: %zu g: %lld ld: %lld eld: %lld",
-                    i, ts->global_seqno(), ts->depends_seqno(),
-                    wsi[i].expected_depends_seqno);
+        ck_assert_msg(result == wsi[i].result, "g: %lld res: %d exp: %d",
+                      ts->global_seqno(), result, wsi[i].result);
+        ck_assert_msg(ts->depends_seqno() == wsi[i].expected_depends_seqno,
+                      "wsi: %zu g: %lld ld: %lld eld: %lld",
+                      i, ts->global_seqno(), ts->depends_seqno(),
+                      wsi[i].expected_depends_seqno);
         cert.set_trx_committed(*ts);
 
         if (ts->nbo_end() && ts->ends_nbo() != WSREP_SEQNO_UNDEFINED)

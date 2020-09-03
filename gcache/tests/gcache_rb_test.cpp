@@ -36,41 +36,42 @@ START_TEST(test1)
     gu::UUID   gid(GID);
     RingBuffer rb(RB_NAME, rb_size, s2p, gid, 0, false);
 
-    fail_if (rb.size() != rb_size, "Expected %zd, got %zd", rb_size, rb.size());
+    ck_assert_msg(rb.size() == rb_size,
+                  "Expected %zd, got %zd", rb_size, rb.size());
 
     if (gid != GID)
     {
         std::ostringstream os;
         os << "Expected GID: " << GID << ", got: " << gid;
-        fail(os.str().c_str());
+        ck_abort_msg(os.str().c_str());
     }
 
     void* buf1 = rb.malloc (MemOps::align_size(rb_size/2 + 1));
-    fail_if (NULL != buf1); // > 1/2 size
+    ck_assert(NULL == buf1); // > 1/2 size
 
     buf1 = rb.malloc (ALLOC_SIZE(1));
-    fail_if (NULL == buf1);
+    ck_assert(NULL != buf1);
 
     BufferHeader* bh1(ptr2BH(buf1));
-    fail_if (bh1->seqno_g != SEQNO_NONE);
-    fail_if (BH_is_released(bh1));
+    ck_assert(bh1->seqno_g == SEQNO_NONE);
+    ck_assert(!BH_is_released(bh1));
 
     void* buf2 = rb.malloc (ALLOC_SIZE(2));
-    fail_if (NULL == buf2);
-    fail_if (BH_is_released(bh1));
+    ck_assert(NULL != buf2);
+    ck_assert(!BH_is_released(bh1));
 
     BufferHeader* bh2(ptr2BH(buf2));
-    fail_if (bh2->seqno_g != SEQNO_NONE);
-    fail_if (BH_is_released(bh2));
+    ck_assert(bh2->seqno_g == SEQNO_NONE);
+    ck_assert(!BH_is_released(bh2));
 
     void* tmp = rb.realloc (buf1, ALLOC_SIZE(2));
     // anything <= MemOps::ALIGNMENT should fit into original buffer
-    fail_if(tmp != buf1 && MemOps::ALIGNMENT > 1);
+    ck_assert(tmp == buf1 && MemOps::ALIGNMENT > 1);
 
     tmp = rb.realloc (buf1, ALLOC_SIZE(MemOps::ALIGNMENT + 1));
     // should require new buffer for which there's no space
-    fail_if (bh2->seqno_g != SEQNO_NONE);
-    fail_if (NULL != tmp);
+    ck_assert(bh2->seqno_g == SEQNO_NONE);
+    ck_assert(NULL == tmp);
 
     BH_release(bh2);
     rb.free (bh2);
@@ -78,34 +79,34 @@ START_TEST(test1)
     tmp = rb.realloc (buf1, ALLOC_SIZE(3));
     if (MemOps::ALIGNMENT > 2)
     {
-        fail_if (NULL == tmp);
-        fail_if (buf1 != tmp);
+        ck_assert(NULL != tmp);
+        ck_assert(buf1 == tmp);
     }
     else
     {
-        fail_if (NULL != tmp);
+        ck_assert(NULL == tmp);
     }
 
     BH_release(bh1);
     rb.free (bh1);
-    fail_if (!BH_is_released(bh1));
+    ck_assert(BH_is_released(bh1));
 
     buf1 = rb.malloc(ALLOC_SIZE(1));
-    fail_if (NULL == buf1);
+    ck_assert(NULL != buf1);
 
     tmp = rb.realloc (buf1, ALLOC_SIZE(2));
-    fail_if (NULL == tmp);
-    fail_if (tmp != buf1);
+    ck_assert(NULL != tmp);
+    ck_assert(tmp  == buf1);
 
     buf2 = rb.malloc (ALLOC_SIZE(1));
-    fail_if (NULL == buf2);
+    ck_assert(NULL != buf2);
 
     tmp = rb.realloc (buf2, ALLOC_SIZE(2));
-    fail_if (NULL == tmp);
-    fail_if (tmp != buf2);
+    ck_assert(NULL != tmp);
+    ck_assert(tmp  == buf2);
 
     tmp = rb.malloc (ALLOC_SIZE(1));
-    fail_if (NULL != tmp);
+    ck_assert(NULL == tmp);
 
     BH_release(ptr2BH(buf1));
     rb.free(ptr2BH(buf1));
@@ -114,7 +115,7 @@ START_TEST(test1)
     rb.free(ptr2BH(buf2));
 
     tmp = rb.malloc (ALLOC_SIZE(2));
-    fail_if (NULL == tmp);
+    ck_assert(NULL != tmp);
 
     mark_point();
 }
@@ -207,34 +208,34 @@ START_TEST(recovery)
     {
         rb_ctx ctx(rb_5size);
 
-        fail_if (ctx.rb.size() != ctx.size,
-                 "Expected %zd, got %zd", ctx.size, ctx.rb.size());
+        ck_assert_msg(ctx.rb.size() == ctx.size,
+                      "Expected %zd, got %zd", ctx.size, ctx.rb.size());
 
         if (ctx.gid != GID)
         {
             std::ostringstream os;
             os << "Expected GID: " << GID << ", got: " << ctx.gid;
-            fail(os.str().c_str());
+            ck_abort_msg(os.str().c_str());
         }
 
-        fail_if(!ctx.s2p.empty());
+        ck_assert(ctx.s2p.empty());
 
         void* m(ctx.add_msg(msgs[0]));
-        fail_if (NULL == m);
-        fail_if (*ctx.s2p.find(msgs[0].g) != m);
+        ck_assert(NULL != m);
+        ck_assert(*ctx.s2p.find(msgs[0].g) == m);
 
         m = ctx.add_msg(msgs[1]);
-        fail_if (NULL == m);
-        fail_if (*ctx.s2p.find(msgs[1].g) != m);
+        ck_assert(NULL != m);
+        ck_assert(*ctx.s2p.find(msgs[1].g) == m);
 
         m = ctx.add_msg(msgs[2]);
-        fail_if (NULL == m);
-        fail_if (*ctx.s2p.find(msgs[2].g) != m);
+        ck_assert(NULL != m);
+        ck_assert(*ctx.s2p.find(msgs[2].g) == m);
 
         m = ctx.add_msg(msgs[3]);
-        fail_if (NULL == m);
-        fail_if (msgs[3].g > 0);
-        fail_if (ctx.s2p.find(msgs[3].g) != ctx.s2p.end());
+        ck_assert(NULL != m);
+        ck_assert(msgs[3].g <= 0);
+        ck_assert(ctx.s2p.find(msgs[3].g) == ctx.s2p.end());
 
         seqno_min = ctx.s2p.index_front();
         seqno_max = ctx.s2p.index_back();
@@ -248,35 +249,35 @@ START_TEST(recovery)
     {
         rb_ctx ctx(rb_5size);
 
-        fail_if (ctx.rb.size() != ctx.size,
-                 "Expected %zd, got %zd", ctx.size, ctx.rb.size());
+        ck_assert_msg(ctx.rb.size() == ctx.size,
+                      "Expected %zd, got %zd", ctx.size, ctx.rb.size());
 
         if (ctx.gid != GID)
         {
             std::ostringstream os;
             os << "Expected GID: " << GID << ", got: " << ctx.gid;
-            fail(os.str().c_str());
+            ck_abort_msg(os.str().c_str());
         }
 
-        fail_if(ctx.s2p.empty());
-        fail_if(ctx.s2p.size() != 1);
-        fail_if(ctx.s2p.index_front() == seqno_min);
-        fail_if(ctx.s2p.index_front() != seqno_max);
+        ck_assert(!ctx.s2p.empty());
+        ck_assert(ctx.s2p.size() == 1);
+        ck_assert(ctx.s2p.index_front() != seqno_min);
+        ck_assert(ctx.s2p.index_front() == seqno_max);
 
         void* m(ctx.add_msg(msgs[4]));
-        fail_if (NULL == m);
-        fail_if (*ctx.s2p.find(msgs[4].g) != m);
+        ck_assert(NULL != m);
+        ck_assert(*ctx.s2p.find(msgs[4].g) == m);
 
         m = ctx.add_msg(msgs[5]);
-        fail_if (NULL == m);
-        fail_if (msgs[5].g > 0);
-        fail_if (ctx.s2p.find(msgs[5].g) != ctx.s2p.end());
+        ck_assert(NULL != m);
+        ck_assert(msgs[5].g <= 0);
+        ck_assert(ctx.s2p.find(msgs[5].g) == ctx.s2p.end());
 
         m = ctx.add_msg(msgs[6]);
-        fail_if (NULL == m);
-        fail_if (*ctx.s2p.find(msgs[6].g) != m);
+        ck_assert(NULL != m);
+        ck_assert(*ctx.s2p.find(msgs[6].g) <= m);
         // here we should have rollover
-        fail_if (ptr2BH(m) != BH_cast(ctx.rb.start()));
+        ck_assert(ptr2BH(m) == BH_cast(ctx.rb.start()));
 
         seqno_min = ctx.s2p.index_front();
         seqno_max = ctx.s2p.index_back();
@@ -290,38 +291,38 @@ START_TEST(recovery)
     {
         rb_ctx ctx0(rb_5size);
 
-        fail_if (ctx0.rb.size() != ctx0.size,
-                 "Expected %zd, got %zd", ctx0.size, ctx0.rb.size());
+        ck_assert_msg(ctx0.rb.size() == ctx0.size,
+                      "Expected %zd, got %zd", ctx0.size, ctx0.rb.size());
 
         if (ctx0.gid != GID)
         {
             std::ostringstream os;
             os << "Expected GID: " << GID << ", got: " << ctx0.gid;
-            fail(os.str().c_str());
+            ck_abort_msg(os.str().c_str());
         }
 
-        fail_if(ctx0.s2p.empty());
-        fail_if(ctx0.s2p.size() != 3);
-        fail_if(ctx0.s2p.index_front() != seqno_min);
-        fail_if(ctx0.s2p.index_back()  != seqno_max);
+        ck_assert(!ctx0.s2p.empty());
+        ck_assert(ctx0.s2p.size() == 3);
+        ck_assert(ctx0.s2p.index_front() == seqno_min);
+        ck_assert(ctx0.s2p.index_back()  == seqno_max);
 
         /* now try to open unclosed file. Results should be the same */
         rb_ctx ctx(rb_5size);
 
-        fail_if (ctx.rb.size() != ctx.size,
-                 "Expected %zd, got %zd", ctx.size, ctx.rb.size());
+        ck_assert_msg(ctx.rb.size() == ctx.size,
+                      "Expected %zd, got %zd", ctx.size, ctx.rb.size());
 
         if (ctx.gid != GID)
         {
             std::ostringstream os;
             os << "Expected GID: " << GID << ", got: " << ctx.gid;
-            fail(os.str().c_str());
+            ck_abort_msg(os.str().c_str());
         }
 
-        fail_if(ctx.s2p.empty());
-        fail_if(ctx.s2p.size() != 3);
-        fail_if(ctx.s2p.index_front() != seqno_min);
-        fail_if(ctx.s2p.index_back()  != seqno_max);
+        ck_assert(!ctx.s2p.empty());
+        ck_assert(ctx.s2p.size() == 3);
+        ck_assert(ctx.s2p.index_front() == seqno_min);
+        ck_assert(ctx.s2p.index_back()  == seqno_max);
 
         seqno_min = ctx.s2p.index_front();
         seqno_max = ctx.s2p.index_back();
@@ -334,35 +335,35 @@ START_TEST(recovery)
     {
         rb_ctx ctx(rb_3size);
 
-        fail_if (ctx.rb.size() != ctx.size,
-                 "Expected %zd, got %zd", ctx.size, ctx.rb.size());
+        ck_assert_msg(ctx.rb.size() == ctx.size,
+                      "Expected %zd, got %zd", ctx.size, ctx.rb.size());
 
         if (ctx.gid != GID)
         {
             std::ostringstream os;
             os << "Expected GID: " << GID << ", got: " << ctx.gid;
-            fail(os.str().c_str());
+            ck_abort_msg(os.str().c_str());
         }
 
-        fail_if(ctx.s2p.empty());
-        fail_if(ctx.s2p.size() != 2);
-        fail_if(ctx.s2p.index_begin()  == seqno_min);
-        fail_if(ctx.s2p.index_back() != seqno_max);
+        ck_assert(!ctx.s2p.empty());
+        ck_assert(ctx.s2p.size() == 2);
+        ck_assert(ctx.s2p.index_begin() != seqno_min);
+        ck_assert(ctx.s2p.index_back()  == seqno_max);
 
         void* m(ctx.add_msg(msgs[8]));
-        fail_if (NULL == m);
-        fail_if (*ctx.s2p.find(msgs[8].g) != m);
+        ck_assert(NULL != m);
+        ck_assert(*ctx.s2p.find(msgs[8].g) == m);
 
         m = ctx.add_msg(msgs[9]);
-        fail_if (NULL == m);
-        fail_if (*ctx.s2p.find(msgs[9].g) != m);
+        ck_assert(NULL != m);
+        ck_assert(*ctx.s2p.find(msgs[9].g) == m);
 
         m = ctx.add_msg(msgs[7]);
-        fail_if (NULL == m);
-        fail_if (msgs[7].g > 0);
-        fail_if (ctx.s2p.find(msgs[7].g) != ctx.s2p.end());
+        ck_assert(NULL != m);
+        ck_assert(msgs[7].g <= 0);
+        ck_assert(ctx.s2p.find(msgs[7].g) == ctx.s2p.end());
         // here we should have rollover
-        fail_if (ptr2BH(m) != BH_cast(ctx.rb.start()));
+        ck_assert(ptr2BH(m) == BH_cast(ctx.rb.start()));
 
         seqno_min = ctx.s2p.index_front();
         seqno_max = ctx.s2p.index_back();
@@ -373,41 +374,41 @@ START_TEST(recovery)
         /* first open this with known offset */
         rb_ctx ctx0(rb_3size);
 
-        fail_if (ctx0.rb.size() != ctx0.size,
-                 "Expected %zd, got %zd", ctx0.size, ctx0.rb.size());
+        ck_assert_msg(ctx0.rb.size() == ctx0.size,
+                      "Expected %zd, got %zd", ctx0.size, ctx0.rb.size());
 
         if (ctx0.gid != GID)
         {
             std::ostringstream os;
             os << "Expected GID: " << GID << ", got: " << ctx0.gid;
-            fail(os.str().c_str());
+            ck_abort_msg(os.str().c_str());
         }
 
-        fail_if(ctx0.s2p.empty());
-        fail_if(ctx0.s2p.size() != 1);
-        fail_if(ctx0.s2p.index_front() != seqno_max);
-        fail_if(ctx0.s2p.index_back()  != seqno_max);
+        ck_assert(!ctx0.s2p.empty());
+        ck_assert(ctx0.s2p.size() == 1);
+        ck_assert(ctx0.s2p.index_front() == seqno_max);
+        ck_assert(ctx0.s2p.index_back()  == seqno_max);
 
         /* now try to open unclosed file. Results should be the same */
         rb_ctx ctx(rb_3size);
 
-        fail_if (ctx.rb.size() != ctx.size,
-                 "Expected %zd, got %zd", ctx.size, ctx.rb.size());
+        ck_assert_msg(ctx.rb.size() == ctx.size,
+                      "Expected %zd, got %zd", ctx.size, ctx.rb.size());
 
         if (ctx.gid != GID)
         {
             std::ostringstream os;
             os << "Expected GID: " << GID << ", got: " << ctx.gid;
-            fail(os.str().c_str());
+            ck_abort_msg(os.str().c_str());
         }
 
-        fail_if(ctx.s2p.empty());
-        fail_if(ctx.s2p.size() != 1);
-        fail_if(ctx.s2p.index_front() != seqno_max);
-        fail_if(ctx.s2p.index_back()  != seqno_max);
+        ck_assert(!ctx.s2p.empty());
+        ck_assert(ctx.s2p.size() == 1);
+        ck_assert(ctx.s2p.index_front() == seqno_max);
+        ck_assert(ctx.s2p.index_back()  == seqno_max);
 
-        fail_if(seqno_max < 1);
-        fail_if(seqno_min != seqno_max);
+        ck_assert(seqno_max >= 1);
+        ck_assert(seqno_min == seqno_max);
     }
 
     ::unlink(RB_NAME.c_str());
@@ -417,36 +418,36 @@ START_TEST(recovery)
     {
         rb_ctx ctx(rb_3size, false);
 
-        fail_if (ctx.rb.size() != ctx.size,
-                 "Expected %zd, got %zd", ctx.size, ctx.rb.size());
+        ck_assert_msg(ctx.rb.size() == ctx.size,
+                      "Expected %zd, got %zd", ctx.size, ctx.rb.size());
 
         if (ctx.gid != GID)
         {
             std::ostringstream os;
             os << "Expected GID: " << GID << ", got: " << ctx.gid;
-            fail(os.str().c_str());
+            ck_abort_msg(os.str().c_str());
         }
 
-        fail_if(!ctx.s2p.empty());
+        ck_assert(ctx.s2p.empty());
 
         void* m(ctx.add_msg(msgs[3]));
-        fail_if (NULL == m);
-        fail_if (ctx.s2p.find(msgs[3].g) != ctx.s2p.end());
+        ck_assert(NULL != m);
+        ck_assert(ctx.s2p.find(msgs[3].g) == ctx.s2p.end());
 
         m = ctx.add_msg(msgs[4]);
-        fail_if (NULL == m);
-        fail_if (*ctx.s2p.find(msgs[4].g) != m);
+        ck_assert(NULL != m);
+        ck_assert(*ctx.s2p.find(msgs[4].g) == m);
 
         m = ctx.add_msg(msgs[5]);
-        fail_if (NULL == m);
-        fail_if (ctx.s2p.find(msgs[5].g) != ctx.s2p.end());
+        ck_assert(NULL != m);
+        ck_assert(ctx.s2p.find(msgs[5].g) == ctx.s2p.end());
         third_buffer_offset = ctx.rb.offset(m);
 
-        fail_if(ctx.s2p.empty());
-        fail_if(ctx.s2p.size() != 1);
+        ck_assert(!ctx.s2p.empty());
+        ck_assert(ctx.s2p.size() == 1);
         seqno_min = ctx.s2p.index_front();
         seqno_max = ctx.s2p.index_back();
-        fail_if(seqno_min != seqno_max);
+        ck_assert(seqno_min == seqno_max);
     }
 
     /* now the situation should be |***444***| - only one segment, in the middle,
@@ -454,21 +455,21 @@ START_TEST(recovery)
     {
         rb_ctx ctx(rb_3size);
 
-        fail_if (ctx.rb.size() != ctx.size,
-                 "Expected %zd, got %zd", ctx.size, ctx.rb.size());
+        ck_assert_msg(ctx.rb.size() == ctx.size,
+                      "Expected %zd, got %zd", ctx.size, ctx.rb.size());
 
         if (ctx.gid != GID)
         {
             std::ostringstream os;
             os << "Expected GID: " << GID << ", got: " << ctx.gid;
-            fail(os.str().c_str());
+            ck_abort_msg(os.str().c_str());
         }
 
-        fail_if(ctx.s2p.empty());
-        fail_if(ctx.s2p.size() != 1);
-        fail_if(seqno_min != ctx.s2p.index_begin());
-        fail_if(seqno_max != ctx.s2p.index_back());
-        fail_if(seqno_min != seqno_max);
+        ck_assert(!ctx.s2p.empty());
+        ck_assert(ctx.s2p.size() == 1);
+        ck_assert(seqno_min == ctx.s2p.index_begin());
+        ck_assert(seqno_max == ctx.s2p.index_back());
+        ck_assert(seqno_min == seqno_max);
     }
 
     /* now the situation should be |---444---| - only one segment, in the middle,
@@ -476,26 +477,26 @@ START_TEST(recovery)
     {
         rb_ctx ctx(rb_3size);
 
-        fail_if (ctx.rb.size() != ctx.size,
-                 "Expected %zd, got %zd", ctx.size, ctx.rb.size());
+        ck_assert_msg(ctx.rb.size() == ctx.size,
+                      "Expected %zd, got %zd", ctx.size, ctx.rb.size());
 
         if (ctx.gid != GID)
         {
             std::ostringstream os;
             os << "Expected GID: " << GID << ", got: " << ctx.gid;
-            fail(os.str().c_str());
+            ck_abort_msg(os.str().c_str());
         }
 
-        fail_if(ctx.s2p.empty());
-        fail_if(ctx.s2p.size() != 1);
-        fail_if(seqno_min != ctx.s2p.index_front());
-        fail_if(seqno_max != ctx.s2p.index_back());
-        fail_if(seqno_min != seqno_max);
+        ck_assert(!ctx.s2p.empty());
+        ck_assert(ctx.s2p.size() == 1);
+        ck_assert(seqno_min == ctx.s2p.index_front());
+        ck_assert(seqno_max == ctx.s2p.index_back());
+        ck_assert(seqno_min == seqno_max);
 
         // must be allocated right after the recovered buffer
         void* m(ctx.add_msg(msgs[3]));
-        fail_if (NULL == m);
-        fail_if (third_buffer_offset != ctx.rb.offset(m));
+        ck_assert(NULL != m);
+        ck_assert(third_buffer_offset == ctx.rb.offset(m));
     }
 
     ::unlink(RB_NAME.c_str());

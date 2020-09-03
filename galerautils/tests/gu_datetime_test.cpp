@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2020 Codership Oy <info@codership.com>
  */
 
 #include "gu_datetime.hpp"
@@ -15,15 +15,15 @@ using namespace gu::datetime;
 
 START_TEST(test_units)
 {
-    fail_unless(NSec  ==                                           1LL);
-    fail_unless(USec  ==                                        1000LL);
-    fail_unless(MSec  ==                                 1000LL*1000LL);
-    fail_unless(Sec   ==                          1000LL*1000LL*1000LL);
-    fail_unless(Min   ==                     60LL*1000LL*1000LL*1000LL);
-    fail_unless(Hour  ==                60LL*60LL*1000LL*1000LL*1000LL);
-    fail_unless(Day   ==           24LL*60LL*60LL*1000LL*1000LL*1000LL);
-    fail_unless(Month ==      30LL*24LL*60LL*60LL*1000LL*1000LL*1000LL);
-    fail_unless(Year  == 12LL*30LL*24LL*60LL*60LL*1000LL*1000LL*1000LL);
+    ck_assert(NSec  ==                                           1LL);
+    ck_assert(USec  ==                                        1000LL);
+    ck_assert(MSec  ==                                 1000LL*1000LL);
+    ck_assert(Sec   ==                          1000LL*1000LL*1000LL);
+    ck_assert(Min   ==                     60LL*1000LL*1000LL*1000LL);
+    ck_assert(Hour  ==                60LL*60LL*1000LL*1000LL*1000LL);
+    ck_assert(Day   ==           24LL*60LL*60LL*1000LL*1000LL*1000LL);
+    ck_assert(Month ==      30LL*24LL*60LL*60LL*1000LL*1000LL*1000LL);
+    ck_assert(Year  == 12LL*30LL*24LL*60LL*60LL*1000LL*1000LL*1000LL);
 
 
 }
@@ -32,42 +32,42 @@ END_TEST
 START_TEST(test_period)
 {
     // Zero periods
-    fail_unless(Period("").get_nsecs() == 0);
-    fail_unless(Period("P").get_nsecs() == 0);
-    fail_unless(Period("PT").get_nsecs() == 0);
+    ck_assert(Period("").get_nsecs() == 0);
+    ck_assert(Period("P").get_nsecs() == 0);
+    ck_assert(Period("PT").get_nsecs() == 0);
 
     // Year-mon-day
-    fail_unless(Period("P3Y").get_nsecs() == 3*Year);
-    fail_unless(Period("P5M").get_nsecs() == 5*Month);
-    fail_unless(Period("P37D").get_nsecs() == 37*Day);
+    ck_assert(Period("P3Y").get_nsecs() == 3*Year);
+    ck_assert(Period("P5M").get_nsecs() == 5*Month);
+    ck_assert(Period("P37D").get_nsecs() == 37*Day);
 
-    fail_unless(Period("P3Y17M").get_nsecs() == 3*Year + 17*Month);
-    fail_unless(Period("P5Y66D").get_nsecs() == 5*Year + 66*Day);
-    fail_unless(Period("P37M44D").get_nsecs() == 37*Month + 44*Day);
+    ck_assert(Period("P3Y17M").get_nsecs() == 3*Year + 17*Month);
+    ck_assert(Period("P5Y66D").get_nsecs() == 5*Year + 66*Day);
+    ck_assert(Period("P37M44D").get_nsecs() == 37*Month + 44*Day);
     
-    fail_unless(Period("P3YT").get_nsecs() == 3*Year);
-    fail_unless(Period("P5MT").get_nsecs() == 5*Month);
-    fail_unless(Period("P37DT").get_nsecs() == 37*Day);
+    ck_assert(Period("P3YT").get_nsecs() == 3*Year);
+    ck_assert(Period("P5MT").get_nsecs() == 5*Month);
+    ck_assert(Period("P37DT").get_nsecs() == 37*Day);
 
-    fail_unless(Period("P3Y17MT").get_nsecs() == 3*Year + 17*Month);
-    fail_unless(Period("P5Y66DT").get_nsecs() == 5*Year + 66*Day);
-    fail_unless(Period("P37M44DT").get_nsecs() == 37*Month + 44*Day);
+    ck_assert(Period("P3Y17MT").get_nsecs() == 3*Year + 17*Month);
+    ck_assert(Period("P5Y66DT").get_nsecs() == 5*Year + 66*Day);
+    ck_assert(Period("P37M44DT").get_nsecs() == 37*Month + 44*Day);
 
 
     // Hour-min-sec
-    fail_unless(Period("PT3H").get_nsecs() == 3*Hour);
-    fail_unless(Period("PT5M").get_nsecs() == 5*Min);
-    fail_unless(Period("P37S").get_nsecs() == 37*Sec);
+    ck_assert(Period("PT3H").get_nsecs() == 3*Hour);
+    ck_assert(Period("PT5M").get_nsecs() == 5*Min);
+    ck_assert(Period("P37S").get_nsecs() == 37*Sec);
 
-    // fail_unless(Period("PT3.578777S").get_nsecs() == 3*Sec + 578*MSec + 777*USec);
-    fail_unless(Period("PT0.5S").get_nsecs() == 500*MSec);
+    // ck_assert(Period("PT3.578777S").get_nsecs() == 3*Sec + 578*MSec + 777*USec);
+    ck_assert(Period("PT0.5S").get_nsecs() == 500*MSec);
 
 
-    // fail_unless(Period("PT5H7M3.578777S").get_nsecs() == 5*Hour + 7*Min + 3*Sec + 578*MSec + 777*USec);    
+    // ck_assert(Period("PT5H7M3.578777S").get_nsecs() == 5*Hour + 7*Min + 3*Sec + 578*MSec + 777*USec);    
     
     // @todo these should fail
-    fail_unless(Period("PT.S").get_nsecs() == 0);
-    fail_unless(Period("PT.D").get_nsecs() == 0);
+    ck_assert(Period("PT.S").get_nsecs() == 0);
+    ck_assert(Period("PT.D").get_nsecs() == 0);
 
 }
 END_TEST
@@ -76,11 +76,11 @@ START_TEST(test_date)
 {
     Date d1(Date::monotonic());
     Date d2 = d1 + Period("PT6S");
-    fail_unless(d2.get_utc() == d1.get_utc() + 6*Sec);
-    fail_unless(d2 - Period("PT6S") == d1);
+    ck_assert(d2.get_utc() == d1.get_utc() + 6*Sec);
+    ck_assert(d2 - Period("PT6S") == d1);
 
     Date max(Date::max());
-    fail_unless(d1 < max);
+    ck_assert(d1 < max);
 
 }
 END_TEST

@@ -1,4 +1,4 @@
-// Copyright (C) 2012 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2020 Codership Oy <info@codership.com>
 
 /*!
  * Original Bob Jenkins' test implementation:
@@ -185,8 +185,8 @@ START_TEST (gu_spooky_test)
 
         if (res != expected[i])
         {
-            fail ("%d: expected: 0x%.8lX, found: 0x%.8lX",
-                  i, expected[i], res);
+            ck_abort_msg("%d: expected: 0x%.8lX, found: 0x%.8lX",
+                         i, expected[i], res);
         }
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2015 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -66,9 +66,9 @@ START_TEST(gcs_code_msg)
     gcs_seqno_t const s1(cm1->seqno());
     uint64_t    const c1(cm1->code());
 
-    fail_if(u0 != u1);
-    fail_if(s0 != s1);
-    fail_if(c0 != c1);
+    ck_assert(u0 == u1);
+    ck_assert(s0 == s1);
+    ck_assert(c0 == c1);
 }
 END_TEST
 
@@ -160,7 +160,7 @@ core_recv_thread (void* arg)
 #define FAIL_IF(expr, format, ...)                            \
     if (expr) {                                               \
         gu_fatal ("FAIL: " format, __VA_ARGS__, NULL);        \
-        fail_if (true, format, __VA_ARGS__, NULL);            \
+        ck_assert_msg(false, format, __VA_ARGS__, NULL);      \
         return true;                                          \
     }
 
@@ -218,18 +218,18 @@ static bool COMMON_RECV_CHECKS(action_t*      act,
     if (NULL != buf) {
         if (GCS_ACT_WRITESET == act->type) {
             // local action buffer should not be copied
-            FAIL_IF (act->local != act->in,
-                     "Received buffer ptr is not the same as sent: %p != %p",
-                     act->in, act->local, NULL);
-            FAIL_IF (memcmp (buf, act->out, act->size),
-                     "Received buffer contents is not the same as sent: "
-                     "'%s' != '%s'", buf, (char*)act->out);
+            ck_assert_msg(act->local == act->in,
+                          "Received buffer ptr is not the same as sent: "
+                          "%p != %p", act->in, act->local, NULL);
+            ck_assert_msg(!memcmp(buf, act->out, act->size),
+                          "Received buffer contents is not the same as sent: "
+                          "'%s' != '%s'", buf, (char*)act->out);
         }
         else {
-            FAIL_IF (act->local == buf,
-                     "Received the same buffer ptr as sent", NULL);
-            FAIL_IF (memcmp (buf, act->out, act->size),
-                     "Received buffer contents is not the same as sent", NULL);
+            ck_assert_msg(act->local != buf,
+                          "Received the same buffer ptr as sent");
+            ck_assert_msg(!memcmp(buf, act->out, act->size),
+                          "Received buffer contents is not the same as sent");
         }
     }
 
@@ -298,13 +298,13 @@ static bool CORE_SEND_END(action_t* act, long ret)
     {
         long _ret = gu_thread_join (act->thread, NULL);
         act->thread = (gu_thread_t)-1;
-        FAIL_IF (0 != _ret, "Failed to join recv thread: %ld (%s)",
-                 _ret, strerror (_ret));
+        ck_assert_msg(0 == _ret, "Failed to join recv thread: %ld (%s)",
+                      _ret, strerror (_ret));
     }
 
-    FAIL_IF (ret != act->seqno,
-             "gcs_core_send(): expected %lld, returned %lld (%s)",
-             (long long) ret, (long long) act->seqno, strerror (-act->seqno));
+    ck_assert_msg(ret == act->seqno,
+                  "gcs_core_send(): expected %lld, returned %lld (%s)",
+                  (long long) ret, (long long) act->seqno, strerror (-act->seqno));
 
     return false;
 }
@@ -365,7 +365,7 @@ core_test_init (gu::Config* config,
 
     mark_point();
 
-    fail_if (config == NULL);
+    ck_assert(config != NULL);
 
     gcs_test::InitConfig(*config, CacheName);
 
@@ -376,24 +376,24 @@ core_test_init (gu::Config* config,
                             "core_test", "aaa.bbb.ccc.ddd:xxxx", 0, 0,
                             gcs_proto_ver);
 
-    fail_if (NULL == Core);
+    ck_assert(NULL != Core);
 
     Backend = gcs_core_get_backend (Core);
-    fail_if (NULL == Backend);
+    ck_assert(NULL != Backend);
 
     Seqno = 0; // reset seqno
 
     ret = core_test_set_payload_size (FRAG_SIZE);
-    fail_if (-EBADFD != ret, "Expected -EBADFD, got: %ld (%s)",
-             ret, strerror(-ret));
+    ck_assert_msg(-EBADFD == ret, "Expected -EBADFD, got: %ld (%s)",
+                  ret, strerror(-ret));
 
     ret = gcs_core_open (Core, "yadda-yadda", "owkmevc", 1);
-    fail_if (-EINVAL != ret, "Expected -EINVAL, got %ld (%s)",
-             ret, strerror(-ret));
+    ck_assert_msg(-EINVAL == ret, "Expected -EINVAL, got %ld (%s)",
+                  ret, strerror(-ret));
 
     ret = gcs_core_open (Core, "yadda-yadda", "dummy://", bootstrap);
-    fail_if (0 != ret, "Failed to open core connection: %ld (%s)",
-             ret, strerror(-ret));
+    ck_assert_msg(0 == ret, "Failed to open core connection: %ld (%s)",
+                  ret, strerror(-ret));
 
     if (!bootstrap) {
         gcs_core_send_lock_step (Core, true);
@@ -402,49 +402,49 @@ core_test_init (gu::Config* config,
     }
 
     // receive first configuration message
-    fail_if (CORE_RECV_ACT (&act, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
-    fail_if (core_test_check_conf(act.out, act.size, bootstrap, 0, 1));
+    ck_assert(!CORE_RECV_ACT (&act, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
+    ck_assert(!core_test_check_conf(act.out, act.size, bootstrap, 0, 1));
     Cache->free(act.out);
 
     int const ver(gcs_core_proto_ver(Core));
-    fail_if(ver != gcs_proto_ver, "Expected protocol version: %d, got: %d",
-            gcs_proto_ver, ver);
+    ck_assert_msg(ver == gcs_proto_ver,"Expected protocol version: %d, got: %d",
+                  gcs_proto_ver, ver);
 
     // this will configure backend to have desired fragment size
     ret = core_test_set_payload_size (FRAG_SIZE);
-    fail_if (0 != ret, "Failed to set up the message payload size: %ld (%s)",
-             ret, strerror(-ret));
+    ck_assert_msg(0 == ret, "Failed to set up the message payload size: %ld (%s)",
+                  ret, strerror(-ret));
 
     // try to send an action to check that everything's alright
     ret = gcs_core_send (Core, act1, sizeof(act1_str), GCS_ACT_WRITESET);
-    fail_if (ret != sizeof(act1_str), "Expected %d, got %d (%s)",
-             sizeof(act1_str), ret, strerror (-ret));
+    ck_assert_msg(ret == sizeof(act1_str), "Expected %d, got %d (%s)",
+                  sizeof(act1_str), ret, strerror (-ret));
     gu_warn ("Next CORE_RECV_ACT fails under valgrind");
     act.in = act1;
-    fail_if (CORE_RECV_ACT (&act, act1_str, sizeof(act1_str), GCS_ACT_WRITESET));
+    ck_assert(!CORE_RECV_ACT(&act, act1_str, sizeof(act1_str), GCS_ACT_WRITESET));
 
     ret = gcs_core_send_join (Core, gu::GTID(Uuid, Seqno), 0);
-    fail_if (ret < 0, "gcs_core_send_join(): %ld (%s)",
-             ret, strerror(-ret));
+    ck_assert_msg(ret >= 0, "gcs_core_send_join(): %ld (%s)",
+                  ret, strerror(-ret));
     // no action to be received (we're joined already)
 
     ret = gcs_core_send_sync (Core, gu::GTID(Uuid, Seqno));
 
     int const proto(gcs_core_proto_ver(Core));
-    fail_if (proto != gcs_proto_ver); // checking just in case
+    ck_assert(proto == gcs_proto_ver); // checking just in case
 
     int const expected_ret
         (proto >= 1 ? gcs::core::CodeMsg::serial_size() : sizeof(gcs_seqno_t));
-    fail_if (ret != expected_ret,
+    ck_assert_msg(ret == expected_ret,
              "gcs_core_send_sync(): %ld (%s)", ret, strerror(-ret));
 
-    fail_if (CORE_RECV_ACT(&act, NULL, sizeof(gcs_seqno_t), GCS_ACT_SYNC));
+    ck_assert(!CORE_RECV_ACT(&act, NULL, sizeof(gcs_seqno_t), GCS_ACT_SYNC));
 
     gcs_seqno_t const s(gcs_seqno_gtoh(*(gcs_seqno_t*)act.out));
 
     int const expected_s(proto >= 1 ? 0 : Seqno);
-    fail_if (s != expected_s, "Expected code %lld, got %lld",
-             (long long)expected_s, (long long)s);
+    ck_assert_msg(s == expected_s, "Expected code %lld, got %lld",
+                  (long long)expected_s, (long long)s);
 
     gcs_core_send_lock_step (Core, true);
     mark_point();
@@ -458,31 +458,31 @@ core_test_cleanup ()
     char      tmp[1];
     action_t  act;
 
-    fail_if (NULL == Core);
-    fail_if (NULL == Backend);
+    ck_assert(NULL != Core);
+    ck_assert(NULL != Backend);
 
     // to fetch self-leave message
-    fail_if (CORE_RECV_START (&act));
+    ck_assert(!CORE_RECV_START (&act));
     ret = gcs_core_close (Core);
-    fail_if (0 != ret, "Failed to close core: %ld (%s)",
-             ret, strerror (-ret));
+    ck_assert_msg(0 == ret, "Failed to close core: %ld (%s)",
+                  ret, strerror (-ret));
     ret = CORE_RECV_END (&act, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE);
-    fail_if (ret, "ret: %ld (%s)", ret, strerror(-ret));
+    ck_assert_msg(0 == ret, "ret: %ld (%s)", ret, strerror(-ret));
     Cache->free(act.out);
 
     // check that backend is closed too
     ret = Backend->send (Backend, tmp, sizeof(tmp), GCS_MSG_ACTION);
-    fail_if (ret != -EBADFD);
+    ck_assert(ret == -EBADFD);
 
     ret = gcs_core_destroy (Core);
-    fail_if (0 != ret, "Failed to destroy core: %ld (%s)",
-             ret, strerror (-ret));
+    ck_assert_msg(0 == ret, "Failed to destroy core: %ld (%s)",
+                  ret, strerror (-ret));
 
     {
         ssize_t   allocated;
         allocated = gcs_tests_get_allocated();
-        fail_if (0 != allocated,
-                 "Expected 0 allocated bytes, found %zd", allocated);
+        ck_assert_msg(0 == allocated,
+                      "Expected 0 allocated bytes, found %zd", allocated);
     }
 
     delete Cache;
@@ -495,9 +495,9 @@ START_TEST (gcs_core_test_api)
     gu::Config config;
     core_test_init (&config);
 
-    fail_if (NULL == Cache);
-    fail_if (NULL == Core);
-    fail_if (NULL == Backend);
+    ck_assert(NULL != Cache);
+    ck_assert(NULL != Core);
+    ck_assert(NULL != Backend);
 
     long     ret;
     long     tout = 100; // 100 ms timeout
@@ -516,33 +516,33 @@ START_TEST (gcs_core_test_api)
         gu_info ("Iteration %ld: act: %s, size: %zu, frags: %ld",
                  i, act, act_size, frags);
 
-        fail_if (CORE_SEND_START (&act_s));
+        ck_assert(!CORE_SEND_START (&act_s));
 
         while ((ret = gcs_core_send_step (Core, 3*tout)) > 0) {
             frags--; gu_info ("frags: %ld", frags);
 //            usleep (1000);
         }
 
-        fail_if (ret != 0, "gcs_core_send_step() returned: %ld (%s)",
-                 ret, strerror(-ret));
-        fail_if (frags != 0, "frags = %ld, instead of 0", frags);
-        fail_if (CORE_SEND_END (&act_s, act_size));
-        fail_if (CORE_RECV_ACT (&act_r, act_buf, act_size, GCS_ACT_WRITESET));
+        ck_assert_msg(ret == 0, "gcs_core_send_step() returned: %ld (%s)",
+                      ret, strerror(-ret));
+        ck_assert_msg(frags == 0, "frags = %ld, instead of 0", frags);
+        ck_assert(!CORE_SEND_END (&act_s, act_size));
+        ck_assert(!CORE_RECV_ACT (&act_r, act_buf, act_size, GCS_ACT_WRITESET));
 
         ret = gcs_core_set_last_applied (Core, gu::GTID(Uuid, Seqno));
-        fail_if (ret < 0, "gcs_core_set_last_applied(): %ld (%s)",
-                 ret, strerror(-ret));
+        ck_assert_msg(ret >= 0, "gcs_core_set_last_applied(): %ld (%s)",
+                      ret, strerror(-ret));
         /* commit cut action size should be 8 */
-        fail_if (CORE_RECV_ACT (&act_r, NULL, 8, GCS_ACT_COMMIT_CUT));
-        fail_if (Seqno != gcs_seqno_gtoh(*(gcs_seqno_t*)act_r.out));
+        ck_assert(!CORE_RECV_ACT (&act_r, NULL, 8, GCS_ACT_COMMIT_CUT));
+        ck_assert(Seqno == gcs_seqno_gtoh(*(gcs_seqno_t*)act_r.out));
         free(act_r.out); // commit cut is allocated by malloc()
     }
 
     // send fake flow control action, its contents is not important
     gcs_core_send_fc (Core, act, act_size);
-    fail_if (ret < 0, "gcs_core_send_fc(): %ld (%s)",
-             ret, strerror(-ret));
-    fail_if (CORE_RECV_ACT(&act_r, act, act_size, GCS_ACT_FLOW));
+    ck_assert_msg(ret >= 0, "gcs_core_send_fc(): %ld (%s)",
+                  ret, strerror(-ret));
+    ck_assert(!CORE_RECV_ACT(&act_r, act, act_size, GCS_ACT_FLOW));
 
     core_test_cleanup ();
 }
@@ -553,11 +553,11 @@ static inline bool
 CORE_SEND_STEP (gcs_core_t* core, long timeout, long ret)
 {
    long err = gcs_core_send_step (core, timeout);
-   FAIL_IF (err < 0, "gcs_core_send_step(): %ld (%s)",
-            err, strerror (-err));
+   ck_assert_msg(err >= 0, "gcs_core_send_step(): %ld (%s)",
+                 err, strerror (-err));
    if (ret >= 0) {
-       FAIL_IF (err != ret, "gcs_core_send_step(): expected %ld, got %ld",
-                ret, err);
+       ck_assert_msg(err == ret, "gcs_core_send_step(): expected %ld, got %ld",
+                     ret, err);
    }
 
    return false;
@@ -569,7 +569,8 @@ DUMMY_INJECT_COMPONENT (gcs_backend_t* backend, const gcs_comp_msg_t* comp)
     long ret = gcs_dummy_inject_msg (Backend, comp,
                                      gcs_comp_msg_size(comp),
                                      GCS_MSG_COMPONENT, GCS_SENDER_NONE);
-    FAIL_IF (ret <= 0, "gcs_dummy_inject_msg(): %ld (%s)", ret, strerror(ret));
+    ck_assert_msg(ret > 0, "gcs_dummy_inject_msg(): %ld (%s)",
+                  ret, strerror(ret));
 
     return false;
 }
@@ -607,8 +608,8 @@ CORE_TEST_OWN (int gcs_proto_ver)
     // Create primary and non-primary component messages
     gcs_comp_msg_t* prim     = gcs_comp_msg_new (true, false,  0, 1, 0);
     gcs_comp_msg_t* non_prim = gcs_comp_msg_new (false, false, 0, 1, 0);
-    fail_if (NULL == prim);
-    fail_if (NULL == non_prim);
+    ck_assert(NULL != prim);
+    ck_assert(NULL != non_prim);
     gcs_comp_msg_add (prim,     "node1", 0);
     gcs_comp_msg_add (non_prim, "node1", 1);
 
@@ -619,17 +620,17 @@ CORE_TEST_OWN (int gcs_proto_ver)
     /// check behaviour in transitional state ///
     /////////////////////////////////////////////
 
-    fail_if (CORE_RECV_START (&act_r));
-    fail_if (CORE_SEND_START (&act_s));
-    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    ck_assert(!CORE_RECV_START (&act_r));
+    ck_assert(!CORE_SEND_START (&act_s));
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 1st frag
     usleep (10000); // resolve race between sending and setting transitional
     gcs_dummy_set_transitional (Backend);
-    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
-    fail_if (CORE_SEND_STEP (Core, tout, 0)); // no frags left
-    fail_if (NULL != act_r.out); // should not have received anything
-    fail_if (gcs_dummy_set_component (Backend, prim)); // return to PRIM state
-    fail_if (CORE_SEND_END (&act_s, act_size));
-    fail_if (CORE_RECV_END (&act_r, act_buf, act_size, GCS_ACT_WRITESET));
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 0)); // no frags left
+    ck_assert(NULL == act_r.out); // should not have received anything
+    ck_assert(!gcs_dummy_set_component (Backend, prim)); // return to PRIM state
+    ck_assert(!CORE_SEND_END (&act_s, act_size));
+    ck_assert(!CORE_RECV_END (&act_r, act_buf, act_size, GCS_ACT_WRITESET));
 
     /*
      * TEST CASE 1: Action was sent successfully, but NON_PRIM component
@@ -637,18 +638,19 @@ CORE_TEST_OWN (int gcs_proto_ver)
      * EXPECTED OUTCOME: action is received with -ENOTCONN instead of global
      * seqno
      */
-    fail_if (DUMMY_INJECT_COMPONENT (Backend, non_prim));
-    fail_if (CORE_SEND_START (&act_s));
-    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 1st frag
-    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
-    fail_if (CORE_SEND_END (&act_s, act_size));
-    fail_if (gcs_dummy_set_component(Backend, non_prim));
-    fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
-    fail_if (core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
+    ck_assert(!DUMMY_INJECT_COMPONENT (Backend, non_prim));
+    ck_assert(!CORE_SEND_START (&act_s));
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
+    ck_assert(!CORE_SEND_END (&act_s, act_size));
+    ck_assert(!gcs_dummy_set_component(Backend, non_prim));
+    ck_assert(!CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
+    ck_assert(!core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
     Cache->free(act_r.out);
-    fail_if (CORE_RECV_ACT (&act_r, act_buf, act_size, GCS_ACT_WRITESET));
-    fail_if (-ENOTCONN != act_r.seqno, "Expected -ENOTCONN, received %ld (%s)",
-             act_r.seqno, strerror (-act_r.seqno));
+    ck_assert(!CORE_RECV_ACT (&act_r, act_buf, act_size, GCS_ACT_WRITESET));
+    ck_assert_msg(-ENOTCONN == act_r.seqno,
+                  "Expected -ENOTCONN, received %ld (%s)",
+                  act_r.seqno, strerror (-act_r.seqno));
 
     /*
      * TEST CASE 2: core in NON_PRIM state. There is attempt to send an
@@ -656,10 +658,10 @@ CORE_TEST_OWN (int gcs_proto_ver)
      * EXPECTED OUTCOME: CORE_SEND_END should return -ENOTCONN after 1st
      * fragment send fails.
      */
-    fail_if (CORE_SEND_START (&act_s));
-    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 1st frag
-    fail_if (CORE_SEND_STEP (Core, tout, 0)); // bail out after 1st frag
-    fail_if (CORE_SEND_END (&act_s, -ENOTCONN));
+    ck_assert(!CORE_SEND_START (&act_s));
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 0)); // bail out after 1st frag
+    ck_assert(!CORE_SEND_END (&act_s, -ENOTCONN));
 
     /*
      * TEST CASE 3: Backend in NON_PRIM state. There is attempt to send an
@@ -667,14 +669,14 @@ CORE_TEST_OWN (int gcs_proto_ver)
      * EXPECTED OUTCOME: CORE_SEND_END should return -ENOTCONN after 1st
      * fragment send fails.
      */
-    fail_if (DUMMY_INSTALL_COMPONENT (Backend, prim));
-    fail_if (gcs_dummy_set_component(Backend, non_prim));
-    fail_if (DUMMY_INJECT_COMPONENT (Backend, non_prim));
-    fail_if (CORE_SEND_START (&act_s));
-    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 1st frag
-    fail_if (CORE_SEND_END (&act_s, -ENOTCONN));
-    fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
-    fail_if (core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
+    ck_assert(!DUMMY_INSTALL_COMPONENT (Backend, prim));
+    ck_assert(!gcs_dummy_set_component(Backend, non_prim));
+    ck_assert(!DUMMY_INJECT_COMPONENT (Backend, non_prim));
+    ck_assert(!CORE_SEND_START (&act_s));
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    ck_assert(!CORE_SEND_END (&act_s, -ENOTCONN));
+    ck_assert(!CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
+    ck_assert(!core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
     Cache->free(act_r.out);
 
     /*
@@ -683,18 +685,19 @@ CORE_TEST_OWN (int gcs_proto_ver)
      * EXPECTED OUTCOME: action is received with -ENOTCONN instead of global
      * seqno.
      */
-    fail_if (DUMMY_INSTALL_COMPONENT (Backend, prim));
-    fail_if (CORE_SEND_START (&act_s));
-    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 1st frag
-    fail_if (DUMMY_INJECT_COMPONENT (Backend, non_prim));
-    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
-    fail_if (CORE_SEND_END (&act_s, act_size));
-    fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
-    fail_if (core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
+    ck_assert(!DUMMY_INSTALL_COMPONENT (Backend, prim));
+    ck_assert(!CORE_SEND_START (&act_s));
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    ck_assert(!DUMMY_INJECT_COMPONENT (Backend, non_prim));
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
+    ck_assert(!CORE_SEND_END (&act_s, act_size));
+    ck_assert(!CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
+    ck_assert(!core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
     Cache->free(act_r.out);
-    fail_if (CORE_RECV_ACT (&act_r, act_buf, act_size, GCS_ACT_WRITESET));
-    fail_if (-ENOTCONN != act_r.seqno, "Expected -ENOTCONN, received %ld (%s)",
-             act_r.seqno, strerror (-act_r.seqno));
+    ck_assert(!CORE_RECV_ACT (&act_r, act_buf, act_size, GCS_ACT_WRITESET));
+    ck_assert_msg(-ENOTCONN == act_r.seqno,
+                  "Expected -ENOTCONN, received %ld (%s)",
+                  act_r.seqno, strerror (-act_r.seqno));
 
     /*
      * TEST CASE 5: Action is being sent and received concurrently. In between
@@ -702,17 +705,18 @@ CORE_TEST_OWN (int gcs_proto_ver)
      * EXPECTED OUTCOME: CORE_RECV_ACT should receive the action with -ERESTART
      * instead of seqno.
      */
-    fail_if (DUMMY_INSTALL_COMPONENT (Backend, prim));
-    fail_if (CORE_SEND_START (&act_s));
-    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    ck_assert(!DUMMY_INSTALL_COMPONENT (Backend, prim));
+    ck_assert(!CORE_SEND_START (&act_s));
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 1st frag
     usleep (100000); // make sure 1st fragment gets in before new component
-    fail_if (DUMMY_INSTALL_COMPONENT (Backend, non_prim));
-    fail_if (DUMMY_INSTALL_COMPONENT (Backend, prim));
-    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
-    fail_if (CORE_SEND_END (&act_s, act_size));
-    fail_if (CORE_RECV_ACT (&act_r, act_buf, act_size, GCS_ACT_WRITESET));
-    fail_if (-ERESTART != act_r.seqno, "Expected -ERESTART, received %ld (%s)",
-             act_r.seqno, strerror (-act_r.seqno));
+    ck_assert(!DUMMY_INSTALL_COMPONENT (Backend, non_prim));
+    ck_assert(!DUMMY_INSTALL_COMPONENT (Backend, prim));
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
+    ck_assert(!CORE_SEND_END (&act_s, act_size));
+    ck_assert(!CORE_RECV_ACT (&act_r, act_buf, act_size, GCS_ACT_WRITESET));
+    ck_assert_msg(-ERESTART == act_r.seqno,
+                  "Expected -ERESTART, received %ld (%s)",
+                  act_r.seqno, strerror (-act_r.seqno));
 
     /*
      * TEST CASE 6: Action has 3 fragments, 2 were sent successfully but the
@@ -730,32 +734,32 @@ CORE_TEST_OWN (int gcs_proto_ver)
     act_s.size = act_size;
 
     // subcase 1
-    fail_if (DUMMY_INSTALL_COMPONENT (Backend, prim));
-    fail_if (CORE_SEND_START (&act_s));
-    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 1st frag
-    fail_if (DUMMY_INJECT_COMPONENT (Backend, non_prim));
-    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
+    ck_assert(!DUMMY_INSTALL_COMPONENT (Backend, prim));
+    ck_assert(!CORE_SEND_START (&act_s));
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    ck_assert(!DUMMY_INJECT_COMPONENT (Backend, non_prim));
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
     usleep (500000); // fail_if_seq
-    fail_if (gcs_dummy_set_component(Backend, non_prim));
-    fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
-    fail_if (core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
+    ck_assert(!gcs_dummy_set_component(Backend, non_prim));
+    ck_assert(!CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
+    ck_assert(!core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
     Cache->free(act_r.out);
-    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 3rd frag
-    fail_if (CORE_SEND_END (&act_s, -ENOTCONN));
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 3rd frag
+    ck_assert(!CORE_SEND_END (&act_s, -ENOTCONN));
 
     // subcase 2
-    fail_if (DUMMY_INSTALL_COMPONENT (Backend, prim));
-    fail_if (CORE_SEND_START (&act_s));
-    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 1st frag
-    fail_if (DUMMY_INJECT_COMPONENT (Backend, non_prim));
-    fail_if (CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
+    ck_assert(!DUMMY_INSTALL_COMPONENT (Backend, prim));
+    ck_assert(!CORE_SEND_START (&act_s));
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    ck_assert(!DUMMY_INJECT_COMPONENT (Backend, non_prim));
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
     usleep (1000000);
-    fail_if (gcs_dummy_set_component(Backend, non_prim));
-    fail_if (CORE_SEND_STEP (Core, 4*tout, 1)); // 3rd frag
-    fail_if (CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
-    fail_if (core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
+    ck_assert(!gcs_dummy_set_component(Backend, non_prim));
+    ck_assert(!CORE_SEND_STEP (Core, 4*tout, 1)); // 3rd frag
+    ck_assert(!CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
+    ck_assert(!core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
     Cache->free(act_r.out);
-    fail_if (CORE_SEND_END (&act_s, -ENOTCONN));
+    ck_assert(!CORE_SEND_END (&act_s, -ENOTCONN));
 
     gu_free (prim);
     gu_free (non_prim);
@@ -775,13 +779,15 @@ START_TEST (gcs_core_test_own_v1)
 }
 END_TEST
 
+#ifdef GCS_ALLOW_GH74
 /*
  * Disabled test because it is too slow and timeouts on crowded
- * build systems like e.g. build.opensuse.org
+ * build systems like e.g. build.opensuse.org */
 
 START_TEST (gcs_core_test_gh74)
 {
-    core_test_init(true, "node1");
+    gu::Config config;
+    core_test_init(&config, true, "node1");
 
     // set frag size large enough to avoid fragmentation.
     gu_info ("set payload size = 1024");
@@ -789,7 +795,7 @@ START_TEST (gcs_core_test_gh74)
 
     // new primary comp message.
     gcs_comp_msg_t* prim = gcs_comp_msg_new (true, false, 0, 2, 0);
-    fail_if (NULL == prim);
+    ck_assert(NULL != prim);
     gcs_comp_msg_add(prim, "node1", 0);
     gcs_comp_msg_add(prim, "node2", 1);
 
@@ -813,7 +819,7 @@ START_TEST (gcs_core_test_gh74)
     frg.act_size = act_size;
     frg.act_type = GCS_ACT_STATE_REQ;
     char msg_buf[1024];
-    fail_if(gcs_act_proto_write(&frg, msg_buf, sizeof(msg_buf)));
+    ck_assert(!gcs_act_proto_write(&frg, msg_buf, sizeof(msg_buf)));
     memcpy(const_cast<void*>(frg.frag), act_ptr, act_size);
     size_t msg_size = act_size + gcs_act_proto_hdr_size(frg.proto_ver);
     // gu_free(act_ptr);
@@ -853,6 +859,10 @@ START_TEST (gcs_core_test_gh74)
                                      group->gcs_proto_ver,
                                      group->repl_proto_ver,
                                      group->appl_proto_ver,
+                                     group->prim_gcs_ver,
+                                     group->prim_repl_ver,
+                                     group->prim_appl_ver,
+                                     0, // desync count
                                      0);
     size_t state_len2 = gcs_state_msg_len (state_msg);
     char state_buf2[state_len2];
@@ -862,8 +872,8 @@ START_TEST (gcs_core_test_gh74)
     action_t act_r(NULL,  NULL, NULL, -1, (gcs_act_type_t)-1, -1, (gu_thread_t)-1);
 
     // ========== from node1's view ==========
-    fail_if (gcs_dummy_set_component(Backend, prim));
-    fail_if (DUMMY_INJECT_COMPONENT(Backend, prim));
+    ck_assert(!gcs_dummy_set_component(Backend, prim));
+    ck_assert(!DUMMY_INJECT_COMPONENT(Backend, prim));
     gu_free(prim);
     CORE_RECV_START(&act_r); // we have to start another thread here.
     // otherwise messages to node1 can not be in right order.
@@ -874,50 +884,50 @@ START_TEST (gcs_core_test_gh74)
         }
     }
     // then STR sneaks before new configuration is delivered.
-    fail_if (gcs_dummy_inject_msg(Backend, msg_buf, msg_size, GCS_MSG_ACTION, 1) !=
-             (int)msg_size);
+    ck_assert(gcs_dummy_inject_msg(Backend, msg_buf, msg_size,
+                                   GCS_MSG_ACTION, 1) == (int)msg_size);
     // then state exchange message from node2.
-    fail_if (gcs_dummy_inject_msg(Backend, state_buf2, state_len2, GCS_MSG_STATE_MSG, 1) !=
-             (int)state_len2);
+    ck_assert(gcs_dummy_inject_msg(Backend, state_buf2, state_len2,
+                                   GCS_MSG_STATE_MSG, 1) == (int)state_len2);
     // expect STR is lost here.
-    fail_if (CORE_RECV_END(&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
-    fail_if (core_test_check_conf((const gcs_act_cchange_t*)act_r.out, true, 0, 2));
+    ck_assert(!CORE_RECV_END(&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
+    ck_assert(!core_test_check_conf((const gcs_act_cchange_t*)act_r.out, true, 0, 2));
     free(act_r.out);
     core_test_cleanup();
 
     // ========== from node2's view ==========
-    core_test_init(false, "node2");
+    core_test_init(&config, false, "node2");
 
     // set frag size large enough to avoid fragmentation.
     gu_info ("set payload size = 1024");
     core_test_set_payload_size(1024);
 
     prim = gcs_comp_msg_new (true, false, 1, 2, 0);
-    fail_if (NULL == prim);
+    ck_assert(NULL != prim);
     gcs_comp_msg_add(prim, "node1", 0);
     gcs_comp_msg_add(prim, "node2", 1);
 
     // node1 and node2 joins.
     // now node2's status == GCS_NODE_STATE_PRIM
-    fail_if (gcs_dummy_set_component(Backend, prim));
-    fail_if (DUMMY_INJECT_COMPONENT(Backend, prim));
+    ck_assert(!gcs_dummy_set_component(Backend, prim));
+    ck_assert(!DUMMY_INJECT_COMPONENT(Backend, prim));
     gu_free(prim);
-    fail_if (gcs_dummy_inject_msg(Backend, uuid_buf, uuid_len, GCS_MSG_STATE_UUID, 0) !=
-             (int)uuid_len);
-    fail_if (gcs_dummy_inject_msg(Backend, state_buf, state_len, GCS_MSG_STATE_MSG, 0) !=
-             (int)state_len);
-    fail_if (CORE_RECV_ACT(&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
-    fail_if (core_test_check_conf((const gcs_act_cchange_t*)act_r.out, true, 1, 2));
+    ck_assert(gcs_dummy_inject_msg(Backend, uuid_buf, uuid_len,
+              GCS_MSG_STATE_UUID, 0) == (int)uuid_len);
+    ck_assert(gcs_dummy_inject_msg(Backend, state_buf, state_len,
+              GCS_MSG_STATE_MSG, 0)  == (int)state_len);
+    ck_assert(!CORE_RECV_ACT(&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
+    ck_assert(!core_test_check_conf((const gcs_act_cchange_t*)act_r.out, true, 1, 2));
     free(act_r.out);
 
     // then node3 joins.
     prim = gcs_comp_msg_new (true, false, 1, 3, 0);
-    fail_if (NULL == prim);
+    ck_assert(NULL != prim);
     gcs_comp_msg_add(prim, "node1", 0);
     gcs_comp_msg_add(prim, "node2", 1);
     gcs_comp_msg_add(prim, "node3", 2);
-    fail_if (gcs_dummy_set_component(Backend, prim));
-    fail_if (DUMMY_INJECT_COMPONENT(Backend, prim));
+    ck_assert(!gcs_dummy_set_component(Backend, prim));
+    ck_assert(!DUMMY_INJECT_COMPONENT(Backend, prim));
     gu_free(prim);
 
     // generate a new state uuid.
@@ -939,6 +949,10 @@ START_TEST (gcs_core_test_gh74)
                                      group->gcs_proto_ver,
                                      group->repl_proto_ver,
                                      group->appl_proto_ver,
+                                     group->prim_gcs_ver,
+                                     group->prim_repl_ver,
+                                     group->prim_appl_ver,
+                                     0, // desync count
                                      0);
     size_t state_len3 = gcs_state_msg_len (state_msg);
     char state_buf3[state_len3];
@@ -956,10 +970,10 @@ START_TEST (gcs_core_test_gh74)
     gcs_state_msg_write(state_buf, state_msg);
     gcs_state_msg_destroy(state_msg);
 
-    fail_if (gcs_dummy_inject_msg(Backend, uuid_buf, uuid_len, GCS_MSG_STATE_UUID, 0) !=
-             (int)uuid_len);
-    fail_if (gcs_dummy_inject_msg(Backend, state_buf, state_len, GCS_MSG_STATE_MSG, 0) !=
-             (int)state_len);
+    ck_assert(gcs_dummy_inject_msg(Backend, uuid_buf, uuid_len,
+                                   GCS_MSG_STATE_UUID, 0) == (int)uuid_len);
+    ck_assert(gcs_dummy_inject_msg(Backend, state_buf, state_len,
+                                   GCS_MSG_STATE_MSG, 0) == (int)state_len);
 
     // STR sneaks.
     // we have to make same message exists in sender queue too.
@@ -977,19 +991,19 @@ START_TEST (gcs_core_test_gh74)
             break;
         }
     }
-    fail_if (gcs_dummy_inject_msg(Backend, msg_buf, msg_size, GCS_MSG_ACTION, 1) !=
-             (int)msg_size);
+    ck_assert(gcs_dummy_inject_msg(Backend, msg_buf, msg_size,
+                                   GCS_MSG_ACTION, 1) == (int)msg_size);
 
-    fail_if (gcs_dummy_inject_msg(Backend, state_buf3, state_len3, GCS_MSG_STATE_MSG, 2) !=
-             (int)state_len3);
+    ck_assert(gcs_dummy_inject_msg(Backend, state_buf3, state_len3,
+                                   GCS_MSG_STATE_MSG, 2) == (int)state_len3);
 
     // expect STR and id == -EAGAIN.
-    fail_if (CORE_RECV_ACT(&act_r, act_ptr, act_size, GCS_ACT_STATE_REQ));
-    fail_if (act_r.seqno != -EAGAIN);
+    ck_assert(!CORE_RECV_ACT(&act_r, act_ptr, act_size, GCS_ACT_STATE_REQ));
+    ck_assert(act_r.seqno == -EAGAIN);
     free(act_r.out);
 
-    fail_if (CORE_RECV_ACT(&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
-    fail_if (core_test_check_conf((const gcs_act_cchange_t*)act_r.out, true, 1, 3));
+    ck_assert(!CORE_RECV_ACT(&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
+    ck_assert(!core_test_check_conf((const gcs_act_cchange_t*)act_r.out, true, 1, 3));
     free(act_r.out);
 
     // core_test_cleanup();
@@ -997,7 +1011,7 @@ START_TEST (gcs_core_test_gh74)
     gu_free(act_ptr);
 }
 END_TEST
-*/
+#endif /* GCS_ALLOW_GH74 */
 
 
 #if 0 // requires multinode support from gcs_dummy
@@ -1018,13 +1032,16 @@ Suite *gcs_core_suite(void)
   suite_add_tcase (suite, tcase);
   tcase_set_timeout(tcase, 60);
   bool skip = false;
+
   if (skip == false) {
       tcase_add_test  (tcase, gcs_code_msg);
       tcase_add_test  (tcase, gcs_core_test_api);
       tcase_add_test  (tcase, gcs_core_test_own_v0);
       tcase_add_test  (tcase, gcs_core_test_own_v1);
-      //  tcase_add_test  (tcase, gcs_core_test_foreign);
-      // tcase_add_test (tcase, gcs_core_test_gh74);
+#ifdef GCS_ALLOW_GH74
+      tcase_add_test  (tcase, gcs_core_test_gh74);
+#endif /* GCS_ALLOW_GH74 */
+      // tcase_add_test (tcase, gcs_core_test_foreign);
   }
   return suite;
 }

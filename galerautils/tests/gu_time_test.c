@@ -1,4 +1,4 @@
-// Copyright (C) 2007 Codership Oy <info@codership.com>
+// Copyright (C) 2007-2020 Codership Oy <info@codership.com>
 
 // $Id$
 
@@ -14,11 +14,11 @@ START_TEST (gu_time_test)
     double diff, tolerance = 1.0e-15; // double precision tolerance
 
     diff = gu_timeval_diff (&left, &right);
-    fail_if (fabs(3.5 + diff) > tolerance,
-             "Expected %f, got %f, delta: %e", -3.5, diff, 3.5 + diff);
+    ck_assert_msg(fabs(3.5 + diff) <= tolerance,
+                  "Expected %f, got %f, delta: %e", -3.5, diff, 3.5 + diff);
     diff = gu_timeval_diff (&right, &left);
-    fail_if (fabs(3.5 - diff) > tolerance,
-             "Expected %f, got %f, delta: %e", 3.5, diff, 3.5 - diff);
+    ck_assert_msg(fabs(3.5 - diff) <= tolerance,
+                  "Expected %f, got %f, delta: %e", 3.5, diff, 3.5 - diff);
 }
 END_TEST
 

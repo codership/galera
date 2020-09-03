@@ -1,4 +1,4 @@
-// Copyright (C) 2010-2015 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2020 Codership Oy <info@codership.com>
 
 // $Id$
 
@@ -12,28 +12,28 @@ START_TEST(gcs_fc_test_limits)
     int      ret;
 
     ret = gcs_fc_init (&fc, 16, 0.5, 0.1);
-    fail_if (ret != 0);
+    ck_assert(ret == 0);
 
     ret = gcs_fc_init (&fc, -1, 0.5, 0.1);
-    fail_if (ret != -EINVAL);
+    ck_assert(ret == -EINVAL);
 
     ret = gcs_fc_init (&fc, 16, 1.0, 0.1);
-    fail_if (ret != -EINVAL);
+    ck_assert(ret == -EINVAL);
 
     ret = gcs_fc_init (&fc, 16, 0.5, 1.0);
-    fail_if (ret != -EINVAL);
+    ck_assert(ret == -EINVAL);
 }
 END_TEST
 
-/* This is a macro to preserve line numbers in fail_if() output */
+/* This is a macro to preserve line numbers in ck_assert_msg() output */
 #define SKIP_N_ACTIONS(fc_,n_)                                          \
     {                                                                   \
         int i;                                                          \
         for (i = 0; i < n_; ++i)                                        \
         {                                                               \
             long long ret = gcs_fc_process (fc_, 0);                    \
-            fail_if (ret != 0, "0-sized action #%d returned %d (%s)",   \
-                     i, ret, strerror(-ret));                           \
+            ck_assert_msg(ret == 0, "0-sized action #%d returned %d (%s)", \
+                          i, ret, strerror(-ret));                      \
         }                                                               \
     }
 
@@ -44,7 +44,7 @@ START_TEST(gcs_fc_test_basic)
     long long pause;
 
     ret = gcs_fc_init (&fc, 16, 0.5, 0.1);
-    fail_if (ret != 0);
+    ck_assert(ret == 0);
 
     gcs_fc_reset (&fc, 8);
     usleep (1000);
@@ -53,8 +53,8 @@ START_TEST(gcs_fc_test_basic)
     /* Here we exceed soft limit almost instantly, which should give a very high
      * data rate and as a result a need to sleep */
     pause = gcs_fc_process (&fc, 7);
-    fail_if(pause <= 0, "Soft limit trip returned %lld (%s)",
-            pause, strerror(-pause));
+    ck_assert_msg(pause > 0, "Soft limit trip returned %lld (%s)",
+                  pause, strerror(-pause));
 
     gcs_fc_reset (&fc, 7);
     usleep (1000);
@@ -63,19 +63,19 @@ START_TEST(gcs_fc_test_basic)
     /* Here we reach soft limit almost instantly, which should give a very high
      * data rate, but soft limit is not exceeded, so no sleep yet. */
     pause = gcs_fc_process (&fc, 1);
-    fail_if(pause != 0, "Soft limit touch returned %lld (%s)",
-            pause, strerror(-pause));
+    ck_assert_msg(pause == 0, "Soft limit touch returned %lld (%s)",
+                  pause, strerror(-pause));
 
     SKIP_N_ACTIONS(&fc, 7);
     usleep (1000);
     pause = gcs_fc_process (&fc, 7);
-    fail_if(pause <= 0, "Soft limit trip returned %lld (%s)",
-            pause, strerror(-pause));
+    ck_assert_msg(pause > 0, "Soft limit trip returned %lld (%s)",
+                  pause, strerror(-pause));
 
     /* hard limit excess should be detected instantly */
     pause = gcs_fc_process (&fc, 1);
-    fail_if(pause != -ENOMEM, "Hard limit trip returned %lld (%s)",
-            pause, strerror(-pause));
+    ck_assert_msg(pause == -ENOMEM, "Hard limit trip returned %lld (%s)",
+                  pause, strerror(-pause));
 }
 END_TEST
 
@@ -94,14 +94,14 @@ START_TEST(gcs_fc_test_precise)
     struct timespec p10ms = {0, 10000000 }; // 10 ms
 
     ret = gcs_fc_init (&fc, 2000, 0.5, 0.5);
-    fail_if (ret != 0);
+    ck_assert(ret == 0);
 
     gcs_fc_reset (&fc, 500);
     SKIP_N_ACTIONS(&fc, 7);
 
     nanosleep (&p10ms, NULL);
     ret = gcs_fc_process (&fc, 1000);
-    fail_if(ret <= 0, "Soft limit trip returned %d (%s)", ret, strerror(-ret));
+    ck_assert_msg(ret > 0, "Soft limit trip returned %d (%s)", ret, strerror(-ret));
 
     // measured data rate should be ~100000 b/s
     // slave queue length should be half-way between soft limit and hard limit
@@ -113,8 +113,8 @@ START_TEST(gcs_fc_test_precise)
     double const correction = 100000.0/fc.max_rate; // due to imprecise sleep
     double const expected_sleep = 0.001666667*correction;
     double sleep = ((double)ret)*1.0e-9;
-    fail_if(!double_equals(sleep, expected_sleep),
-            "Sleep: %f, expected %f", sleep, expected_sleep);
+    ck_assert_msg(double_equals(sleep, expected_sleep),
+                  "Sleep: %f, expected %f", sleep, expected_sleep);
 }
 END_TEST
 

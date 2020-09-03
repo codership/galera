@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2018-2019 Codership Oy <info@codership.com>
+// Copyright (C) 2018-2020 Codership Oy <info@codership.com>
 //
 
 #include <wsrep_api.h>
@@ -127,8 +127,8 @@ fill_in_expected(DefaultsMap& map, const char* def_list[])
         std::pair<std::string, std::string> param(def_list[i], def_list[i+1]);
         DefaultsMap::iterator it(map.insert(param).first);
 
-        fail_if(it == map.end(), "Failed to insert KV pair: %s = %s",
-                param.first.c_str(), param.second.c_str());
+        ck_assert_msg(it != map.end(), "Failed to insert KV pair: %s = %s",
+                      param.first.c_str(), param.second.c_str());
     }
 }
 
@@ -146,8 +146,8 @@ fill_in_real(DefaultsMap& map, wsrep_t& provider)
                                                           kv_pairs[i].second);
         DefaultsMap::iterator it(map.insert(trimmed).first);
 
-        fail_if(it == map.end(), "Failed to insert KV pair: %s = %s",
-                trimmed.first.c_str(), trimmed.second.c_str());
+        ck_assert_msg(it != map.end(), "Failed to insert KV pair: %s = %s",
+                      trimmed.first.c_str(), trimmed.second.c_str());
     }
 }
 
@@ -222,7 +222,7 @@ recv_func(void* ctx)
     wsrep_t& provider(c->provider_);
 
     wsrep_status_t const ret(provider.recv(&provider, NULL));
-    fail_if(WSREP_OK != ret, "recv() returned %d", ret);
+    ck_assert_msg(WSREP_OK == ret, "recv() returned %d", ret);
 
     return NULL;
 }
@@ -236,7 +236,7 @@ START_TEST(defaults)
     app_ctx ctx;
     wsrep_t& provider(ctx.provider_);
     int ret = wsrep_status_t(wsrep_loader(&provider));
-    fail_if(WSREP_OK != ret);
+    ck_assert(WSREP_OK == ret);
 
     struct wsrep_init_args init_args =
         {
@@ -270,11 +270,11 @@ START_TEST(defaults)
             synced_cb,// wsrep_synced_cb_t synced_cb
         };
     ret = provider.init(&provider, &init_args);
-    fail_if(WSREP_OK != ret);
+    ck_assert(WSREP_OK == ret);
 
     /* some defaults are set only on connection attmept */
     ret = provider.connect(&provider, "cluster_name", "gcomm://", "", false);
-    fail_if(WSREP_OK != ret, "connect() returned %d", ret);
+    ck_assert_msg(WSREP_OK == ret, "connect() returned %d", ret);
 
     fill_in_real(real_defaults, provider);
     mark_point();
@@ -297,10 +297,11 @@ START_TEST(defaults)
         mark_point();
 
         ret = provider.disconnect(&provider);
-        fail_if(WSREP_OK != ret, "disconnect() returned %d", ret);
+        ck_assert_msg(WSREP_OK == ret, "disconnect() returned %d", ret);
 
         ret = gu_thread_join(recv_thd, NULL);
-        fail_if(0 != ret, "Could not join thread: %d (%s)", ret, strerror(ret));
+        ck_assert_msg(0 == ret, "Could not join thread: %d (%s)",
+                      ret, strerror(ret));
     }
 
     provider.free(&provider);
@@ -347,8 +348,8 @@ START_TEST(defaults)
         real_defaults.erase(real++);
     }
 
-    fail_if (!err.str().empty(), "Defaults discrepancies detected:\n%s",
-             err.str().c_str());
+    ck_assert_msg(err.str().empty(), "Defaults discrepancies detected:\n%s",
+                  err.str().c_str());
 }
 END_TEST
 

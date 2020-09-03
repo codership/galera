@@ -109,7 +109,10 @@ gcs_node_record_state (gcs_node_t* node, gcs_state_msg_t* state_msg)
     // copy relevant stuff from state msg into node
     node->status = gcs_state_msg_current_state (state_msg);
 
-    node->last_applied = gcs_state_msg_last_applied(state_msg);
+    // NOTE: it is important that we don't overwrite last_applied from the
+    // state msg yet for compatibility with gcs proto 0. We'll do it in
+    // gcs_node_update_status() after quorum is computed
+    // node->last_applied = gcs_state_msg_last_applied(state_msg);
 
     gcs_state_msg_last_vote(state_msg, node->vote_seqno, node->vote_res);
 

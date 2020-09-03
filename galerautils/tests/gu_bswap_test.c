@@ -1,4 +1,4 @@
-// Copyright (C) 2007 Codership Oy <info@codership.com>
+// Copyright (C) 2007-2020 Codership Oy <info@codership.com>
 
 // $Id$
 
@@ -24,19 +24,19 @@ START_TEST (gu_bswap_test)
     lle = gu_le64(l); lbe = gu_be64(l);
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-    fail_if (s != sle);
-    fail_if (i != ile);
-    fail_if (l != lle);
-    fail_if (s == sbe);
-    fail_if (i == ibe);
-    fail_if (l == lbe);
+    ck_assert(s == sle);
+    ck_assert(i == ile);
+    ck_assert(l == lle);
+    ck_assert(s != sbe);
+    ck_assert(i != ibe);
+    ck_assert(l != lbe);
 #else
-    fail_if (s == sle);
-    fail_if (i == ile);
-    fail_if (l == lle);
-    fail_if (s != sbe);
-    fail_if (i != ibe);
-    fail_if (l != lbe);
+    ck_assert(s != sle);
+    ck_assert(i != ile);
+    ck_assert(l != lle);
+    ck_assert(s == sbe);
+    ck_assert(i == ibe);
+    ck_assert(l == lbe);
 #endif /* __BYTE_ORDER */
 
     // second conversion
@@ -44,12 +44,12 @@ START_TEST (gu_bswap_test)
     ile = gu_le32(ile); ibe = gu_be32(ibe);
     lle = gu_le64(lle); lbe = gu_be64(lbe);
 
-    fail_if (s != sle);
-    fail_if (i != ile);
-    fail_if (l != lle);
-    fail_if (s != sbe);
-    fail_if (i != ibe);
-    fail_if (l != lbe);
+    ck_assert(s == sle);
+    ck_assert(i == ile);
+    ck_assert(l == lle);
+    ck_assert(s == sbe);
+    ck_assert(i == ibe);
+    ck_assert(l == lbe);
 
 }
 END_TEST

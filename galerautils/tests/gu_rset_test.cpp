@@ -1,4 +1,4 @@
-/* Copyright (C) 2013 Codership Oy <info@codership.com>
+/* Copyright (C) 2013-2020 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -35,7 +35,7 @@ public:
         str_(reinterpret_cast<const char*>(buf_ + sizeof(uint32_t))),
         own_(true)
     {
-        fail_if (size_ > 0x7fffffff);
+        ck_assert (size_ <= 0x7fffffff);
         if (0 == buf_) throw std::runtime_error("failed to allocate record");
         gu::byte_t* tmp = const_cast<gu::byte_t*>(buf_);
         gu::serialize4(uint32_t(size_), tmp, 0);
@@ -112,15 +112,15 @@ START_TEST (empty)
 {
     gu::RecordSetIn<TestRecord> const rset_in(0, 0);
 
-    fail_if (0 != rset_in.size());
-    fail_if (0 != rset_in.count());
+    ck_assert(0 == rset_in.size());
+    ck_assert(0 == rset_in.count());
 
     try {
         rset_in.checksum();
     }
     catch (std::exception& e)
     {
-        fail("%s", e.what());
+        ck_abort_msg("%s", e.what());
     }
 }
 END_TEST
@@ -135,8 +135,8 @@ test_version (gu::RecordSet::Version version)
     // the choice of sizes below is based on default allocator memory store size
     // of 4MB. If it is changed, these need to be changed too.
     TestRecord rout0(120,  "abc0");
-    fail_if (rout0.serial_size() != 120);
-    fail_if (gtoh32(*reinterpret_cast<const uint32_t*>(rout0.buf())) != 120);
+    ck_assert(rout0.serial_size() == 120);
+    ck_assert(gtoh32(*reinterpret_cast<const uint32_t*>(rout0.buf())) == 120);
     TestRecord rout1(121,  "abc1");
     TestRecord rout2(122,  "012345");
     TestRecord rout3(123,  "defghij");
@@ -161,7 +161,7 @@ test_version (gu::RecordSet::Version version)
                                           gu::RecordSet::CHECK_MMH64, version);
 
     size_t offset(rset_out.size());
-    fail_if (1 != rset_out.page_count());
+    ck_assert(1 == rset_out.page_count());
 
     std::pair<const gu::byte_t*, size_t> rp;
     int rsize;
@@ -171,43 +171,43 @@ test_version (gu::RecordSet::Version version)
     rp = rset_out.append (rout0);
     rout_ptrs[0] = rp.first;
     rsize = rp.second;
-    fail_if (rsize != rout0.serial_size());
-    fail_if (rsize < 0);
-    fail_if (rsize != TestRecord::serial_size(rp.first, rsize));
+    ck_assert(rsize == rout0.serial_size());
+    ck_assert(rsize >= 0);
+    ck_assert(rsize == TestRecord::serial_size(rp.first, rsize));
     offset += rsize;
-    fail_if (rset_out.size() != offset);
+    ck_assert(rset_out.size() == offset);
 
-    fail_if (1 != rset_out.page_count());
+    ck_assert(1 == rset_out.page_count());
 
     // this should trigger new page since not stored
     rp = rset_out.append (rout1.buf(), rout1.serial_size(), false);
     rout_ptrs[1] = rp.first;
     rsize = rp.second;
-    fail_if (rsize != rout1.serial_size());
+    ck_assert(rsize == rout1.serial_size());
     offset += rsize;
-    fail_if (rset_out.size() != offset);
+    ck_assert(rset_out.size() == offset);
 
     if (0 == (offset % alignment)) // aligment page may be required
-        fail_if (2 != rset_out.page_count());
+        ck_assert(2 == rset_out.page_count());
     else
-        fail_if (3 != rset_out.page_count());
+        ck_assert(3 == rset_out.page_count());
 
     // this should trigger new page since previous one was not stored
     rp = rset_out.append (rout2);
     rout_ptrs[2] = rp.first;
     rsize = rp.second;
-    fail_if (rsize != rout2.serial_size());
-    fail_if (rsize < 0);
-    fail_if (rsize != TestRecord::serial_size(rp.first, rsize));
+    ck_assert(rsize == rout2.serial_size());
+    ck_assert(rsize >= 0);
+    ck_assert(rsize == TestRecord::serial_size(rp.first, rsize));
     offset += rsize;
-    fail_if (rset_out.size() != offset);
+    ck_assert(rset_out.size() == offset);
 
     if (0 == (offset % alignment)) // aligment page may be required
-        fail_if (3 != rset_out.page_count(),
-                 "Expected %d pages, found %zu", 3, rset_out.page_count());
+        ck_assert_msg(3 == rset_out.page_count(),
+                      "Expected %d pages, found %zu", 3, rset_out.page_count());
     else
-        fail_if (4 != rset_out.page_count(),
-                 "Expected %d pages, found %zu", 4, rset_out.page_count());
+        ck_assert_msg(4 == rset_out.page_count(),
+                      "Expected %d pages, found %zu", 4, rset_out.page_count());
 
     //***** test partial record appending *****//
     // this should be allocated inside the current page.
@@ -215,45 +215,45 @@ test_version (gu::RecordSet::Version version)
 //    rout_ptrs[2] = rp.first;
     rsize = rp.second;
     offset += rp.second;
-    fail_if ((3 + (0 != (offset % alignment))) != rset_out.page_count());
+    ck_assert((3 + (0 != (offset % alignment))) == rset_out.page_count());
 
     // this should trigger a new page, since not stored
     rp = rset_out.append (rout3.buf() + 3, rout3.serial_size() - 3, false,
                             false);
     rout_ptrs[3] = rp.first;
     rsize += rp.second;
-    fail_if (rsize != rout3.serial_size());
+    ck_assert(rsize == rout3.serial_size());
     offset += rp.second;
-    fail_if (rset_out.size() != offset);
+    ck_assert(rset_out.size() == offset);
 
-    fail_if ((4 + (0 != (offset % alignment))) != rset_out.page_count());
+    ck_assert((4 + (0 != (offset % alignment))) == rset_out.page_count());
 
     // this should trigger new page, because won't fit in the current page
     rp = rset_out.append (rout4);
     rout_ptrs[4] = rp.first;
     rsize = rp.second;
-    fail_if (rsize != rout4.serial_size());
+    ck_assert(rsize == rout4.serial_size());
     offset += rsize;
-    fail_if (rset_out.size() != offset);
+    ck_assert(rset_out.size() == offset);
 
-    fail_if ((5 + (0 != (offset % alignment))) != rset_out.page_count());
+    ck_assert((5 + (0 != (offset % alignment))) == rset_out.page_count());
 
     // this should trigger new page, because 4MB RAM limit exceeded
     rp = rset_out.append (rout5);
     rout_ptrs[5] = rp.first;
     rsize = rp.second;
-    fail_if (rsize != rout5.serial_size());
+    ck_assert(rsize == rout5.serial_size());
     offset += rsize;
-    fail_if (rset_out.size() != offset);
+    ck_assert(rset_out.size() == offset);
 
     if (0 == (offset % alignment)) // aligment page may be required
-        fail_if (6 != rset_out.page_count(),
-                 "Expected %d pages, found %zu", 6, rset_out.page_count());
+        ck_assert_msg(6 == rset_out.page_count(),
+                      "Expected %d pages, found %zu", 6, rset_out.page_count());
     else
-        fail_if (7 != rset_out.page_count(),
-                 "Expected %d pages, found %zu", 7, rset_out.page_count());
+        ck_assert_msg(7 == rset_out.page_count(),
+                      "Expected %d pages, found %zu", 7, rset_out.page_count());
 
-    fail_if (records.size() != size_t(rset_out.count()));
+    ck_assert(records.size() == size_t(rset_out.count()));
 
     gu::RecordSet::GatherVector out_bufs;
     out_bufs->reserve (rset_out.page_count());
@@ -267,13 +267,13 @@ test_version (gu::RecordSet::Version version)
 
     size_t const out_size (rset_out.gather (out_bufs));
 
-    fail_if (out_size != rset_out.serial_size());
-    fail_if (out_size <= min_out_size || out_size > offset);
-    fail_if (out_bufs->size() > size_t(rset_out.page_count()) ||
-             out_bufs->size() < size_t(rset_out.page_count() - padding_page),
-             "Expected %zu buffers, got: %zd",
-             rset_out.page_count(), out_bufs->size());
-    fail_if (out_size % alignment); // make sure it is aligned
+    ck_assert(out_size == rset_out.serial_size());
+    ck_assert(out_size > min_out_size && out_size <= offset);
+    ck_assert_msg(out_bufs->size() <= size_t(rset_out.page_count()) &&
+                  out_bufs->size() >= size_t(rset_out.page_count()-padding_page),
+                  "Expected %zu buffers, got: %zd",
+                  rset_out.page_count(), out_bufs->size());
+    ck_assert((out_size % alignment) == 0); // make sure it is aligned
 
     /* concatenate all buffers into one */
     std::vector<gu::byte_t> in_buf;
@@ -285,9 +285,9 @@ test_version (gu::RecordSet::Version version)
         // last fragment may be a padding page
         bool const check_fragment(i > 0 && i < (out_bufs->size()- padding_page));
 
-        fail_if (check_fragment && rout_ptrs[i] != out_bufs[i].ptr,
-                 "Record pointers don't mathch after gather(). "
-                 "old: %p, new: %p", rout_ptrs[i],out_bufs[i].ptr);
+        ck_assert_msg(!check_fragment || rout_ptrs[i] == out_bufs[i].ptr,
+                      "Record pointers don't mathch after gather(). "
+                      "old: %p, new: %p", rout_ptrs[i],out_bufs[i].ptr);
 
         ssize_t size;
         int const off(gu::unserialize4(out_bufs[i].ptr, 0, size));
@@ -295,9 +295,9 @@ test_version (gu::RecordSet::Version version)
         const char* str =
             reinterpret_cast<const char*>(out_bufs[i].ptr) + off;
 
-        fail_if (check_fragment && size <= ssize_t(sizeof(uint32_t)),
-                 "Expected size > 4, got %zd(%#010zx). i = %zu, buf = %s",
-                 size, size, i, str);
+        ck_assert_msg(!check_fragment || size > ssize_t(sizeof(uint32_t)),
+                      "Expected size > 4, got %zd(%#010zx). i = %zu, buf = %s",
+                      size, size, i, str);
 
         // the above variables make have sense only on certain pages
         // hence ifs below
@@ -309,15 +309,15 @@ test_version (gu::RecordSet::Version version)
             break; // 4th page is partial 4th record
         case 1:
         case 2:
-            fail_if (::strcmp(str, records[k]->c_str()),
-                     "Buffer %zu: appending '%s', expected '%s'",
-                     i, str, records[k]->c_str());
+            ck_assert_msg(::strcmp(str, records[k]->c_str()) == 0,
+                          "Buffer %zu: appending '%s', expected '%s'",
+                          i, str, records[k]->c_str());
         }
 
         if (i == 1 || i == 4) {
-            fail_if (size != records[k]->serial_size(),
-                     "Buffer %zu: appending size %zd, expected %zd",
-                     i, size, records[k]->serial_size());
+            ck_assert_msg(size == records[k]->serial_size(),
+                          "Buffer %zu: appending size %zd, expected %zd",
+                          i, size, records[k]->serial_size());
         }
 
         log_info << "\nadding buf " << i << ": "
@@ -331,12 +331,12 @@ test_version (gu::RecordSet::Version version)
 
         in_buf.insert (in_buf.end(), begin, begin + out_bufs[i].size);
 
-        fail_if (old_size + out_bufs[i].size != in_buf.size());
+        ck_assert(old_size + out_bufs[i].size == in_buf.size());
     }
 
-    fail_if (in_buf.size() != out_size,
-             "Sent buf size: %zu, recvd buf size: %zu",
-             out_size, in_buf.size());
+    ck_assert_msg(in_buf.size() == out_size,
+                  "Sent buf size: %zu, recvd buf size: %zu",
+                  out_size, in_buf.size());
 
     log_info << "Resulting RecordSet buffer:\n"
              << gu::Hexdump(in_buf.data(), 32, false) << '\n'
@@ -344,15 +344,16 @@ test_version (gu::RecordSet::Version version)
 
     gu::RecordSetIn<TestRecord> const rset_in(in_buf.data(), in_buf.size());
 
-    fail_if (rset_in.size()  != rset_out.size());
-    fail_if (rset_in.count() != rset_out.count());
-    fail_if (rset_in.serial_size() != rset_out.serial_size());
+    ck_assert(rset_in.size()  == rset_out.size());
+    ck_assert(rset_in.count() == rset_out.count());
+    ck_assert(rset_in.serial_size() == rset_out.serial_size());
 
     for (ssize_t i = 0; i < rset_in.count(); ++i)
     {
         TestRecord const rin(rset_in.next());
-        fail_if (rin != *records[i], "Record %d failed: expected %s, found %s",
-                 i, records[i]->c_str(), rin.c_str());
+        ck_assert_msg(rin == *records[i],
+                      "Record %d failed: expected %s, found %s",
+                      i, records[i]->c_str(), rin.c_str());
     }
 
     /* Test checksum method: */
@@ -361,51 +362,52 @@ test_version (gu::RecordSet::Version version)
     }
     catch (std::exception& e)
     {
-        fail("%s", e.what());
+        ck_abort_msg("%s", e.what());
     }
 
     /* test buf() method */
     gu::RecordSetIn<TestRecord> const rset_in_buf(rset_in.buf().ptr,
                                                   rset_in.buf().size);
-    fail_if(rset_in.count() != rset_in_buf.count());
-    fail_if(rset_in.size()  != rset_in_buf.size());
-    fail_if (rset_in.buf().ptr != rset_in_buf.buf().ptr);
+    ck_assert(rset_in.count() == rset_in_buf.count());
+    ck_assert(rset_in.size()  == rset_in_buf.size());
+    ck_assert(rset_in.buf().ptr == rset_in_buf.buf().ptr);
     for (ssize_t i = 0; i < rset_in_buf.count(); ++i)
     {
         TestRecord const rin(rset_in_buf.next());
-        fail_if (rin != *records[i], "Record %d failed: expected %s, found %s",
-                 i, records[i]->c_str(), rin.c_str());
+        ck_assert_msg(rin == *records[i],
+                      "Record %d failed: expected %s, found %s",
+                      i, records[i]->c_str(), rin.c_str());
     }
 
     /* test empty RecordSetIn creation with subsequent initialization */
     gu::RecordSetIn<TestRecord> rset_in_empty;
-    fail_if (rset_in_empty.size()  != 0);
-    fail_if (rset_in_empty.count() != 0);
+    ck_assert(rset_in_empty.size()  == 0);
+    ck_assert(rset_in_empty.count() == 0);
 
     try {
         TestRecord const rin(rset_in_empty.next());
-        fail ("next() succeeded on an empty writeset");
+        ck_abort_msg("next() succeeded on an empty writeset");
     }
     catch (gu::Exception& e) {
-        fail_if (e.get_errno() != EPERM);
+        ck_assert(e.get_errno() == EPERM);
     }
 
     rset_in_empty.init(in_buf.data(), in_buf.size(), true);
-    fail_if (rset_in_empty.size()  != rset_out.size());
-    fail_if (rset_in_empty.count() != rset_out.count());
+    ck_assert(rset_in_empty.size()  == rset_out.size());
+    ck_assert(rset_in_empty.count() == rset_out.count());
 
     /* Try some data corruption: swap a bit */
     in_buf[10] ^= 1;
 
     try {
         rset_in.checksum();
-        fail("checksum() didn't throw on corrupted set");
+        ck_abort_msg("checksum() didn't throw on corrupted set");
     }
     catch (std::exception& e) {}
 
     try {
         rset_in_empty.checksum();
-        fail("checksum() didn't throw on corrupted set");
+        ck_abort_msg("checksum() didn't throw on corrupted set");
     }
     catch (std::exception& e) {}
 }
@@ -455,8 +457,8 @@ test_padding(gu::RecordSet::Version rsv)
     size_t const out_size(rso.gather(out));
     /* here we must get a vector of */
     size_t const expected_pages(2 + padding_page);
-    fail_if(out->size() != expected_pages,
-            "Expected %zu pages, got %zu", expected_pages, out->size());
+    ck_assert_msg(out->size() == expected_pages,
+                  "Expected %zu pages, got %zu", expected_pages, out->size());
 
     /* concatenate all out buffers */
     std::vector<gu::byte_t> in_buf;
@@ -467,7 +469,7 @@ test_padding(gu::RecordSet::Version rsv)
         in_buf.insert (in_buf.end(), ptr, ptr + out[i].size);
     }
 
-    fail_if (in_buf.size() != out_size);
+    ck_assert(in_buf.size() == out_size);
 
     try
     {
@@ -476,7 +478,7 @@ test_padding(gu::RecordSet::Version rsv)
     }
     catch (gu::Exception& e)
     {
-        fail("%s", e.what());
+        ck_abort_msg("%s", e.what());
     }
 }
 
@@ -515,10 +517,10 @@ ver2_size(int const count, size_t const size, gu::RecordSet::CheckType ct)
     out_bufs->reserve(rset.page_count());
 
     size_t const out_size(rset.gather(out_bufs));
-    fail_if((out_size % gu::RecordSet::VER2_ALIGNMENT),
-            "Final size %zu is not multiple of %d. "
-            "Params: count: %d, size: %zu, ct: %d",
-            out_size, gu::RecordSet::VER2_ALIGNMENT, count, size, ct);
+    ck_assert_msg(0 == (out_size % gu::RecordSet::VER2_ALIGNMENT),
+                  "Final size %zu is not multiple of %d. "
+                  "Params: count: %d, size: %zu, ct: %d",
+                  out_size, gu::RecordSet::VER2_ALIGNMENT, count, size, ct);
 
     return out_size;
 }
@@ -535,7 +537,7 @@ START_TEST (ver2_sizes)
     try
     {
         s = ver2_size(128, 1, ct);
-        fail("Must throw exception!");
+        ck_abort_msg("Must throw exception!");
     }
     catch(gu::Exception& e) {}
 #endif
@@ -547,7 +549,7 @@ START_TEST (ver2_sizes)
     rs   = ver2_size(c, s, ct);
     // expected size: short header(8) + checksum size + aligned payload size
     es   = 8 + ct_s + GU_ALIGN(c*s, gu::RecordSet::VER2_ALIGNMENT);
-    fail_if(rs != es);
+    ck_assert(rs == es);
 
     c   += 1; // this count must force "long" header
     s    = 1; // record size
@@ -556,7 +558,7 @@ START_TEST (ver2_sizes)
     rs   = ver2_size(c, s, ct);
     // expected size: long header(16) + checksum size + aligned payload size
     es   = 16 + ct_s + GU_ALIGN(c*s, gu::RecordSet::VER2_ALIGNMENT);
-    fail_if(rs != es);
+    ck_assert(rs == es);
 
     ct   = gu::RecordSet::CHECK_MMH128;
     ct_s = gu::RecordSet::check_size(ct);
@@ -565,7 +567,7 @@ START_TEST (ver2_sizes)
     rs = ver2_size(c, s, ct);
     // expected size: long header(16) + checksum size + aligned payload size
     es   = 8 + ct_s + GU_ALIGN(c*s, gu::RecordSet::VER2_ALIGNMENT);
-    fail_if(rs != es);
+    ck_assert(rs == es);
 
     ct   = gu::RecordSet::CHECK_MMH128;
     ct_s = gu::RecordSet::check_size(ct);
@@ -574,7 +576,7 @@ START_TEST (ver2_sizes)
     rs = ver2_size(c, s, ct);
     // expected size: long header(16) + checksum size + aligned payload size
     es   = 16 + ct_s + GU_ALIGN(c*s, gu::RecordSet::VER2_ALIGNMENT);
-    fail_if(rs != es);
+    ck_assert(rs == es);
 
     ct   = gu::RecordSet::CHECK_NONE;
     ct_s = gu::RecordSet::check_size(ct);
@@ -583,7 +585,7 @@ START_TEST (ver2_sizes)
     rs = ver2_size(c, s, ct);
     // expected size: long header(16) + checksum size + aligned payload size
     es   = 8 + ct_s + GU_ALIGN(c*s, gu::RecordSet::VER2_ALIGNMENT);
-    fail_if(rs != es);
+    ck_assert(rs == es);
 }
 END_TEST
 

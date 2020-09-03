@@ -1,4 +1,4 @@
-// Copyright (C) 2012 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2020 Codership Oy <info@codership.com>
 
 // $Id$
 
@@ -17,9 +17,9 @@ START_TEST (gu_fnv32_test)
 {
     uint32_t ret = 0;
     gu_fnv32a_internal (test_buf, strlen(test_buf), &ret);
-    fail_if (GU_FNV32_SEED != ret,
-             "FNV32 failed: expected %"PRIu32", got %"PRIu32,
-             GU_FNV32_SEED, ret);
+    ck_assert_msg(GU_FNV32_SEED == ret,
+                  "FNV32 failed: expected %"PRIu32", got %"PRIu32,
+                  GU_FNV32_SEED, ret);
 }
 END_TEST
 
@@ -27,9 +27,9 @@ START_TEST (gu_fnv64_test)
 {
     uint64_t ret = 0;
     gu_fnv64a_internal (test_buf, strlen(test_buf), &ret);
-    fail_if (GU_FNV64_SEED != ret,
-             "FNV64 failed: expected %"PRIu64", got %"PRIu64,
-             GU_FNV64_SEED, ret);
+    ck_assert_msg(GU_FNV64_SEED == ret,
+                  "FNV64 failed: expected %"PRIu64", got %"PRIu64,
+                  GU_FNV64_SEED, ret);
 }
 END_TEST
 
@@ -38,15 +38,15 @@ START_TEST (gu_fnv128_test)
     gu_uint128_t GU_SET128(ret, 0, 0);
     gu_fnv128a_internal (test_buf, strlen(test_buf), &ret);
 #if defined(__SIZEOF_INT128__)
-    fail_if (!GU_EQ128(GU_FNV128_SEED, ret),
-             "FNV128 failed: expected %"PRIx64" %"PRIx64", got %"PRIx64" %"PRIx64,
-             (uint64_t)(GU_FNV128_SEED >> 64), (uint64_t)GU_FNV128_SEED,
-             (uint64_t)(ret >> 64), (uint64_t)ret);
+    ck_assert_msg(GU_EQ128(GU_FNV128_SEED, ret),
+                  "FNV128 failed: expected %"PRIx64" %"PRIx64", got %"PRIx64" %"PRIx64,
+                  (uint64_t)(GU_FNV128_SEED >> 64), (uint64_t)GU_FNV128_SEED,
+                  (uint64_t)(ret >> 64), (uint64_t)ret);
 #else
-    fail_if (!GU_EQ128(GU_FNV128_SEED, ret),
-             "FNV128 failed: expected %"PRIx64" %"PRIx64", got %"PRIx64" %"PRIx64,
-             GU_FNV128_SEED.u64[GU_64HI], GU_FNV128_SEED.u64[GU_64LO],
-             ret.u64[GU_64HI], ret.u64[GU_64LO]);
+    ck_assert_msg(GU_EQ128(GU_FNV128_SEED, ret),
+                  "FNV128 failed: expected %"PRIx64" %"PRIx64", got %"PRIx64" %"PRIx64,
+                  GU_FNV128_SEED.u64[GU_64HI], GU_FNV128_SEED.u64[GU_64LO],
+                  ret.u64[GU_64HI], ret.u64[GU_64LO]);
 #endif
 }
 END_TEST

@@ -284,7 +284,8 @@ group_redo_last_applied (gcs_group_t* group)
         group->last_node    = last_node;
     }
 
-    log_debug << "final last_applied: " << group->last_applied;
+    log_debug << "final last_applied on " << group->nodes[group->my_idx].name
+              << "): " << group->last_applied;
 }
 
 static void
@@ -697,14 +698,6 @@ gcs_group_handle_uuid_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
     return group->state;
 }
 
-static void group_print_state_debug(gcs_state_msg_t* state)
-{
-    size_t str_len = 1024;
-    char state_str[str_len];
-    gcs_state_msg_snprintf (state_str, str_len, state);
-    gu_info ("%s", state_str);
-}
-
 gcs_group_state_t
 gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
 {
@@ -725,8 +718,6 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
                          msg->sender_idx, gcs_state_msg_name(state));
                 gu_debug("%s", state_str);
 
-                if (gu_log_debug) group_print_state_debug(state);
-
                 gcs_node_record_state (&group->nodes[msg->sender_idx], state);
                 group_post_state_exchange (group);
             }
@@ -738,8 +729,6 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
                           msg->sender_idx, gcs_state_msg_name(state),
                           GU_UUID_ARGS(&group->state_uuid));
                 gu_debug ("%s", state_str);
-
-                if (gu_log_debug) group_print_state_debug(state);
 
                 gcs_state_msg_destroy (state);
             }
@@ -830,8 +819,8 @@ gcs_group_handle_last_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
         group_redo_last_applied (group);
 
         if (old_val < group->last_applied) {
-            gu_debug ("New COMMIT CUT %lld after %lld from %d",
-                      (long long)group->last_applied,
+            gu_debug ("New COMMIT CUT %lld on %d after %lld from %d",
+                      (long long)group->last_applied, group->my_idx,
                       (long long)gtid.seqno(), msg->sender_idx);
             return group->last_applied;
         }
@@ -1752,7 +1741,10 @@ group_select_donor (gcs_group_t* group,
 void
 gcs_group_ignore_action (gcs_group_t* group, struct gcs_act_rcvd* act)
 {
-//    if (act->act.type <= GCS_ACT_STATE_REQ) {
+    gu_debug("Ignoring action: buf: %p, len: %zd, type: %d, sender: %d, "
+             "seqno: %lld", act->act.buf, act->act.buf_len, act->act.type,
+             act->sender_idx, act->id);
+
     if (act->act.type <= GCS_ACT_CCHANGE) {
         gcs_gcache_free (group->cache, act->act.buf);
     }

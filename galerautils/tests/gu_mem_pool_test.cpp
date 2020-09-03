@@ -1,4 +1,4 @@
-// Copyright (C) 2013 Codership Oy <info@codership.com>
+// Copyright (C) 2013-2020 Codership Oy <info@codership.com>
 
 // $Id$
 
@@ -13,17 +13,17 @@ START_TEST (unsafe)
     gu::MemPoolUnsafe mp(10, 1, "unsafe");
 
     void* const buf0(mp.acquire());
-    fail_if(NULL == buf0);
+    ck_assert(NULL != buf0);
 
     void* const buf1(mp.acquire());
-    fail_if(NULL == buf1);
-    fail_if(buf0 == buf1);
+    ck_assert(NULL != buf1);
+    ck_assert(buf0 != buf1);
 
     mp.recycle(buf0);
 
     void* const buf2(mp.acquire());
-    fail_if(NULL == buf2);
-    fail_if(buf0 != buf2);
+    ck_assert(NULL != buf2);
+    ck_assert(buf0 == buf2);
 
     log_info << mp;
 
@@ -37,17 +37,17 @@ START_TEST (safe)
     gu::MemPoolSafe mp(10, 1, "safe");
 
     void* const buf0(mp.acquire());
-    fail_if(NULL == buf0);
+    ck_assert(NULL != buf0);
 
     void* const buf1(mp.acquire());
-    fail_if(NULL == buf1);
-    fail_if(buf0 == buf1);
+    ck_assert(NULL != buf1);
+    ck_assert(buf0 != buf1);
 
     mp.recycle(buf0);
 
     void* const buf2(mp.acquire());
-    fail_if(NULL == buf2);
-    fail_if(buf0 != buf2);
+    ck_assert(NULL != buf2);
+    ck_assert(buf0 == buf2);
 
     log_info << mp;
 

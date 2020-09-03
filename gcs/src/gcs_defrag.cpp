@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -12,7 +12,7 @@
 
 #define DF_ALLOC()                                              \
     do {                                                        \
-        df->head = static_cast<uint8_t*>(gcs_gcache_malloc (df->cache, df->size)); \
+        df->head = static_cast<uint8_t*>(gcs_gcache_malloc(df->cache,df->size));\
                                                                 \
         if(gu_likely(df->head != NULL))                         \
             df->tail = df->head;                                \

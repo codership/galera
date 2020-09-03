@@ -26,11 +26,11 @@ START_TEST(test_ist_message)
     Message m3(3, Message::T_HANDSHAKE, 0x2, 3, 1001);
 
 #if GU_WORDSIZE == 32
-    fail_unless(serial_size(m3) == 20, "serial size %zu != 20",
-                serial_size(m3));
+    ck_assert_msg(serial_size(m3) == 20, "serial size %zu != 20",
+                  serial_size(m3));
 #elif GU_WORDSIZE == 64
-    fail_unless(serial_size(m3) == 24, "serial size %zu != 24",
-                serial_size(m3));
+    ck_assert_msg(serial_size(m3) == 24, "serial size %zu != 24",
+                  serial_size(m3));
 #endif
 
     gu::Buffer buf(m3.serial_size());
@@ -38,44 +38,46 @@ START_TEST(test_ist_message)
     Message mu3(3);
     mu3.unserialize(&buf[0], buf.size(), 0);
 
-    fail_unless(mu3.version() == 3);
-    fail_unless(mu3.type()    == Message::T_HANDSHAKE);
-    fail_unless(mu3.flags()   == 0x2);
-    fail_unless(mu3.ctrl()    == 3);
-    fail_unless(mu3.len()     == 1001);
+    ck_assert(mu3.version() == 3);
+    ck_assert(mu3.type()    == Message::T_HANDSHAKE);
+    ck_assert(mu3.flags()   == 0x2);
+    ck_assert(mu3.ctrl()    == 3);
+    ck_assert(mu3.len()     == 1001);
 #endif /* 0 */
 
     Message const m2(VER21, Message::T_HANDSHAKE, 0x2, 3, 1001);
     size_t const s2(12);
-    fail_unless(m2.serial_size() == s2,
-                "Expected m2.serial_size() = %zd, got %zd", s2,m2.serial_size());
+    ck_assert_msg(m2.serial_size() == s2,
+                  "Expected m2.serial_size() = %zd, got %zd",
+                  s2, m2.serial_size());
 
     gu::Buffer buf2(m2.serial_size());
     m2.serialize(&buf2[0], buf2.size(), 0);
 
     Message mu2(VER21);
     mu2.unserialize(&buf2[0], buf2.size(), 0);
-    fail_unless(mu2.version() == VER21);
-    fail_unless(mu2.type()    == Message::T_HANDSHAKE);
-    fail_unless(mu2.flags()   == 0x2);
-    fail_unless(mu2.ctrl()    == 3);
-    fail_unless(mu2.len()     == 1001);
+    ck_assert(mu2.version() == VER21);
+    ck_assert(mu2.type()    == Message::T_HANDSHAKE);
+    ck_assert(mu2.flags()   == 0x2);
+    ck_assert(mu2.ctrl()    == 3);
+    ck_assert(mu2.len()     == 1001);
 
     Message const m4(VER40, Message::T_HANDSHAKE, 0x2, 3, 1001);
     size_t const s4(16 + sizeof(uint64_t /* Message::checksum_t */));
-    fail_unless(m4.serial_size() == s4,
-                "Expected m3.serial_size() = %zd, got %zd", s4,m4.serial_size());
+    ck_assert_msg(m4.serial_size() == s4,
+                  "Expected m3.serial_size() = %zd, got %zd",
+                  s4, m4.serial_size());
 
     gu::Buffer buf4(m4.serial_size());
     m4.serialize(&buf4[0], buf4.size(), 0);
 
     Message mu4(VER40);
     mu4.unserialize(&buf4[0], buf4.size(), 0);
-    fail_unless(mu4.version() == VER40);
-    fail_unless(mu4.type()    == Message::T_HANDSHAKE);
-    fail_unless(mu4.flags()   == 0x2);
-    fail_unless(mu4.ctrl()    == 3);
-    fail_unless(mu4.len()     == 1001);
+    ck_assert(mu4.version() == VER40);
+    ck_assert(mu4.type()    == Message::T_HANDSHAKE);
+    ck_assert(mu4.flags()   == 0x2);
+    ck_assert(mu4.ctrl()    == 3);
+    ck_assert(mu4.len()     == 1001);
 }
 END_TEST
 
@@ -307,7 +309,8 @@ static int select_trx_version(int protocol_version)
     case 10:
         return 5;
     default:
-        fail("unsupported replicator protocol version: %n", protocol_version);
+        ck_abort_msg("unsupported replicator protocol version: %n",
+                     protocol_version);
     }
 
     return -1;
@@ -340,7 +343,8 @@ static void store_trx(gcache::GCache* const gcache,
 
     if (trx_params.version_ < 3)
     {
-        fail("WS version %d not supported any more", trx_params.version_);
+        ck_abort_msg("WS version %d not supported any more",
+                     trx_params.version_);
     }
     else
     {
@@ -389,7 +393,7 @@ static void store_cc(gcache::GCache* const gcache,
     int   const cc_size(cc.write(&tmp));
     void* const cc_ptr(gcache->malloc(cc_size));
 
-    fail_if(NULL == cc_ptr);
+    ck_assert(NULL != cc_ptr);
     memcpy(cc_ptr, tmp, cc_size);
     free(tmp);
     gcache->seqno_assign(cc_ptr, i, GCS_ACT_CCHANGE, i > 0);

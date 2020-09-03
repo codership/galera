@@ -1,5 +1,5 @@
 
-Import('check_env')
+Import('check_env all_tests')
 
 env = check_env.Clone()
 
@@ -20,9 +20,12 @@ env.Replace(CCFLAGS = env['CCFLAGS'].replace('-pedantic', ''))
 env.Append(CPPFLAGS = ' -Wno-missing-field-initializers')
 env.Append(CPPFLAGS = ' -Wno-effc++')
 
+if all_tests:
+    env.Append(CPPFLAGS = ' -DGCS_ALLOW_GH74')
 
 gcs_tests_sources = Split('''
                              gcs_tests.cpp
+                             gcs_test_utils.cpp
                              gcs_fifo_test.cpp
                              ../gcs_fifo_lite.cpp
                              gcs_sm_test.cpp
@@ -53,7 +56,6 @@ gcs_tests_sources = Split('''
                              ../gcs_params.cpp
                              gcs_fc_test.cpp
                              ../gcs_fc.cpp
-                             gcs_test_utils.cpp
                           ''')
 
 

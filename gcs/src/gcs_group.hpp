@@ -177,7 +177,7 @@ gcs_group_handle_act_msg (gcs_group_t*          const group,
                           struct gcs_act_rcvd*  const rcvd,
                           bool commonly_supported_version)
 {
-    long const sender_idx = msg->sender_idx;
+    int  const sender_idx = msg->sender_idx;
     bool const local      = (sender_idx == group->my_idx);
     ssize_t ret;
 
@@ -199,6 +199,7 @@ gcs_group_handle_act_msg (gcs_group_t*          const group,
         assert (ret == rcvd->act.buf_len);
 
         rcvd->act.type = frg->act_type;
+        rcvd->sender_idx = sender_idx;
 
         if (gu_likely(GCS_ACT_WRITESET  == rcvd->act.type &&
                       GCS_GROUP_PRIMARY == group->state   &&

@@ -457,7 +457,7 @@ then
 
             if [ "$MYSQL_MM_VER" -ge "56" ]
             then
-                BUILD_OPT+=" -DWITH_LIBEVENT=yes -DWITH_INNODB_MEMCACHED=ON"
+                BUILD_OPT+=" -DWITH_LIBEVENT=bundled -DWITH_INNODB_MEMCACHED=ON"
             fi
             if [ "$MYSQL_MM_VER" -ge "57" ]
             then
@@ -498,8 +498,8 @@ then
         [ "$DEBUG" = "yes" ] && CPPFLAGS="${CPPFLAGS:-""} -O0"
 
         cmake \
-            -DCMAKE_C_COMPILER=$(basename $CC) \
-            -DCMAKE_CXX_COMPILER=$(basename $CXX) \
+            -DCMAKE_C_COMPILER=$(pwd)/$(basename $CC) \
+            -DCMAKE_CXX_COMPILER=$(pwd)/$(basename $CXX) \
             -DCMAKE_C_FLAGS="$CFLAGS" \
             -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
             -DBUILD_CONFIG=mysql_release \
@@ -510,6 +510,7 @@ then
 
     else  # just recompile and relink with old configuration
         pushd $MYSQL_BUILD_DIR
+        CC=$(pwd)/$(basename $CC) CXX=$(pwd)/$(basename $CXX) \
         make -j $JOBS -S > /dev/null
         popd
     fi

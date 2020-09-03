@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2020 Codership Oy <info@codership.com>
  */
 
 #include "pc.hpp"
@@ -226,6 +226,7 @@ void gcomm::PC::handle_get_status(gu::Status& status) const
     status.insert("gcomm_uuid", uuid().full_str());
     status.insert("cluster_weight", gu::to_string(
                       pc_ ? pc_->cluster_weight() : 0));
+    status.insert("gmcast_segment", gu::to_string(int(gmcast_->segment())));
 }
 
 gcomm::PC::PC(Protonet& net, const gu::URI& uri) :

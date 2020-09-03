@@ -2326,6 +2326,8 @@ gcs_get_stats (gcs_conn_t* conn, struct gcs_stats* stats)
     stats->fc_ssent    = conn->stats_fc_stop_sent;
     stats->fc_csent    = conn->stats_fc_cont_sent;
     stats->fc_received = conn->stats_fc_received;
+    stats->fc_active   = conn->stop_count > 0;
+    stats->fc_requested= conn->stop_sent_ > 0;
 }
 
 void
