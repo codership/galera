@@ -157,11 +157,11 @@ core_recv_thread (void* arg)
 }
 
 // this macro logs errors from within a function
-#define FAIL_IF(expr, format, ...)                            \
-    if (expr) {                                               \
-        gu_fatal ("FAIL: " format, __VA_ARGS__, NULL);        \
-        ck_assert_msg(false, format, __VA_ARGS__);      \
-        return true;                                          \
+#define FAIL_IF(expr, format, ...)                                      \
+    if (expr) {                                                         \
+        gu_fatal ("FAIL: " format, __VA_ARGS__);                  \
+        ck_assert_msg(false, format, __VA_ARGS__);                \
+        return true;                                                    \
     }
 
 // Start a thread to receive an action
@@ -179,7 +179,7 @@ static bool COMMON_RECV_CHECKS(action_t*      act,
                                gcs_seqno_t*   seqno)
 {
     FAIL_IF (size != UNKNOWN_SIZE && size != act->size,
-             "gcs_core_recv(): expected size %d, returned %d (%s)",
+             "gcs_core_recv(): expected size %d, returned %zd (%s)",
              size, act->size, strerror (-act->size));
     FAIL_IF (act->type != type,
              "type does not match: expected %d, got %d", type, act->type);
@@ -584,11 +584,14 @@ DUMMY_INSTALL_COMPONENT (gcs_backend_t* backend, const gcs_comp_msg_t* comp)
 
     action_t act;
 
-    FAIL_IF (gcs_dummy_set_component(Backend, comp), "", NULL);
-    FAIL_IF (DUMMY_INJECT_COMPONENT (Backend, comp), "", NULL);
-    FAIL_IF (CORE_RECV_ACT (&act, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE), "", NULL);
+    FAIL_IF (gcs_dummy_set_component(Backend, comp), "%s",
+             "gcs_dummy_set_component");
+    FAIL_IF (DUMMY_INJECT_COMPONENT (Backend, comp), "%s",
+             "DUMMT_INJECT_COMPONENT");
+    FAIL_IF (CORE_RECV_ACT (&act, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE),
+             "%s", "CORE_RECV_ACT");
     FAIL_IF (core_test_check_conf(act.out, act.size, primary, my_idx, members),
-             "", NULL);
+             "%s", "core_test_check_conf");
     Cache->free(act.out);
     return false;
 }

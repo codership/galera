@@ -134,7 +134,7 @@ START_TEST (gcs_group_configuration)
     gcs_group_register(&cnf);
     gcs_group_init (&group, &cnf, NULL, "my node", "my addr", 0, 0, 0);
     ck_assert(!gcs_group_is_primary(&group));
-    ck_assert(group.num == 1);
+    ck_assert(group.num == 0);
 
     // Prepare first  primary component message containing only one node
     comp = gcs_comp_msg_new (TRUE, false, 0, 1, 0);
@@ -363,7 +363,7 @@ START_TEST (gcs_group_configuration)
                   "Action received: '%s', expected '%s'",
                   static_cast<const char*>(act->buf),
                   act_buf);
-    ck_assert_msg(r_act.id == -ERESTART, "Expected seqno %lld, found %lld",
+    ck_assert_msg(r_act.id == -ERESTART, "Expected seqno %d, found %" PRId64,
                   -ERESTART, r_act.id);
     // cleanup
     free ((void*)act->buf);
@@ -459,8 +459,9 @@ test_last_applied(int const gcs_proto_ver)
     // the previous PC (13) as opposed to the minimal individual value (16)
     gcs_seqno_t const expect1(gcs_proto_ver < 2 ? 16 : 13);
     ck_assert_msg(group.last_applied == expect1,
-                  "Expected %lld, got %" PRId64 "\n"
-                  "Nodes: %d; last_applieds: %" PRId64 ", %lld, %lld",
+                  "Expected %" PRId64 ", got %" PRId64 "\n"
+                  "Nodes: %ld; last_applieds: "
+                  "%" PRId64 ", %" PRId64 " , %" PRId64,
                   expect1, group.last_applied, group.num,
                   group.nodes[0].last_applied, group.nodes[1].last_applied,
                   group.nodes[2].last_applied);

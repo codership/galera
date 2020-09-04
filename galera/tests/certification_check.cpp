@@ -8,6 +8,7 @@
 #include "key_os.hpp"
 #include "GCache.hpp"
 #include "gu_config.hpp"
+#include "gu_inttypes.hpp"
 
 #include <check.h>
 
@@ -131,10 +132,11 @@ void run_wsinfo(const WSInfo* const wsi, size_t const nws, int const version)
         ck_assert(ts->unserialize<true>(act) == size);
 
         galera::Certification::TestResult result(cert.append_trx(ts));
-        ck_assert_msg(result == wsi[i].result, "g: %lld res: %d exp: %d",
+        ck_assert_msg(result == wsi[i].result,
+                      "g: %" PRId64 " res: %d exp: %d",
                       ts->global_seqno(), result, wsi[i].result);
         ck_assert_msg(ts->depends_seqno() == wsi[i].expected_depends_seqno,
-                      "wsi: %zu g: %lld ld: %lld eld: %lld",
+                      "wsi: %zu g: %" PRId64 " ld: %" PRId64 " eld: %" PRId64,
                       i, ts->global_seqno(), ts->depends_seqno(),
                       wsi[i].expected_depends_seqno);
         cert.set_trx_committed(*ts);

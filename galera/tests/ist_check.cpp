@@ -309,7 +309,7 @@ static int select_trx_version(int protocol_version)
     case 10:
         return 5;
     default:
-        ck_abort_msg("unsupported replicator protocol version: %n",
+        ck_abort_msg("unsupported replicator protocol version: %d",
                      protocol_version);
     }
 

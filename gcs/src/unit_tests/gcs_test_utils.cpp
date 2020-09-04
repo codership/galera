@@ -135,11 +135,11 @@ gt_node::gt_node(const char* const name, int const gcs_proto_ver)
 {
     if (name)
     {
-        snprintf(id, sizeof(id - 1), "%s", name);
+        snprintf(id, sizeof(id) - 1, "%s", name);
     }
     else
     {
-        snprintf(id, sizeof(id - 1), "%p", this);
+        snprintf(id, sizeof(id) - 1, "%p", this);
     }
 
     id[sizeof(id) - 1] = '\0';

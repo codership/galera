@@ -59,7 +59,7 @@ START_TEST(size_test)
     ck_assert(v.front() == ptr1);
     ck_assert(v().back() == ptr1);
     ck_assert(v.back() == ptr1);
-    ck_assert_msg(v.size() == 1, "v.size() expected 1, got %llu", v.size());
+    ck_assert_msg(v.size() == 1, "v.size() expected 1, got %zu", v.size());
 
     void* const ptr2(reinterpret_cast<void*>(2));
     v.push_back(ptr2);
@@ -71,7 +71,7 @@ START_TEST(size_test)
     ck_assert(v.front() == ptr1);
     ck_assert(v().back() == ptr2);
     ck_assert(v.back() == ptr2);
-    ck_assert_msg(v.size() == 2, "v.size() expected 2, got %llu", v.size());
+    ck_assert_msg(v.size() == 2, "v.size() expected 2, got %zu", v.size());
     ck_assert(v.in_heap());
 }
 END_TEST

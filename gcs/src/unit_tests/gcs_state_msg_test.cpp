@@ -76,10 +76,10 @@ START_TEST (gcs_state_msg_test_basic)
     ck_assert(send_state->repl_proto_ver == repl_proto_ver);
     ck_assert(send_state->appl_proto_ver == appl_proto_ver);
     ck_assert_msg(send_state->received   == received,
-                  "Last received seqno: sent %lld, recv %lld",
+                  "Last received seqno: sent %" PRId64 ", recv %" PRId64,
                   send_state->received, received);
     ck_assert_msg(send_state->cached     == cached,
-                  "Last cached seqno: sent %lld, recv %lld",
+                  "Last cached seqno: sent %" PRId64 ", recv %" PRId64,
                   send_state->cached, cached);
     ck_assert(send_state->prim_seqno    == prim_seqno);
     ck_assert(send_state->current_state == current_state);
