@@ -17,6 +17,7 @@
 
 #include "../src/gu_hexdump.hpp"
 #include "../src/gu_logger.hpp"
+#include "../src/gu_inttypes.hpp"
 
 /* checks equivalence of two buffers, returns true if check fails and logs
  * buffer contents. */
@@ -90,7 +91,8 @@ START_TEST (gu_hash_test)
     uint64_t res64;
     hash_multi.gather<sizeof(res64)>(&res64);
     uint64_t const res(gu_hash64(test_msg, GU_HASH_TEST_LENGTH));
-    ck_assert_msg(res == res64, "got 0x%0llx, expected 0x%llx", res64, res);
+    ck_assert_msg(res == res64, "got 0x%0" PRIx64 ", expected 0x%" PRIx64,
+                  res64, res);
     res64 = gu_le64(res64);
     ck_assert_msg(!check(gu_hash64_check, &res64, sizeof(res64)),
                   "gu::Hash::gather<uint64_t>() failed.");

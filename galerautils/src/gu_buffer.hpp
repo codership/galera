@@ -12,6 +12,7 @@
 #include "gu_types.hpp" // for gu::byte_t
 
 #include "gu_shared_ptr.hpp"
+#include <cassert>
 #include <vector>
 
 namespace gu

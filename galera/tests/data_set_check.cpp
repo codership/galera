@@ -215,14 +215,14 @@ static void test_ver(gu::RecordSet::Version const rsv)
     ck_assert(dset_in.size()  == dset_out.size());
     ck_assert(dset_in.count() == dset_out.count());
     try { dset_in.checksum(); }
-    catch(gu::Exception& e) { ck_abort_msg(e.what()); }
+    catch(gu::Exception& e) { ck_abort_msg("%s", e.what()); }
 
     for (ssize_t i = 0; i < dset_in.count(); ++i)
     {
         gu::Buf data = dset_in.next();
         TestRecord const rin(data.ptr, data.size);
         ck_assert_msg(rin == *records[i],
-                      "Record %d failed: expected %s, found %s",
+                      "Record %zd failed: expected %s, found %s",
                       i, records[i]->c_str(), rin.c_str());
     }
 
@@ -237,7 +237,7 @@ static void test_ver(gu::RecordSet::Version const rsv)
         gu::Buf data = dset_in_empty.next();
         TestRecord const rin(data.ptr, data.size);
         ck_assert_msg(rin == *records[i],
-                      "Record %d failed: expected %s, found %s",
+                      "Record %zd failed: expected %s, found %s",
                       i, records[i]->c_str(), rin.c_str());
     }
 }

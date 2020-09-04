@@ -1618,7 +1618,7 @@ START_TEST(test_fifo_violation)
     try
     {
         pc1.handle_up(0, *dg2, ProtoUpMeta(uuid1, ViewId(), 0, 0xff, O_SAFE));
-        ck_abort_msg("");
+        ck_abort_msg("Exception not thrown");
     }
     catch (Exception& e)
     {
@@ -1659,7 +1659,7 @@ START_TEST(test_checksum)
     try
     {
         pc1.handle_up(0, *dg, ProtoUpMeta(uuid1));
-        ck_abort_msg("");
+        ck_abort_msg("Exception not thrown");
     }
     catch (Exception& e)
     {
@@ -1813,7 +1813,7 @@ START_TEST(test_weighted_quorum)
     {
         int weight(pc_from_dummy(dn[i])->cluster_weight());
         ck_assert_msg(weight == 3,
-                      "index: %i weight: %i", i, weight);
+                      "index: %zu weight: %d", i, weight);
     }
     // split node 3 (weight 2) out, node 3 should remain in prim while
     // nodes 1 and 2 (weights 0 + 1 = 1) should end up in non-prim

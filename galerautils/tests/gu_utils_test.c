@@ -8,6 +8,7 @@
 
 #include <limits.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 START_TEST (gu_strconv_test)
 {
@@ -111,7 +112,8 @@ START_TEST (gu_strconv_test)
     void* ptr;
     strret = gu_str2ptr ("-01234abc", &ptr);
     ck_assert(strret[0] == '\0');
-    ck_assert_msg(-0x1234abcLL == (intptr_t)ptr, "Expected %lld, got %lld",
+    ck_assert_msg(-0x1234abcLL == (intptr_t)ptr,
+                  "Expected %lld, got %" PRIdPTR,
                   -0x1234abcLL, (intptr_t)ptr);
 }
 END_TEST

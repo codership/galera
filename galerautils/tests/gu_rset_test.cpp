@@ -352,7 +352,7 @@ test_version (gu::RecordSet::Version version)
     {
         TestRecord const rin(rset_in.next());
         ck_assert_msg(rin == *records[i],
-                      "Record %d failed: expected %s, found %s",
+                      "Record %zd failed: expected %s, found %s",
                       i, records[i]->c_str(), rin.c_str());
     }
 
@@ -375,7 +375,7 @@ test_version (gu::RecordSet::Version version)
     {
         TestRecord const rin(rset_in_buf.next());
         ck_assert_msg(rin == *records[i],
-                      "Record %d failed: expected %s, found %s",
+                      "Record %zd failed: expected %s, found %s",
                       i, records[i]->c_str(), rin.c_str());
     }
 

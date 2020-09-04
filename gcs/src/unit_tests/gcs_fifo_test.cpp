@@ -24,11 +24,11 @@ START_TEST (gcs_fifo_lite_test)
     fifo = gcs_fifo_lite_create (1, 1);
     ck_assert(fifo != NULL);
     ret = gcs_fifo_lite_destroy (fifo);
-    ck_assert_msg(ret == 0, "gcs_fifo_lite_destroy() returned %d", ret);
+    ck_assert_msg(ret == 0, "gcs_fifo_lite_destroy() returned %ld", ret);
 
     fifo = gcs_fifo_lite_create (FIFO_LENGTH, sizeof(i));
     ck_assert(fifo != NULL);
-    ck_assert_msg(fifo->used == 0, "fifo->used is %z for an empty FIFO",
+    ck_assert_msg(fifo->used == 0, "fifo->used is %ld for an empty FIFO",
                   fifo->used);
 
     gcs_fifo_lite_open (fifo);
@@ -39,7 +39,7 @@ START_TEST (gcs_fifo_lite_test)
         *item = i;
         gcs_fifo_lite_push_tail (fifo);
     }
-    ck_assert_msg(fifo->used == FIFO_LENGTH, "fifo->used is %zu, expected %zu", 
+    ck_assert_msg(fifo->used == FIFO_LENGTH, "fifo->used is %ld, expected %d",
                   fifo->used, FIFO_LENGTH);
 
     // test remove
@@ -47,7 +47,7 @@ START_TEST (gcs_fifo_lite_test)
         ret = gcs_fifo_lite_remove (fifo);
         ck_assert_msg(0 != ret, "gcs_fifo_lite_remove() failed, i = %ld", i);
     }
-    ck_assert_msg(fifo->used == 0, "fifo->used is %zu, expected %zu", 
+    ck_assert_msg(fifo->used == 0, "fifo->used is %ld, expected %d",
                   fifo->used, 0);
 
     // try remove on empty queue
@@ -61,7 +61,7 @@ START_TEST (gcs_fifo_lite_test)
         *item = i;
         gcs_fifo_lite_push_tail (fifo);
     }
-    ck_assert_msg(fifo->used == FIFO_LENGTH, "fifo->used is %zu, expected %zu", 
+    ck_assert_msg(fifo->used == FIFO_LENGTH, "fifo->used is %ld, expected %d",
                   fifo->used, FIFO_LENGTH);
 
     // test get
@@ -78,10 +78,11 @@ START_TEST (gcs_fifo_lite_test)
         gcs_fifo_lite_pop_head (fifo);
     }
 
-    ck_assert_msg(fifo->used == 0, "fifo->used for empty queue is %ld", fifo->used);
+    ck_assert_msg(fifo->used == 0, "fifo->used for empty queue is %ld",
+                  fifo->used);
 
     ret = gcs_fifo_lite_destroy (fifo);
-    ck_assert_msg(ret == 0, "gcs_fifo_lite_destroy() failed: %d", ret);
+    ck_assert_msg(ret == 0, "gcs_fifo_lite_destroy() failed: %ld", ret);
 }
 END_TEST
 

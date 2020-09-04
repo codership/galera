@@ -446,7 +446,7 @@ gt_group::sst_start (int const joiner_idx,const char* donor_name)
         ck_assert(NULL != gcache);
         // sst request is expected to be dynamically allocated
         char* const req_buf = (char*)gcache->malloc(req_len);
-        ck_assert_msg(NULL != req_buf);
+        ck_assert(NULL != req_buf);
         sprintf (req_buf, "%s", donor_name);
 
         struct gcs_act_rcvd req(gcs_act(req_buf, req_len, GCS_ACT_STATE_REQ),
@@ -463,13 +463,13 @@ gt_group::sst_start (int const joiner_idx,const char* donor_name)
         }
 
         if (i == joiner_idx) {
-            ck_assert_msg(ret == req_len);
+            ck_assert(ret == req_len);
             gcache->free(req_buf); // passed to joiner
         }
         else {
             if (ret > 0) {
                 if (donor_idx < 0) {
-                    ck_assert_msg(req.id == i);
+                    ck_assert(req.id == i);
                     donor_idx = i;
                     gcache->free(req_buf); // passed to donor
                 }

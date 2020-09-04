@@ -6,6 +6,7 @@
 #include "../gcs_state_msg.hpp"
 
 #include "gcs_state_msg_test.hpp" // must be included last
+#include "gu_inttypes.hpp"
 
 static int const QUORUM_VERSION = 6;
 
@@ -140,10 +141,10 @@ START_TEST (gcs_state_msg_test_basic)
     ck_assert_msg(recv_state->prim_appl_ver == 1, "prim_appl_ver: %d",
                   recv_state->prim_appl_ver);
     ck_assert_msg(send_state->received       == recv_state->received,
-                  "Last received seqno: sent %lld, recv %lld",
+                  "Last received seqno: sent %" PRId64 " , recv %" PRId64,
                   send_state->received, recv_state->received);
     ck_assert_msg(send_state->cached         == recv_state->cached,
-                  "Last cached seqno: sent %lld, recv %lld",
+                  "Last cached seqno: sent %" PRId64 ", recv %" PRId64,
                   send_state->cached, recv_state->cached);
     ck_assert(send_state->prim_seqno    == recv_state->prim_seqno);
     ck_assert(send_state->current_state == recv_state->current_state);

@@ -9,6 +9,8 @@
 #include "gu_lock.hpp"
 #include "gu_throw.hpp"
 
+#include <algorithm>
+
 void galera::Wsdb::print(std::ostream& os) const
 {
     os << "trx map:\n";

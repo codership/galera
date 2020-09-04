@@ -160,7 +160,7 @@ core_recv_thread (void* arg)
 #define FAIL_IF(expr, format, ...)                            \
     if (expr) {                                               \
         gu_fatal ("FAIL: " format, __VA_ARGS__, NULL);        \
-        ck_assert_msg(false, format, __VA_ARGS__, NULL);      \
+        ck_assert_msg(false, format, __VA_ARGS__);      \
         return true;                                          \
     }
 
@@ -220,7 +220,7 @@ static bool COMMON_RECV_CHECKS(action_t*      act,
             // local action buffer should not be copied
             ck_assert_msg(act->local == act->in,
                           "Received buffer ptr is not the same as sent: "
-                          "%p != %p", act->in, act->local, NULL);
+                          "%p != %p", act->in, act->local);
             ck_assert_msg(!memcmp(buf, act->out, act->size),
                           "Received buffer contents is not the same as sent: "
                           "'%s' != '%s'", buf, (char*)act->out);
@@ -246,7 +246,7 @@ static bool CORE_RECV_END(action_t*      act,
     {
         int ret = gu_thread_join (act->thread, NULL);
         act->thread = (gu_thread_t)-1;
-        FAIL_IF(0 != ret, "Failed to join recv thread: %ld (%s)",
+        FAIL_IF(0 != ret, "Failed to join recv thread: %d (%s)",
                 ret, strerror (ret));
     }
 
@@ -417,7 +417,7 @@ core_test_init (gu::Config* config,
 
     // try to send an action to check that everything's alright
     ret = gcs_core_send (Core, act1, sizeof(act1_str), GCS_ACT_WRITESET);
-    ck_assert_msg(ret == sizeof(act1_str), "Expected %d, got %d (%s)",
+    ck_assert_msg(ret == sizeof(act1_str), "Expected %zu, got %ld (%s)",
                   sizeof(act1_str), ret, strerror (-ret));
     gu_warn ("Next CORE_RECV_ACT fails under valgrind");
     act.in = act1;

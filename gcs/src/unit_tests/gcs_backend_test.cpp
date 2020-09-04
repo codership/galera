@@ -71,7 +71,7 @@ START_TEST (gcs_backend_test)
     ck_assert(ret == -EINVAL);
 
     ret = gcs_backend_init (&backend, "dummy://", config);
-    ck_assert_msg(ret == 0, "ret = %d (%s)", ret, strerror(-ret));
+    ck_assert_msg(ret == 0, "ret = %ld (%s)", ret, strerror(-ret));
     backend.destroy(&backend);
 //    ck_assert(backend.name == gcs_test_name); this test is broken since we can
 //    no longer use global gcs_dummy_create() symbol because linking with real

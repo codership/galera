@@ -32,10 +32,12 @@ START_TEST (gcs_sm_test_basic)
         ck_assert_msg(0 == ret, "gcs_sm_enter() failed: %d (%s)",
                       ret, strerror(-ret));
         ck_assert_msg(sm->users == 1, "users = %ld, expected 1", sm->users);
-        ck_assert_msg(sm->entered == 1, "entered = %d, expected 1",sm->entered);
+        ck_assert_msg(sm->entered == 1, "entered = %ld, expected 1",
+                      sm->entered);
 
         gcs_sm_leave(sm);
-        ck_assert_msg(sm->entered == 0, "entered = %d, expected 0",sm->entered);
+        ck_assert_msg(sm->entered == 0, "entered = %ld, expected 0",
+                      sm->entered);
     }
 
     ret = gcs_sm_close(sm);
@@ -79,7 +81,7 @@ START_TEST (gcs_sm_test_simple)
     ck_assert_msg(0 == ret, "gcs_sm_enter() failed: %d (%s)",
                   ret, strerror(-ret));
     ck_assert_msg(sm->users == 1, "users = %ld, expected 1", sm->users);
-    ck_assert_msg(sm->entered == true, "entered = %d, expected %d",
+    ck_assert_msg(sm->entered == true, "entered = %ld, expected %d",
                   sm->users, true);
 
     gu_thread_t t1, t2, t3, t4;
@@ -256,7 +258,8 @@ START_TEST (gcs_sm_test_pause)
     gcs_sm_pause (sm);
     gu_thread_create (&thr, NULL, pausing_thread, sm);
     WAIT_FOR(1 == pause_order);
-    ck_assert_msg(pause_order == 1, "pause_order = %d, expected 1");
+    ck_assert_msg(pause_order == 1, "pause_order = %d, expected 1",
+                  pause_order);
     usleep(TEST_USLEEP); // make sure pausing_thread blocked in gcs_sm_enter()
     pause_order = 2;
 
@@ -271,7 +274,8 @@ START_TEST (gcs_sm_test_pause)
     gu_info ("Calling gcs_sm_continue()");
     gcs_sm_continue (sm);
     gu_thread_join (thr, NULL);
-    ck_assert_msg(pause_order == 3, "pause_order = %d, expected 3");
+    ck_assert_msg(pause_order == 3, "pause_order = %d, expected 3",
+                  pause_order);
 
     ck_assert_msg(2 == sm->wait_q_head, "wait_q_head = %lu, expected 2",
                   sm->wait_q_head);
@@ -283,7 +287,7 @@ START_TEST (gcs_sm_test_pause)
     gcs_sm_stats_get (sm, &q_len, &q_len_max, &q_len_min, &q_len_avg,
                       &tmp, &paused_avg);
     ck_assert(tmp >= paused_ns); paused_ns = tmp;
-    ck_assert_msg(paused_avg > 0.0);
+    ck_assert(paused_avg > 0.0);
     ck_assert_msg(fabs(q_len_avg) <= EPS,
                   "q_len_avg: expected <= %e, got %e", EPS, fabs(q_len_avg));
     gcs_sm_stats_flush(sm);
@@ -304,7 +308,8 @@ START_TEST (gcs_sm_test_pause)
     // released monitor lock, thr should continue and schedule,
     // set pause_order to 1
     WAIT_FOR(1 == pause_order);
-    ck_assert_msg(pause_order == 1, "pause_order = %d, expected 1");
+    ck_assert_msg(pause_order == 1, "pause_order = %d, expected 1",
+                  pause_order);
     ck_assert_msg(sm->users == 2, "users = %ld, expected 2", sm->users);
 
     ck_assert_msg(2 == sm->wait_q_head, "wait_q_head = %lu, expected 2",
@@ -317,7 +322,7 @@ START_TEST (gcs_sm_test_pause)
     ck_assert(tmp >= paused_ns); paused_ns = tmp;
     ck_assert_msg(fabs(paused_avg) <= EPS,
                   "paused_avg: expected <= %e, got %e", EPS, fabs(paused_avg));
-    ck_assert_msg(q_len == sm->users, "found q_len %d, expected = %d",
+    ck_assert_msg(q_len == sm->users, "found q_len %d, expected = %ld",
                   q_len, sm->users);
     ck_assert_msg(q_len_max == q_len, "found q_len_max %d, expected = %d",
                   q_len_max, q_len);
@@ -335,7 +340,8 @@ START_TEST (gcs_sm_test_pause)
     usleep (TEST_USLEEP);
     gcs_sm_continue (sm); // nothing should continue, since monitor is entered
     usleep (TEST_USLEEP);
-    ck_assert_msg(pause_order == 2, "pause_order = %d, expected 2");
+    ck_assert_msg(pause_order == 2, "pause_order = %d, expected 2",
+                  pause_order);
     ck_assert_msg(sm->entered == 1, "entered = %ld, expected 1", sm->entered);
 
     // Now test pausing when monitor is left
@@ -352,13 +358,15 @@ START_TEST (gcs_sm_test_pause)
                   sm->wait_q_tail);
 
     usleep (TEST_USLEEP); // nothing should change, since monitor is paused
-    ck_assert_msg(pause_order == 2, "pause_order = %d, expected 2");
+    ck_assert_msg(pause_order == 2, "pause_order = %d, expected 2",
+                  pause_order);
     ck_assert_msg(sm->entered == 0, "entered = %ld, expected 0", sm->entered);
     ck_assert_msg(sm->users   == 1, "users = %ld, expected 1", sm->users);
 
     gcs_sm_continue (sm); // paused thread should continue
     WAIT_FOR(3 == pause_order);
-    ck_assert_msg(pause_order == 3, "pause_order = %d, expected 3");
+    ck_assert_msg(pause_order == 3, "pause_order = %d, expected 3",
+                  pause_order);
 
     gcs_sm_stats_get (sm, &q_len, &q_len_max, &q_len_min, &q_len_avg,
                       &tmp, &paused_avg);
@@ -417,17 +425,18 @@ static void* interrupt_thread(void* arg)
     gu_thread_create (thr, NULL, interrupt_thread, sm);                 \
     WAIT_FOR(global_handle == h);                                       \
     ck_assert_msg(sm->wait_q_tail == tail, "wait_q_tail = %lu, expected %lu", \
-                  sm->wait_q_tail, tail);                               \
+                  sm->wait_q_tail, static_cast<unsigned long>(tail));   \
     ck_assert_msg(global_handle == h, "global_handle = %ld, expected %ld", \
-                  global_handle, h);                                    \
-    ck_assert_msg(sm->users == u, "users = %ld, expected %ld", sm->users, u);
+                  global_handle, static_cast<long>(h));                 \
+    ck_assert_msg(sm->users == u, "users = %ld, expected %ld",          \
+                  sm->users, static_cast<long>(u));
 
 #define TEST_INTERRUPT_THREAD(h, t)                                     \
     ret = gcs_sm_interrupt (sm, (h));                                   \
     ck_assert(ret == 0);                                                \
     gu_thread_join ((t), NULL);                                         \
     ck_assert_msg(global_ret == -EINTR, "global_ret = %ld, "            \
-                  "expected %ld (-EINTR)", global_ret, -EINTR);
+                  "expected %d (-EINTR)", global_ret, -EINTR);
 
 
 START_TEST (gcs_sm_test_interrupt)

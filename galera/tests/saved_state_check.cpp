@@ -6,12 +6,11 @@
 
 #include <gu_uuid.hpp>
 
+#include "gu_inttypes.hpp"
+
 #include <check.h>
 #include <errno.h>
 #include <gu_threads.h>
-
-#define __STDC_FORMAT_MACROS
-#include <inttypes.h>
 
 static volatile bool stop(false);
 

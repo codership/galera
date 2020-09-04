@@ -132,7 +132,8 @@ START_TEST (gcs_defrag_test)
     ck_assert(recv_act.buf != NULL);
     ck_assert(recv_act.buf_len == (long)act_len);
     ck_assert_msg(!strncmp((const char*)recv_act.buf, act_buf, act_len),
-                  "Action received: '%s', expected '%s'",recv_act.buf,act_buf);
+                  "Action received: '%s', expected '%s'",
+                  static_cast<const char*>(recv_act.buf) ,act_buf);
     defrag_check_init (&defrag); // should be empty
 
     gcs_gcache_free(defrag.cache, recv_act.buf);

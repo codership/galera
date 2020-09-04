@@ -11,6 +11,7 @@
 #include "gu_uuid.h"
 #include "gu_logger.hpp"
 #include "gu_hexdump.hpp"
+#include "gu_inttypes.hpp"
 
 #include <check.h>
 
@@ -86,7 +87,8 @@ static void ver3_basic(gu::RecordSet::Version const rsv,
         mark_point();
         wsi.verify_checksum();
         wsrep_seqno_t const ls(wsi.last_seen());
-        ck_assert_msg(ls == last_seen, "Found last seen: %lld, expected: %lld",
+        ck_assert_msg(ls == last_seen,
+                      "Found last seen: %" PRId64 ", expected: %" PRId64,
                       ls, last_seen);
         ck_assert(wsi.flags() == flags);
         ck_assert(0 != wsi.timestamp());
@@ -109,7 +111,7 @@ static void ver3_basic(gu::RecordSet::Version const rsv,
 
         wsi.set_seqno (seqno, pa_range);
         ck_assert_msg(wsi.pa_range() == pa_range,
-                      "wsi.pa_range = %lld\n    pa_range = %lld",
+                      "wsi.pa_range = %d\n    pa_range = %d",
                       wsi.pa_range(), pa_range);
         ck_assert(wsi.certified());
     }
@@ -351,7 +353,8 @@ static void ver3_annotation(gu::RecordSet::Version const rsv)
     mark_point();
     wsi.verify_checksum();
     wsrep_seqno_t const ls(wsi.last_seen());
-    ck_assert_msg(ls == last_seen, "Found last seen: %lld, expected: %lld",
+    ck_assert_msg(ls == last_seen,
+                  "Found last seen: %" PRId64 ", expected: %" PRId64,
                   ls, last_seen);
     ck_assert(wsi.flags() == flags);
     ck_assert(0 != wsi.timestamp());

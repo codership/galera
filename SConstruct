@@ -674,7 +674,7 @@ elif conf.CheckSetTmpEcdh():
 
 # these will be used only with our software
 if strict_build_flags == 1:
-    conf.env.Append(CCFLAGS = ' -Werror -pedantic')
+    conf.env.Append(CCFLAGS = ' -Werror ')
     if 'clang' in cxx_version:
         conf.env.Append(CCFLAGS  = ' -Wno-self-assign')
         conf.env.Append(CCFLAGS  = ' -Wno-gnu-zero-variadic-macro-arguments')

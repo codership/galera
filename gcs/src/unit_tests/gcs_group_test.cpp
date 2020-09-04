@@ -12,6 +12,8 @@
 #include "gcs_group_test.hpp"
 #include "gcs_test_utils.hpp"
 
+#include "gu_inttypes.hpp"
+
 #define TRUE (0 == 0)
 #define FALSE (!TRUE)
 
@@ -28,7 +30,7 @@ msg_write (gcs_recv_msg_t* msg,
 {
     long ret;
     ret = gcs_act_proto_write (frg, buf, buf_len);
-    ck_assert_msg(0 == ret, "error code: %d", ret);
+    ck_assert_msg(0 == ret, "error code: %ld", ret);
     ck_assert(frg->frag != NULL);
     ck_assert_msg(frg->frag_len >= data_len,
                   "Resulting frag_len %lu is less than required act_len %lu\n"
@@ -202,7 +204,8 @@ START_TEST (gcs_group_configuration)
     ck_assert(r_act.sender_idx == 0);
     ck_assert(act->buf != NULL);
     ck_assert(act->buf_len == act_len);
-    ck_assert_msg(r_act.id == seqno, "Expected seqno %lld, found %lld",
+    ck_assert_msg(r_act.id == seqno,
+                  "Expected seqno %" PRId64 ", found %" PRId64,
                   seqno, r_act.id);
     seqno++;
     // cleanup
@@ -239,11 +242,15 @@ START_TEST (gcs_group_configuration)
     ck_assert_msg(ret == act_len, "Expected ret = %zd, got %zd", act_len, ret);
     ck_assert(act->buf_len == act_len);
     ck_assert(act->buf != NULL);
-    ck_assert_msg(!strncmp((const char*)act->buf, act_buf, act_len),
-                  "Action received: '%s', expected '%s'", act_buf);
+    ck_assert_msg(!strncmp(static_cast<const char*>(act->buf),
+                           act_buf, act_len),
+                  "Action received: '%s', expected '%s'",
+                  static_cast<const char*>(act->buf),
+                  act_buf);
     ck_assert(r_act.sender_idx == 0);
     ck_assert(act->type == GCS_ACT_WRITESET);
-    ck_assert_msg(r_act.id == seqno, "Expected seqno %llu, found %llu",
+    ck_assert_msg(r_act.id == seqno,
+                  "Expected seqno %" PRId64 ", found %" PRId64,
                   seqno, r_act.id);
     seqno++;
     // cleanup
@@ -281,11 +288,15 @@ START_TEST (gcs_group_configuration)
     ck_assert(ret == act_len);
     ck_assert(act->buf_len == act_len);
     ck_assert(act->buf != NULL);
-    ck_assert_msg(!strncmp((const char*)act->buf, act_buf, act_len),
-                  "Action received: '%s', expected '%s'", act_buf);
+    ck_assert_msg(!strncmp(static_cast<const char*>(act->buf),
+                           act_buf, act_len),
+                  "Action received: '%s', expected '%s'",
+                  static_cast<const char*>(act->buf),
+                  act_buf);
     ck_assert(r_act.sender_idx == 0);
     ck_assert(act->type == GCS_ACT_WRITESET);
-    ck_assert_msg(r_act.id == seqno, "Expected seqno %lld, found %lld",
+    ck_assert_msg(r_act.id == seqno,
+                  "Expected seqno %" PRId64 ", found %" PRId64,
                   seqno, r_act.id);
     seqno++;
     // cleanup
@@ -330,7 +341,7 @@ START_TEST (gcs_group_configuration)
 
     // 13.3 now I just continue sending messages
     TRY_MESSAGE(msg2);
-    ck_assert_msg(ret == 0, "%d (%s)", ret, strerror(-ret));
+    ck_assert_msg(ret == 0, "%zd (%s)", ret, strerror(-ret));
     ck_assert(act->buf_len == 0);
     ck_assert(act->buf == NULL);
 
@@ -349,7 +360,9 @@ START_TEST (gcs_group_configuration)
     ck_assert(r_act.sender_idx == 0);
     ck_assert(act->type == GCS_ACT_WRITESET);
     ck_assert_msg(!strncmp((const char*)act->buf, act_buf, act_len),
-                  "Action received: '%s', expected '%s'", act_buf);
+                  "Action received: '%s', expected '%s'",
+                  static_cast<const char*>(act->buf),
+                  act_buf);
     ck_assert_msg(r_act.id == -ERESTART, "Expected seqno %lld, found %lld",
                   -ERESTART, r_act.id);
     // cleanup
@@ -368,7 +381,8 @@ START_TEST (gcs_group_configuration)
     ck_assert_msg(r_act.sender_idx == -1,
                   "Expected action sender -1, got %d", r_act.sender_idx);
     ck_assert(act->type == GCS_ACT_ERROR);
-    ck_assert_msg(r_act.id == GCS_SEQNO_ILL, "Expected seqno %lld, found %lld",
+    ck_assert_msg(r_act.id == GCS_SEQNO_ILL,
+                  "Expected seqno %" PRId64 ", found %" PRId64,
                   GCS_SEQNO_ILL, r_act.id);
     ck_assert(group.act_id_ + 1 == seqno);
     // cleanup
@@ -413,7 +427,8 @@ test_last_applied(int const gcs_proto_ver)
     gt.deliver_last_applied (0, 11);
     // 11, 0, 0, 0
     ck_assert_msg(group.last_applied == 0,
-                  "expected last_applied = 0, got %lld", group.last_applied);
+                  "expected last_applied = 0, got %" PRId64,
+                  group.last_applied);
     gt.deliver_last_applied (1, 12);
     // 11, 12, 0, 0
     ck_assert(group.last_applied == 0);
@@ -443,8 +458,9 @@ test_last_applied(int const gcs_proto_ver)
     // With GCS protocol 2 and above we use conservative group wide value from
     // the previous PC (13) as opposed to the minimal individual value (16)
     gcs_seqno_t const expect1(gcs_proto_ver < 2 ? 16 : 13);
-    ck_assert_msg(group.last_applied == expect1, "Expected %lld, got %lld\n"
-                  "Nodes: %d; last_applieds: %lld, %lld, %lld",
+    ck_assert_msg(group.last_applied == expect1,
+                  "Expected %lld, got %" PRId64 "\n"
+                  "Nodes: %d; last_applieds: %" PRId64 ", %lld, %lld",
                   expect1, group.last_applied, group.num,
                   group.nodes[0].last_applied, group.nodes[1].last_applied,
                   group.nodes[2].last_applied);

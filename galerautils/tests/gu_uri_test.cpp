@@ -138,7 +138,7 @@ START_TEST (uri_test1) // checking normal URI
     }
     catch (Exception& e)
     {
-        ck_abort_msg(e.what());
+        ck_abort_msg("%s", e.what());
     }
 }
 END_TEST
@@ -199,7 +199,7 @@ START_TEST (uri_test2) // checking corner cases
     }
     catch (Exception& e)
     {
-        ck_abort_msg(e.what());
+        ck_abort_msg("%s", e.what());
     }
 
     mark_point();
@@ -225,7 +225,7 @@ START_TEST (uri_test2) // checking corner cases
     }
     catch (Exception& e)
     {
-        ck_abort_msg(e.what());
+        ck_abort_msg("%s", e.what());
     }
 
     mark_point();
@@ -237,10 +237,10 @@ START_TEST (uri_test2) // checking corner cases
         try             { ck_assert(uri.get_authority() == "@"); }
         catch (NotSet&) { ck_abort_msg("Authority should be set"); }
 
-        try             { ck_assert_msg(uri.get_user() == ""); }
+        try             { ck_assert(uri.get_user() == ""); }
         catch (NotSet&) { ck_abort_msg("User should be set"); }
 
-        try             { ck_assert_msg(uri.get_host() == ""); }
+        try             { ck_assert(uri.get_host() == ""); }
         catch (NotSet&) { ck_abort_msg("Host should be set"); }
 
         try             { uri.get_port(); ck_abort_msg("Port should be unset"); }
@@ -248,7 +248,7 @@ START_TEST (uri_test2) // checking corner cases
     }
     catch (Exception& e)
     {
-        ck_abort_msg(e.what());
+        ck_abort_msg("%s", e.what());
     }
 
     mark_point();
@@ -257,13 +257,13 @@ START_TEST (uri_test2) // checking corner cases
     {
         URI uri("scheme://@:/path");
 
-        try             { ck_assert_msg(uri.get_authority() == "@"); }
+        try             { ck_assert(uri.get_authority() == "@"); }
         catch (NotSet&) { ck_abort_msg("Authority should be set"); }
 
-        try             { ck_assert_msg(uri.get_user() == ""); }
+        try             { ck_assert(uri.get_user() == ""); }
         catch (NotSet&) { ck_abort_msg("User should be set"); }
 
-        try             { ck_assert_msg(uri.get_host() == ""); }
+        try             { ck_assert(uri.get_host() == ""); }
         catch (NotSet&) { ck_abort_msg("Host should be set"); }
 
         try             { uri.get_port(); ck_abort_msg("Port should be unset"); }
@@ -271,7 +271,7 @@ START_TEST (uri_test2) // checking corner cases
     }
     catch (Exception& e)
     {
-        ck_abort_msg(e.what());
+        ck_abort_msg("%s", e.what());
     }
 
     mark_point();
@@ -280,7 +280,7 @@ START_TEST (uri_test2) // checking corner cases
     {
         URI uri("scheme://");
 
-        try             { ck_assert_msg(uri.get_authority() == ""); }
+        try             { ck_assert(uri.get_authority() == ""); }
         catch (NotSet&) { ck_abort_msg("Authority should be set"); }
 
         try             { uri.get_user(); ck_abort_msg("User should be unset"); }
@@ -293,12 +293,12 @@ START_TEST (uri_test2) // checking corner cases
         catch (NotSet&) {}
 
         // According to http://tools.ietf.org/html/rfc3986#section-3.3
-        try             { ck_assert_msg(uri.get_path() == ""); }
+        try             { ck_assert(uri.get_path() == ""); }
         catch (NotSet&) { ck_abort_msg("Path should be set to empty"); }
     }
     catch (Exception& e)
     {
-        ck_abort_msg(e.what());
+        ck_abort_msg("%s", e.what());
     }
 }
 END_TEST
@@ -313,7 +313,7 @@ START_TEST (uri_test3) // Test from gcomm
     }
     catch (gu::Exception& e)
     {
-        ck_assert_msg(e.get_errno() == EINVAL);
+        ck_assert(e.get_errno() == EINVAL);
     }
 #endif
     URI empty_auth("http://");
@@ -397,8 +397,8 @@ START_TEST(uri_non_strict)
     {
         URI u(addr, false);
 
-        ck_assert_msg(u.get_host() == ip);
-        ck_assert_msg(u.get_port() == port);
+        ck_assert(u.get_host() == ip);
+        ck_assert(u.get_port() == port);
 
         try
         {
@@ -409,7 +409,7 @@ START_TEST(uri_non_strict)
     }
     catch (gu::Exception& e)
     {
-        ck_assert_msg(e.get_errno() == EINVAL);
+        ck_assert(e.get_errno() == EINVAL);
     }
 }
 END_TEST
@@ -439,7 +439,7 @@ START_TEST(uri_test_multihost)
     }
     catch (gu::Exception& e)
     {
-        ck_abort_msg(e.what());
+        ck_abort_msg("%s", e.what());
     }
 
     try
@@ -460,7 +460,7 @@ START_TEST(uri_test_multihost)
     }
     catch (gu::Exception& e)
     {
-        ck_abort_msg(e.what());
+        ck_abort_msg("%s", e.what());
     }
 
 
@@ -486,7 +486,7 @@ START_TEST(uri_IPv6)
     }
     catch (gu::Exception& e)
     {
-        ck_abort_msg(e.what());
+        ck_abort_msg("%s", e.what());
     }
 
     try
@@ -496,7 +496,7 @@ START_TEST(uri_IPv6)
     }
     catch (gu::Exception& e)
     {
-        ck_abort_msg(e.what());
+        ck_abort_msg("%s", e.what());
     }
 
     try
@@ -507,7 +507,7 @@ START_TEST(uri_IPv6)
     }
     catch (gu::Exception& e)
     {
-        ck_abort_msg(e.what());
+        ck_abort_msg("%s", e.what());
     }
 
     try
@@ -517,7 +517,7 @@ START_TEST(uri_IPv6)
     }
     catch (gu::Exception& e)
     {
-        ck_abort_msg(e.what());
+        ck_abort_msg("%s", e.what());
     }
 
     try
@@ -528,7 +528,7 @@ START_TEST(uri_IPv6)
     }
     catch (gu::Exception& e)
     {
-        ck_abort_msg(e.what());
+        ck_abort_msg("%s", e.what());
     }
 
     try
@@ -538,7 +538,7 @@ START_TEST(uri_IPv6)
     }
     catch (gu::Exception& e)
     {
-        ck_abort_msg(e.what());
+        ck_abort_msg("%s", e.what());
     }
 
     try
@@ -548,7 +548,7 @@ START_TEST(uri_IPv6)
     }
     catch (gu::Exception& e)
     {
-        ck_assert_msg(e.get_errno() == EINVAL);
+        ck_assert(e.get_errno() == EINVAL);
     }
 
     try
@@ -558,7 +558,7 @@ START_TEST(uri_IPv6)
     }
     catch (const gu::Exception& e)
     {
-        ck_abort_msg(e.what());
+        ck_abort_msg("%s", e.what());
     }
 }
 END_TEST
