@@ -117,15 +117,9 @@ gt_node::deliver_last_applied(int const from, gcs_seqno_t const la)
 {
     gcs_seqno_t buf(gcs_seqno_htog(la));
 
-    gcs_recv_msg_t const msg =
-    {
-        .buf        = &buf,
-        .buf_len    = sizeof(buf),
-        .size       = sizeof(buf),
-        .sender_idx = from,
-        .type       = GCS_MSG_LAST
-    };
-
+    gcs_recv_msg_t const msg(&buf, sizeof(buf), sizeof(buf),
+                             from,
+                             GCS_MSG_LAST);
     return gcs_group_handle_last_msg(group(), &msg);
 }
 
