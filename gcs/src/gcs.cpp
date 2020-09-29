@@ -2235,15 +2235,15 @@ gcs_vote (gcs_conn_t* const conn, const gu::GTID& gtid, uint64_t const code,
     if (0 != code)
     {
         size_t const buf_len(gtid.serial_size() + sizeof(code));
-        char* const buf(new char[buf_len]);
+        std::vector<char> buf(buf_len);
         size_t offset(0);
 
-        offset = gtid.serialize(buf, buf_len, offset);
-        offset = gu::serialize8(code, buf, buf_len, offset);
-        assert(buf_len == offset);
+        offset = gtid.serialize(buf.data(), buf.size(), offset);
+        offset = gu::serialize8(code, buf.data(), buf.size(), offset);
+        assert(buf.size() == offset);
 
         gu::MMH3 hash;
-        hash.append(buf, buf_len);
+        hash.append(buf.data(), buf.size());
         hash.append(msg, msg_len);
 
         my_vote = (hash.gather8() | (1ULL << 63));
