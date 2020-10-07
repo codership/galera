@@ -294,18 +294,8 @@ ReplicatorSMM::donate_sst(void* const         recv_ctx,
     wsrep_cb_status const err(sst_donate_cb_(app_ctx_, recv_ctx,
                                              streq.sst_req(), streq.sst_len(),
                                              &state_id, 0, 0, bypass));
-
-    /* The fix to codership/galera#284 may break backward comatibility due to
-     * different (now correct) interpretation of retrun value. Default to old
-     * interpretation which is forward compatible with the new one. */
-#if NO_BACKWARD_COMPATIBILITY
     wsrep_seqno_t const ret
         (WSREP_CB_SUCCESS == err ? state_id.seqno : -ECANCELED);
-#else
-    wsrep_seqno_t const ret
-        (int(err) >= 0 ? state_id.seqno : int(err));
-#endif /* NO_BACKWARD_COMPATIBILITY */
-
     if (ret < 0)
     {
         log_error << "SST " << (bypass ? "bypass " : "") << "failed: " << err;
