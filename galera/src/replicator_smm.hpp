@@ -396,13 +396,14 @@ namespace galera
         static wsrep_cap_t capabilities(int protocol_version);
 
         // Return the global seqno of the last transaction which has
-        // released commit order. Note that this does not mean that
-        // the transaction with given gtid has completed the commit
-        // on application side.
+        // commmitted.
+        //
+        // galera-bugs#555: Assign last seen from apply_monitor_.last_left()
+        // because apply monitor is held until the whole transaction is over.
+        // Commit monitor may be released early due to group commit.
         wsrep_seqno_t last_committed()
         {
-            return co_mode_ != CommitOrder::BYPASS ?
-                   commit_monitor_.last_left() : apply_monitor_.last_left();
+            return apply_monitor_.last_left();
         }
 
         void report_last_committed(wsrep_seqno_t purge_seqno)
