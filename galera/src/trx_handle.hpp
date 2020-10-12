@@ -916,7 +916,7 @@ namespace galera
             return write_set_out().gather(source_id(),conn_id(),trx_id(),out);
         }
 
-        void finalize(wsrep_seqno_t const last_seen_seqno)
+        void finalize(wsrep_seqno_t last_seen_seqno)
         {
             assert(last_seen_seqno >= 0);
             assert(ts_ == 0 || last_seen_seqno >= ts_->last_seen_seqno());
@@ -936,7 +936,13 @@ namespace galera
                 }
                 assert(version() >= WriteSetNG::VER5);
                 assert(prev_seqno >= 0);
-                assert(prev_seqno <= last_seen_seqno);
+                // Although commit happens in order, the release of apply
+                // monitor which is used to determine last committed may
+                // not happen in order. Therefore it is possible that the
+                // last seen given as an argument for this method lies
+                // below prev_seqno. Adjust last seen seqno to match
+                // at least prev_seqno which is now known to be committed.
+                last_seen_seqno = std::max(last_seen_seqno, prev_seqno);
                 pa_range = std::min(wsrep_seqno_t(pa_range),
                                     last_seen_seqno - prev_seqno);
             }
