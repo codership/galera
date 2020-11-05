@@ -1,0 +1,5 @@
+{
+    global: wsrep_loader;
+            wsrep_interface_version;
+    local:  *;
+};

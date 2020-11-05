@@ -11,7 +11,7 @@
 
 #include "gu_logger.hpp"
 
-#include <list>
+#include <vector>
 
 // Disable debug logging until debug mask is available here
 #define evs_log_debug(i) if ((proto_.debug_mask_ & gcomm::evs::Proto::D_CONSENSUS) == 0) \
@@ -122,7 +122,7 @@ bool gcomm::evs::Consensus::equal(const Message& m1, const Message& m2) const
 
 gcomm::evs::seqno_t gcomm::evs::Consensus::highest_reachable_safe_seq() const
 {
-    std::list<seqno_t> seq_list;
+    std::vector<seqno_t> seq_list;
     for (NodeMap::const_iterator i = known_.begin(); i != known_.end();
          ++i)
     {
