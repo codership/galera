@@ -20,7 +20,6 @@
 #include <stdbool.h>
 
 #include <arm_acle.h>
-#include <arm_neon.h>
 
 static inline gu_crc32c_t
 crc32c_arm64_tail7(gu_crc32c_t state, const uint8_t* ptr, size_t len)
@@ -69,25 +68,36 @@ gu_crc32c_arm64(gu_crc32c_t state, const void* data, size_t len)
     return crc32c_arm64_tail7(state, ptr, len);
 }
 
+#include <asm/hwcap.h>
 #include <sys/auxv.h>
 
-#ifndef HWCAP_CRC32
-#define HWCAP_CRC32 (1 << 7)
+#if defined(HWCAP_CRC32)
+#    define GU_AT_HWCAP    AT_HWCAP
+#    define GU_HWCAP_CRC32 HWCAP_CRC32
+#elif defined(HWCAP2_CRC32)
+#    define GU_AT_HWCAP    AT_HWCAP2
+#    define GU_HWCAP_CRC32 HWCAP2_CRC32
 #endif /* HWCAP_CRC32 */
 
 gu_crc32c_func_t
 gu_crc32c_hardware()
 {
-    unsigned long int const hwcaps = getauxval(AT_HWCAP);
-    if (hwcaps & HWCAP_CRC32)
+#if defined(GU_AT_HWCAP)
+    unsigned long int const hwcaps = getauxval(GU_AT_HWCAP);
+    if (hwcaps & GU_HWCAP_CRC32)
     {
         gu_info ("CRC-32C: using hardware acceleration.");
         return gu_crc32c_arm64;
     }
     else
     {
+        gu_info ("CRC-32C: hardware does not have CRC-32C capabilities.");
         return NULL;
     }
+#else
+    gu_info ("CRC-32C: compiled without hardware acceleration support.");
+    return NULL;
+#endif /* GU_AT_HWCAP */
 }
 
 #endif /* GU_CRC32C_ARM64 */

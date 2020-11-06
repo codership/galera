@@ -93,6 +93,8 @@ run_bench_with_impl(gu_crc32c_func_t impl,
               << std::fixed << duration << '\t' << result << '\n';
 }
 
+static gu_crc32c_func_t configured_impl;
+
 static void
 one_length(size_t const len, size_t const reps)
 {
@@ -109,7 +111,8 @@ one_length(size_t const len, size_t const reps)
 #endif /* GU_CRC32C_X86 */
 
 #if defined(GU_CRC32C_ARM64)
-    run_bench_with_impl(gu_crc32c_arm64,        len, reps, "GU arm64   ");
+    if (gu_crc32c_arm64 == configured_impl)
+        run_bench_with_impl(gu_crc32c_arm64,    len, reps, "GU arm64   ");
 #endif /* GU_CRC32C_X86 */
 }
 
@@ -117,9 +120,11 @@ int main()
 {
     gu_crc32c_configure(); // compute SW lookup tables
 
+    configured_impl = gu_crc32c_func;
+
     one_length(11,  1<<22 /* 4M   */);
     one_length(31,  1<<21 /* 2M   */);
     one_length(64,  1<<20 /* 1M   */);
     one_length(512, 1<<17 /* 128K */);
-    one_length(1<<20 /* 1M */,    64);
+    one_length(1<<20,  64 /* 1M   */);
 }

@@ -144,8 +144,13 @@ END_TEST
 #if defined(GU_CRC32C_ARM64)
 START_TEST(test_gu_crc32c_arm64)
 {
-    gu_crc32c_func = gu_crc32c_arm64;
-    test_function();
+    gu_crc32c_func = gu_crc32c_hardware();
+
+    if (NULL != gu_crc32c_func)
+    {
+        ck_assert(gu_crc32c_arm64 == gu_crc32c_func);
+        test_function();
+    }
 }
 END_TEST
 #endif /* GU_CRC32C_ARM64 */
