@@ -32,7 +32,7 @@ START_TEST(test_gmcast_multicast)
     gu::Config conf;
     gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
-    auto_ptr<Protonet> pnet(Protonet::create(conf));
+    unique_ptr<Protonet> pnet(Protonet::create(conf));
     Transport* gm1(Transport::create(*pnet, uri1));
 
     gm1->connect();
@@ -157,7 +157,7 @@ START_TEST(test_gmcast_w_user_messages)
     gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     mark_point();
-    auto_ptr<Protonet> pnet(Protonet::create(conf));
+    unique_ptr<Protonet> pnet(Protonet::create(conf));
     mark_point();
     User u1(*pnet, "127.0.0.1:0", "");
     pnet->insert(&u1.pstack());
@@ -259,7 +259,7 @@ START_TEST(test_gmcast_auto_addr)
     gu::Config conf;
     gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
-    auto_ptr<Protonet> pnet(Protonet::create(conf));
+    unique_ptr<Protonet> pnet(Protonet::create(conf));
     Transport* tp1 = Transport::create(*pnet, "gmcast://?gmcast.group=test");
     Transport* tp2 = Transport::create(*pnet, "gmcast://127.0.0.1:4567"
               "?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:10002");
@@ -295,7 +295,7 @@ START_TEST(test_gmcast_forget)
     gu::Config conf;
     gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
-    auto_ptr<Protonet> pnet(Protonet::create(conf));
+    unique_ptr<Protonet> pnet(Protonet::create(conf));
     Transport* tp1 = Transport::create(*pnet, "gmcast://"
                     "?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0");
     pnet->insert(&tp1->pstack());
@@ -358,7 +358,7 @@ START_TEST(test_trac_380)
     gu::Config conf;
     gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
-    std::auto_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
+    std::unique_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
 
     // caused either assertion or exception
     gcomm::Transport* tp1(gcomm::Transport::create(
@@ -392,7 +392,7 @@ START_TEST(test_trac_828)
     gu::Config conf;
     gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
-    std::auto_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
+    std::unique_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
 
     // If the bug is present, this will throw because of own address being
     // in address list.
@@ -421,11 +421,11 @@ START_TEST(test_gmcast_ipv6)
     gcomm::Conf::register_params(conf);
     conf.set("base_host", "ip6-localhost");
     gu_log_max_level = GU_LOG_DEBUG;
-    std::auto_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
+    std::unique_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
 
     // Without scheme
     {
-        std::auto_ptr<Transport> tp(gcomm::Transport::create(
+        std::unique_ptr<Transport> tp(gcomm::Transport::create(
                                         *pnet,
                                         "gmcast://[::1]:4567?"
                                         "gmcast.group=test&"
@@ -435,7 +435,7 @@ START_TEST(test_gmcast_ipv6)
     }
 
     {
-        std::auto_ptr<Transport> tp(gcomm::Transport::create(
+        std::unique_ptr<Transport> tp(gcomm::Transport::create(
                                         *pnet,
                                         "gmcast://ip6-localhost:4567?"
                                         "gmcast.group=test&"
@@ -445,7 +445,7 @@ START_TEST(test_gmcast_ipv6)
     }
 
     {
-        std::auto_ptr<Transport> tp(gcomm::Transport::create(
+        std::unique_ptr<Transport> tp(gcomm::Transport::create(
                                         *pnet,
                                         "gmcast://[::1]?"
                                         "gmcast.group=test&"
@@ -455,7 +455,7 @@ START_TEST(test_gmcast_ipv6)
     }
 
     {
-        std::auto_ptr<Transport> tp(gcomm::Transport::create(
+        std::unique_ptr<Transport> tp(gcomm::Transport::create(
                                         *pnet,
                                         "gmcast://ip6-localhost?"
                                         "gmcast.group=test&"
@@ -465,7 +465,7 @@ START_TEST(test_gmcast_ipv6)
     }
     {
         gcomm::Protolay::sync_param_cb_t spcb;
-        std::auto_ptr<Transport> tp(gcomm::Transport::create(
+        std::unique_ptr<Transport> tp(gcomm::Transport::create(
                                         *pnet,
                                         "gmcast://ip6-localhost?"
                                         "gmcast.group=test&"

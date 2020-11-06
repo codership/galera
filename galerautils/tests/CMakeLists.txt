@@ -45,6 +45,7 @@ add_test(
 
 add_executable(gu_tests++
   gu_atomic_test.cpp
+  gu_gtid_test.cpp
   gu_vector_test.cpp
   gu_string_test.cpp
   gu_vlq_test.cpp

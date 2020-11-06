@@ -17,8 +17,10 @@ add_library(galera
   replicator_smm_params.cpp
   gcs_action_source.cpp
   galera_info.cpp
+  galera_view.cpp
   replicator.cpp
   ist.cpp
+  ist_proto.cpp
   gcs_dummy.cpp
   saved_state.cpp
   replicator_smm.cpp

@@ -172,13 +172,13 @@ namespace gcomm
         UUID uuid_;
         std::deque<Datagram*> out_;
         bool queue_;
-
+        static std::unique_ptr<Protonet> net_;
+        Protonet& get_net();
     public:
 
         DummyTransport(const UUID& uuid = UUID::nil(), bool queue = true,
                        const gu::URI& uri = gu::URI("dummy:")) :
-            Transport(*std::auto_ptr<Protonet>
-                      (Protonet::create(check_trace_conf())), uri),
+            Transport(get_net(), uri),
             uuid_(uuid),
             out_(),
             queue_(queue)

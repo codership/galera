@@ -1,2 +1,2 @@
 garb/files/garb-systemd usr/bin
-usr/bin/garb/garbd usr/bin
+usr/bin/garbd usr/bin

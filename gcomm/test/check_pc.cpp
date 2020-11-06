@@ -3694,7 +3694,7 @@ START_TEST(test_quorum_2_to_2_in_3_node_cluster)
         .pc_view(pc_view)
         .instances(instances)
         .state(gcomm::pc::Proto::S_INSTALL);
-    std::auto_ptr<gcomm::pc::Proto> p(builder.make_proto());
+    std::unique_ptr<gcomm::pc::Proto> p(builder.make_proto());
     DummyEvs devs(conf);
     DummyTop dtop(conf);
     gcomm::connect(&devs, p.get());

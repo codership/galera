@@ -18,6 +18,7 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/gcomm/src
   ${CMAKE_SOURCE_DIR}/gcache/src
   ${CMAKE_SOURCE_DIR}/gcs/src
+  ${CMAKE_SOURCE_DIR}/wsrep/src
   )
 
 # Options to control compiler options and error behavior.
@@ -78,9 +79,6 @@ install(FILES
 install(FILES ${CMAKE_SOURCE_DIR}/asio/LICENSE_1_0.txt
   DESTINATION doc
   RENAME LICENSE.asio)
-install(FILES ${CMAKE_SOURCE_DIR}/chromium/LICENSE
-  DESTINATION doc
-  RENAME LICENSE.chromium)
 
 message(STATUS "")
 message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")

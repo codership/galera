@@ -25,14 +25,6 @@ target_compile_options(check_gcomm
   -Wno-overloaded-virtual
   )
 
-# Compiling with C++11 gets deprecation warnings from auto_ptr.
-if (NOT CMAKE_CXX_STANDARD EQUAL 98)
-  target_compile_options(check_gcomm
-    PRIVATE
-    -Wno-deprecated-declarations
-    )
-endif()
-
 add_test(
   NAME check_gcomm
   COMMAND check_gcomm

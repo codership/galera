@@ -30,6 +30,7 @@ extern "C" void check_trace_log_cb(int severity, const char* msg)
     std::cerr << gu::datetime::Date::monotonic() << ": " << msg << "\n";
 }
 
+
 // This is to avoid static initialization fiasco with gcomm::Conf static members
 // Ideally it is the latter which should be wrapped in a function, but, unless
 // this is used to initialize another static object, it should be fine.
@@ -40,6 +41,17 @@ gu::Config& check_trace_conf()
 
     return conf;
 }
+
+std::unique_ptr<Protonet> DummyTransport::net_;
+Protonet& DummyTransport::get_net()
+{
+    // Unit tests are single threaded, no need to worry about thread
+    // synchronization here.
+    if (not net_)
+        net_ = std::unique_ptr<Protonet>(Protonet::create(check_trace_conf()));;
+    return *net_;
+}
+
 
 ostream& gcomm::operator<<(ostream& os, const TraceMsg& msg)
 {

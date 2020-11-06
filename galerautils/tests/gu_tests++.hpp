@@ -27,7 +27,6 @@
 #include "gu_histogram_test.hpp"
 #include "gu_stats_test.hpp"
 #include "gu_thread_test.hpp"
-#include "gu_shared_ptr_test.hpp"
 #include "gu_asio_test.hpp"
 #include "gu_deqmap_test.hpp"
 
@@ -52,7 +51,6 @@ static suite_creator_t suites[] =
     gu_histogram_suite,
     gu_stats_suite,
     gu_thread_suite,
-    gu_shared_ptr_suite,
     gu_asio_suite,
     gu_deqmap_suite,
     0

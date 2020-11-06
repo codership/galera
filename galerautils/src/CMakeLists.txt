@@ -41,6 +41,7 @@ target_compile_options(galerautils
 add_library(galerautilsxx
   gu_vlq.cpp
   gu_datetime.cpp
+  gu_gtid.cpp
   gu_exception.cpp
   gu_hexdump.cpp
   gu_serialize.cpp

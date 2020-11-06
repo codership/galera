@@ -119,7 +119,7 @@ START_TEST(test_pc_transport)
     gu::Config conf;
     gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
-    auto_ptr<Protonet> net(Protonet::create(conf));
+    unique_ptr<Protonet> net(Protonet::create(conf));
     PCUser2 pu1(*net,
                 "pc://?"
                 "evs.info_log_mask=0xff&"
@@ -181,7 +181,7 @@ START_TEST(test_set_param)
     Protolay::sync_param_cb_t sync_param_cb;
     gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
-    auto_ptr<Protonet> net(Protonet::create(conf));
+    unique_ptr<Protonet> net(Protonet::create(conf));
     PCUser2 pu1(*net,
                 "pc://?"
                 "evs.info_log_mask=0xff&"
@@ -253,8 +253,8 @@ START_TEST(test_trac_599)
     gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
     D d(conf);
-    std::auto_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
-    std::auto_ptr<gcomm::Transport> tp(
+    std::unique_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
+    std::unique_ptr<gcomm::Transport> tp(
         gcomm::Transport::create
         (*pnet,"pc://?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0"
          "&pc.recovery=0"));
@@ -284,7 +284,7 @@ START_TEST(test_trac_620)
     gu::Config conf;
     gu::ssl_register_params(conf);
     gcomm::Conf::register_params(conf);
-    auto_ptr<Protonet> net(Protonet::create(conf));
+    unique_ptr<Protonet> net(Protonet::create(conf));
     Transport* tp(Transport::create(*net, "pc://?"
                                     "evs.info_log_mask=0xff&"
                                     "gmcast.listen_addr=tcp://127.0.0.1:0&"

@@ -5,6 +5,8 @@
 add_executable(gcs_tests
   gcs_tests.cpp
   gcs_test_utils.cpp
+  gcs_act_cchange_test.cpp
+  ../gcs_act_cchange.cpp
   gcs_fifo_test.cpp
   ../gcs_fifo_lite.cpp
   gcs_sm_test.cpp
@@ -25,6 +27,7 @@ add_executable(gcs_tests
   gcs_memb_test.cpp
   ../gcs_group.cpp
   gcs_core_test.cpp
+  ../gcs_code_msg.cpp
   ../gcs_core.cpp
   ../gcs_dummy.cpp
   ../gcs_msg_type.cpp

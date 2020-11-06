@@ -3,6 +3,8 @@
 #
 
 set(GCS_SOURCES
+  gcs_act_cchange.cpp
+  gcs_code_msg.cpp
   gcs_params.cpp
   gcs_conf.cpp
   gcs_fifo_lite.cpp
@@ -81,7 +83,8 @@ add_executable(gcs_test gcs_test.cpp)
 
 target_compile_options(gcs_test
   PRIVATE
-  -Wno-conversion)
+  -Wno-conversion
+  -Wno-unused-parameter)
 
 target_link_libraries(gcs_test gcs gcomm ${GALERA_SSL_LIBS} pthread rt)
 

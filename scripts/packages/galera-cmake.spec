@@ -15,9 +15,9 @@
 # Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston
 # MA  02110-1301  USA.
 
-%{!?name: %define name galera-3}
-%{!?wsrep_api: %define wsrep_api 25}
-%{!?version: %define version %{wsrep_api}_3.x}
+%{!?name: %define name galera-4}
+%{!?wsrep_api: %define wsrep_api 26}
+%{!?version: %define version %{wsrep_api}_4.x}
 %{!?release: %define release 2}
 %define revision XXXX
 %define copyright Copyright 2007-2015 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
@@ -50,6 +50,23 @@
 %define dist .lp151
 %define ssl_package_devel libopenssl-devel
 %endif
+%if 0%{?sle_version} == 120500 && !0%{?is_opensuse}
+%define dist .sl12
+%endif
+%if 0%{?sle_version} == 150000 && !0%{?is_opensuse}
+%define dist .sl15
+%define ssl_package_devel libopenssl-devel
+%endif
+%if 0%{?sle_version} == 150100 && !0%{?is_opensuse}
+%define dist .sl15_1
+%define ssl_package_devel libopenssl-devel
+%endif
+%if 0%{?sle_version} == 150200 && !0%{?is_opensuse}
+%define dist .sl15_2
+%define ssl_package_devel libopenssl-devel
+%endif
+
+
 
 
 Name:          %{name}
@@ -125,7 +142,7 @@ Requires(preun): initscripts
 Requires:      openssl
 
 Provides:      wsrep, %{name} = %{version}-%{release}
-Provides:      galera, galera3, Percona-XtraDB-Cluster-galera-25
+Provides:      galera, galera4, Percona-XtraDB-Cluster-galera-%{wsrep_api}
 
 %description
 Galera is a fast synchronous multimaster wsrep provider (replication engine)
@@ -167,8 +184,8 @@ make -j$(echo $NUM_JOBS) VERBOSE=1
 make test ARGS=-j$(echo $NUM_JOBS)
 
 %install
-RBR=$RPM_BUILD_ROOT # eg. rpmbuild/BUILDROOT/galera-3-3.x-33.1.x86_64
-RBD=$RPM_BUILD_DIR/%{name}-%{version} # eg. rpmbuild/BUILD/galera-3.x
+RBR=$RPM_BUILD_ROOT # eg. rpmbuild/BUILDROOT/galera-4-4.x-44.1.x86_64
+RBD=$RPM_BUILD_DIR/%{name}-%{version} # eg. rpmbuild/BUILD/galera-4.x
 # When downloading from GitHub the contents is in a folder
 # that is named by the branch it was exported from.
 
@@ -212,7 +229,6 @@ install -m 755 $RBD/libgalera_smm.so              $RBR%{libs}/libgalera_smm.so
 install -d $RBR%{docs}
 install -m 644 $RBD/COPYING                       $RBR%{docs}/COPYING
 install -m 644 $RBD/asio/LICENSE_1_0.txt          $RBR%{docs}/LICENSE.asio
-install -m 644 $RBD/chromium/LICENSE              $RBR%{docs}/LICENSE.chromium
 install -m 644 $RBD/scripts/packages/README       $RBR%{docs}/README
 install -m 644 $RBD/scripts/packages/README-MySQL $RBR%{docs}/README-MySQL
 
@@ -319,7 +335,6 @@ fi
 %attr(0755,root,root) %dir %{docs}
 %doc %attr(0644,root,root) %{docs}/COPYING
 %doc %attr(0644,root,root) %{docs}/LICENSE.asio
-%doc %attr(0644,root,root) %{docs}/LICENSE.chromium
 %doc %attr(0644,root,root) %{docs}/README
 %doc %attr(0644,root,root) %{docs}/README-MySQL
 

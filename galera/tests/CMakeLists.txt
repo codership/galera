@@ -5,9 +5,9 @@
 add_executable(galera_check
   galera_check.cpp
   data_set_check.cpp
+  certification_check.cpp
   key_set_check.cpp
   write_set_ng_check.cpp
-  write_set_check.cpp
   trx_handle_check.cpp
   service_thd_check.cpp
   ist_check.cpp
