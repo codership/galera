@@ -14,7 +14,6 @@ core
 rb_test
 galera.cache
 gvwstate.dat
-galera-sym.map
 galera/tests/galera_check
 galera/tests/galera_check.passed
 galerautils/tests/gu_tests
@@ -49,3 +48,12 @@ tests/conf/my[0-9]*.cnf
 docs/build
 *.gcno
 *.gcda
+CMakeCache.txt
+CPackConfig.cmake
+CPackSourceConfig.cmake
+**/cmake_install.cmake
+**/CMakeFiles/
+**/CTestTestfile.cmake
+Testing/
+**/Makefile
+*~

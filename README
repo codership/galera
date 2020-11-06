@@ -26,6 +26,14 @@ or
  $ ./scripts/build.sh
 (see ./scripts/build.sh --help for information on options)
 
+Starting from Galera 3.32, building with CMake is also supported.
+To build with CMake, do:
+ $ cmake .
+ $ make
+Run unit tests with CMake:
+ $ make test
+
+
 To build MySQL/Galera demo distribution, clone
 https://github.com/codership/mysql-wsrep into some directory (hereafter
 <MYSQL_DIR>) and run build script from this directory (hereafter <GALERA_DIR>):

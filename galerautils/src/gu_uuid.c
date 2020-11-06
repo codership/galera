@@ -154,12 +154,20 @@ uuid_time (const gu_uuid_t* uuid)
 {
     uint64_t uuid_time;
 
+    union
+    {
+        uint16_t u16[4];
+        uint32_t u32[2];
+    } tmp;
+
+    memcpy(&tmp, uuid, sizeof(tmp));
+
     /* time_high_and_version */
-    uuid_time = gu_be16 (((uint16_t*)uuid->data)[3]) & 0x0FFF;
+    uuid_time = gu_be16(tmp.u16[3]) & 0x0FFF;
     /* time_mid */
-    uuid_time = (uuid_time << 16) + gu_be16 (((uint16_t*)uuid->data)[2]);
+    uuid_time = (uuid_time << 16) + gu_be16(tmp.u16[2]);
     /* time_low */
-    uuid_time = (uuid_time << 32) + gu_be32 (((uint32_t*)uuid->data)[0]);
+    uuid_time = (uuid_time << 32) + gu_be32(tmp.u32[0]);
 
     return uuid_time;
 }

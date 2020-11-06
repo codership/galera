@@ -11,7 +11,8 @@
     #include <gcache.h>
 #else
     #ifndef gcache_t
-        struct gcache_t;
+        struct _gcache;
+        typedef struct _gcache gcache_t;
     #endif
 #endif
 

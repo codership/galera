@@ -3,5 +3,3 @@ $ cd galera
 $ git clean -d -f && git reset --hard # clean up any cruft from previous builds
 $ dpkg-buildpackage -us -uc -b
 
-The galera/scripts/packages/deb.sh is going to be deprecated soon.
-
