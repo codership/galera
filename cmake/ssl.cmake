@@ -6,6 +6,38 @@ if (NOT GALERA_WITH_SSL)
   return()
 endif()
 
+#
+# Helper macros to check Ecdh features.
+#
+
+macro(CHECK_ECDH_AUTO)
+  check_cxx_source_compiles(
+    "
+#include <openssl/ssl.h>
+int main() { SSL_CTX* ctx=NULL; return !SSL_CTX_set_ecdh_auto(ctx, 1); }
+" ECDH_AUTO_OK)
+  if (ECDH_AUTO_OK)
+    add_definitions(-DOPENSSL_HAS_SET_ECDH_AUTO)
+  endif()
+endmacro()
+
+macro(CHECK_TMP_ECDH)
+  check_cxx_source_compiles(
+    "
+#include <openssl/ssl.h>
+int main() { SSL_CTX* ctx=NULL; EC_KEY* ecdh=NULL; return !SSL_CTX_set_tmp_ecdh(
+ctx,ecdh); }
+" ECDH_TMP_OK)
+  if (ECDH_TMP_OK)
+    add_definitions(-DOPENSSL_HAS_SET_TMP_ECDH)
+  endif()
+endmacro()
+
+macro(CHECK_ECDH)
+  CHECK_ECDH_AUTO()
+  CHECK_TMP_ECDH()
+endmacro()
+
 # Make sure not to build static version with system SSL libraries.
 if (GALERA_STATIC)
   if (NOT OPENSSL_ROOT_DIR)
@@ -22,6 +54,7 @@ if (CMAKE_VERSION VERSION_GREATER "3.1")
   message(STATUS "${OPENSSL_LIBRARIES}")
   set(GALERA_SSL_LIBS ${OPENSSL_LIBRARIES})
   message(STATUS "GALERA_SSL_LIBS: ${GALERA_SSL_LIBS}")
+  CHECK_ECDH()
   return()
 endif()
 
@@ -65,6 +98,7 @@ elseif (GALERA_WITH_SSL)
   endif()
 endif()
 
+CHECK_ECDH()
 message(STATUS "GALERA_SSL_LIBS: ${GALERA_SSL_LIBS}")
 
 unset(HAVE_SSL_LIB CACHE)

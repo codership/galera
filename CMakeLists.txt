@@ -3,7 +3,7 @@
 #
 
 cmake_minimum_required(VERSION 2.8)
-project(galera-3)
+project(galera-4)
 
 include(CheckCCompilerFlag)
 include(CheckCXXCompilerFlag)

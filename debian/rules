@@ -7,6 +7,9 @@ DPKG_EXPORT_BUILDFLAGS = 1
 include /usr/share/dpkg/default.mk
 include /usr/share/dpkg/buildflags.mk
 
+override_dh_auto_test:
+	dh_auto_test -O--no-parallel -- ARGS=--output-on-failure
+
 # Start earlier than MySQL which has value 19
 override_dh_installinit-arch:
 	dh_installinit -n --name=garb -- defaults 18 22
