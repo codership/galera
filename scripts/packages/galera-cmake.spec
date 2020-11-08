@@ -164,7 +164,7 @@ NUM_JOBS=${NUM_JOBS:-$(ncpu=$(cat /proc/cpuinfo | grep processor | wc -l) && ech
 
 cmake -DCMAKE_BUILD_TYPE=Release .
 make -j$(echo $NUM_JOBS) VERBOSE=1
-make test ARGS=-j$(echo $NUM_JOBS)
+make test ARGS=-V
 
 %install
 RBR=$RPM_BUILD_ROOT # eg. rpmbuild/BUILDROOT/galera-3-3.x-33.1.x86_64

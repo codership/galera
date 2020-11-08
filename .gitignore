@@ -27,7 +27,7 @@ galerautils/tests/deqmap_bench
 galerautils/tests/crc32c_bench
 garb/garbd
 gcache.page.*
-gcache/src/test
+gcache/src/gcache_test
 gcache/tests/gcache_tests
 gcache/tests/gcache_tests.passed
 gcomm/test/check_gcomm
@@ -54,4 +54,5 @@ CPackSourceConfig.cmake
 **/CTestTestfile.cmake
 Testing/
 **/Makefile
+GALERA_REVISION
 *~
