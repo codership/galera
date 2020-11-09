@@ -70,6 +70,7 @@ add_subdirectory(gcache)
 add_subdirectory(gcs)
 add_subdirectory(garb)
 add_subdirectory(galera)
+add_subdirectory(scripts/packages)
 
 install(FILES
   ${CMAKE_SOURCE_DIR}/AUTHORS
