@@ -35,10 +35,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Woverloaded-virtual -Wcon
 if (GALERA_STRICT_BUILD_FLAGS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Weffc++")
 endif()
-if (GALERA_MAINTAINER_MODE)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
-endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   # To detect STD library misuse with Debug builds.

@@ -37,6 +37,24 @@ option(GALERA_GCS_SM_DEBUG
 option(GALERA_GU_DEBUG_MUTEX "Enable mutex debug instrumentation" OFF)
 option(GALERA_GU_DBUG_ON "Enable sync point macros (ON for Debug builds)" OFF)
 
+#
+# Set cmake policies before doing any checks.
+#
+
+# In CMake 3.12 and above, the
+#
+# * ``check_include_file`` macro in the ``CheckIncludeFile`` module, the
+# * ``check_include_file_cxx`` macro in the
+#   ``CheckIncludeFileCXX`` module, and the
+# * ``check_include_files`` macro in the ``CheckIncludeFiles`` module
+#
+# now prefer to link the check executable to the libraries listed in the
+# ``CMAKE_REQUIRED_LIBRARIES`` variable.  This policy provides compatibility
+# with projects that have not been updated to expect this behavior.
+if (POLICY CMP0075)
+  CMAKE_POLICY(SET CMP0075 OLD)
+endif()
+
 # Determine version first to have it near the top of build log.
 include(cmake/version.cmake)
 include(cmake/package.cmake)
@@ -61,6 +79,9 @@ include(cmake/endian.cmake)
 include(cmake/shared_ptr.cmake)
 include(cmake/unordered.cmake)
 include(cmake/check.cmake)
+# Keep the maintainer mode as last to avoid feature checks failing
+# in compiler warnings.
+include(cmake/maintainer_mode.cmake)
 
 enable_testing()
 add_subdirectory(galerautils)
