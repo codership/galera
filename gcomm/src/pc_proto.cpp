@@ -77,10 +77,16 @@ private:
     const gcomm::UUID& uuid_;
 };
 
-static bool UUID_fixed_part_pred(const gcomm::NodeList::value_type& lhs,
-                                 const gcomm::NodeList::value_type& rhs)
+static bool UUID_fixed_part_cmp_equal(const gcomm::NodeList::value_type& lhs,
+                                      const gcomm::NodeList::value_type& rhs)
 {
     return lhs.first.fixed_part_matches(rhs.first);
+}
+
+static bool UUID_fixed_part_cmp_intersection(const gcomm::UUID& lhs,
+                                             const gcomm::UUID& rhs)
+{
+    return lhs.fixed_part_matches(rhs) ? false : lhs < rhs;
 }
 
 // Return max to seq found from states, -1 if states is empty
@@ -294,7 +300,7 @@ void gcomm::pc::Proto::deliver_view(bool bootstrap)
             if (rst_view_->id().seq() == max_view_seqno &&
                 v.members().size() == rst_view_->members().size() &&
                 std::equal(v.members().begin(), v.members().end(),
-                           rst_view_->members().begin(), UUID_fixed_part_pred))
+                           rst_view_->members().begin(), UUID_fixed_part_cmp_equal))
             {
                 log_info << "promote to primary component";
                 // All of the nodes are in non-primary so we need to bootstrap.
@@ -996,7 +1002,8 @@ bool gcomm::pc::Proto::is_prim() const
         std::set<UUID> intersection;
         set_intersection(greatest_view.begin(), greatest_view.end(),
                          present.begin(), present.end(),
-                         inserter(intersection, intersection.begin()));
+                         inserter(intersection, intersection.begin()),
+                         UUID_fixed_part_cmp_intersection);
         log_debug << self_id()
                   << " intersection size " << intersection.size()
                   << " greatest view size " << greatest_view.size();
