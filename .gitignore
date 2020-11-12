@@ -38,6 +38,7 @@ gcs/src/gcs_test
 gcs/src/unit_tests/gcs_tests
 gcs/src/unit_tests/gcs_tests.passed
 scripts/mysql/mysql-[5-9].[5-9].[0-9]*
+scripts/packages/codership-galera.spec
 tests/bin
 tests/out
 tests/run
