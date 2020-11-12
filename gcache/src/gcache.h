@@ -16,7 +16,7 @@ extern "C" {
 
 #include "gu_config.h"
 
-typedef struct _gcache gcache_t;
+typedef struct gcache_st gcache_t;
 
 extern gcache_t* gcache_create  (gu_config_t* conf, const char* data_dir);
 extern void      gcache_destroy (gcache_t* gc);

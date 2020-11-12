@@ -2,6 +2,7 @@
 # Copyright (C) 2020 Codership Oy <info@codership.com>
 #
 
+message(STATUS "CMake version ${CMAKE_VERSION}")
 cmake_minimum_required(VERSION 2.8)
 project(galera-4)
 
