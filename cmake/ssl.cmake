@@ -35,7 +35,9 @@ endmacro()
 
 macro(CHECK_ECDH)
   CHECK_ECDH_AUTO()
-  CHECK_TMP_ECDH()
+  if (NOT ECDH_AUTO_OK)
+    CHECK_TMP_ECDH()
+  endif()
 endmacro()
 
 # Make sure not to build static version with system SSL libraries.
@@ -45,7 +47,9 @@ if (GALERA_STATIC)
   endif()
 endif()
 
-if (CMAKE_VERSION VERSION_GREATER "3.1")
+# OPENSSL_USE_STATIC_LIBS was introduced in CMake 3.3.2. For earlier versions
+# there is a fallback code below.
+if (CMAKE_VERSION VERSION_GREATER "3.3.1")
   set(OPENSSL_USE_STATIC_LIBS ${GALERA_STATIC})
   find_package(OpenSSL 1.0)
   if (NOT OPENSSL_FOUND)

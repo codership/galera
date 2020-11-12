@@ -123,6 +123,8 @@ bool gcomm::evs::Consensus::equal(const Message& m1, const Message& m2) const
 gcomm::evs::seqno_t gcomm::evs::Consensus::highest_reachable_safe_seq() const
 {
     std::vector<seqno_t> seq_list;
+    seq_list.reserve(known_.size());
+
     for (NodeMap::const_iterator i = known_.begin(); i != known_.end();
          ++i)
     {
