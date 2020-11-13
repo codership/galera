@@ -1381,23 +1381,47 @@ gcs_group_handle_state_request (gcs_group_t*         group,
     gcs_seqno_t ist_seqno = GCS_SEQNO_ILL;
     int str_version = 1; // actually it's 0 or 1.
 
-    if (act->act.buf_len != (ssize_t)(donor_name_len + 1) &&
+    if (act->act.buf_len > (ssize_t)(donor_name_len + 2) &&
         donor_name[donor_name_len + 1] == 'V') {
         str_version = (int)donor_name[donor_name_len + 2];
     }
 
     if (str_version >= 2) {
-        const char* ist_buf = donor_name + donor_name_len + 3;
+        ssize_t const ist_offset(donor_name_len + 3);
+        ssize_t const sst_offset
+            (ist_offset + sizeof(ist_uuid) + sizeof(ist_seqno));
+
+        if (act->act.buf_len < sst_offset)
+        {
+            if (group->my_idx == joiner_idx)
+            {
+                gu_fatal("Failed to form State Transfer Request: %zd < %zd. "
+                         "Internal program error.",
+                         act->act.buf_len, sst_offset);
+                act->id = -ENOTRECOVERABLE;
+                return act->act.buf_len;
+            }
+            else
+            {
+                gu_warn("Malformed State Transfer Request from %d.%d (%s): "
+                        "%zd < %zd. Ignoring.",
+                        joiner_idx, group->nodes[joiner_idx].segment,
+                        joiner_name);
+                gcs_group_ignore_action(group, act);
+                return 0;
+            }
+        }
+
+        const char* ist_buf = donor_name + ist_offset;
         memcpy(&ist_uuid, ist_buf, sizeof(ist_uuid));
         ist_seqno = gcs_seqno_gtoh(*(gcs_seqno_t*)(ist_buf + sizeof(ist_uuid)));
 
         // change act.buf's content to original version.
         // and it's safe to change act.buf_len
-        size_t head = donor_name_len + 3 + sizeof(ist_uuid) + sizeof(ist_seqno);
         memmove((char*)act->act.buf + donor_name_len + 1,
-                (char*)act->act.buf + head,
-                act->act.buf_len - head);
-        act->act.buf_len -= sizeof(ist_uuid) + sizeof(ist_seqno) + 2;
+                (char*)act->act.buf + sst_offset,
+                act->act.buf_len - sst_offset);
+        act->act.buf_len -= sst_offset - donor_name_len - 1;
     }
 
     assert (GCS_ACT_STATE_REQ == act->act.type);

@@ -279,7 +279,7 @@ gt_group::sst_start (int const joiner_idx,const char* donor_name)
     for (i = 0; i < nodes_num; i++)
     {
         // sst request is expected to be dynamically allocated
-        char* const req_buf = (char*)malloc (req_len);
+        char* const req_buf = (char*)calloc(req_len, sizeof(char));
         ck_assert(NULL != req_buf);
         sprintf (req_buf, "%s", donor_name);
 
