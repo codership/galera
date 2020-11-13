@@ -1781,31 +1781,58 @@ gcs_group_handle_state_request (gcs_group_t*         group,
     gu::GTID ist_gtid;
     int str_version = 1; // actually it's 0 or 1.
 
-    if (act->act.buf_len > (ssize_t)donor_name_len &&
-        donor_name[donor_name_len + 0] == 'V') {
+    if (act->act.buf_len > (ssize_t)(donor_name_len + 1) &&
+        donor_name[donor_name_len] == 'V') {
         str_version = (int)donor_name[donor_name_len + 1];
     }
 
     if (str_version >= 2) {
-        size_t offset(donor_name_len + 2);
+        ssize_t const ist_offset(donor_name_len + 2);
+        ssize_t const sst_offset(ist_offset + gu::GTID::serial_size());
 
         try
         {
-            offset = ist_gtid.unserialize(act->act.buf, act->act.buf_len,offset);
+            if (act->act.buf_len < sst_offset)
+            {
+                gu_throw_error(EINVAL) << "Request message too short: "
+                                       << act->act.buf_len << " < "
+                                       << sst_offset;
+            }
+
+            ssize_t const offset
+                (ist_gtid.unserialize(act->act.buf, act->act.buf_len,
+                                      ist_offset));
+            if (offset != sst_offset)
+            {
+                gu_throw_error(EINVAL) << "Actual SST offset " << offset
+                                       << " does not match expected "
+                                       << sst_offset;
+            }
         }
-        catch (gu::Exception& e) {
-            log_warn << "Malformed state transfer request: " << e.what()
-                     << " Ignoring";
-            gcs_group_ignore_action(group, act);
-            return 0;
+        catch (gu::Exception& e)
+        {
+            if (group->my_idx == joiner_idx)
+            {
+                log_fatal << "Failed to form State Transfer Request: "
+                          << e.what();
+                act->id = -ENOTRECOVERABLE;
+                return act->act.buf_len;
+            }
+            else
+            {
+               log_warn << "Malformed State Transfer Request: " << e.what()
+                        << " Ignoring";
+                gcs_group_ignore_action(group, act);
+                return 0;
+            }
         }
 
         // change act.buf's content to original version.
         // and it's safe to change act.buf_len
         ::memmove((char*)act->act.buf + donor_name_len,
-                  (char*)act->act.buf + offset,
-                  act->act.buf_len - offset);
-        act->act.buf_len -= offset - donor_name_len;
+                  (char*)act->act.buf + sst_offset,
+                  act->act.buf_len - sst_offset);
+        act->act.buf_len -= sst_offset - donor_name_len;
     }
 
     assert (GCS_ACT_STATE_REQ == act->act.type);

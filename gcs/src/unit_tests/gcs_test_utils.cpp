@@ -441,6 +441,7 @@ gt_group::sst_start (int const joiner_idx,const char* donor_name)
         // sst request is expected to be dynamically allocated
         char* const req_buf = (char*)gcache->malloc(req_len);
         ck_assert(NULL != req_buf);
+        ::memset(req_buf, 0, req_len);
         sprintf (req_buf, "%s", donor_name);
 
         struct gcs_act_rcvd req(gcs_act(req_buf, req_len, GCS_ACT_STATE_REQ),
