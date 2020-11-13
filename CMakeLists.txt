@@ -33,6 +33,7 @@ option(GALERA_STATIC "Build statically linked binaries" OFF)
 
 # Developer options and instrumentation.
 option(GALERA_WITH_ASAN "Enable ASAN instrumentation" OFF)
+option(GALERA_WITH_VALGRIND "Optionally run tests with valgrind" OFF)
 option(GALERA_GCS_SM_DEBUG
   "Enable dumping of send monitor state and history" OFF)
 option(GALERA_GU_DEBUG_MUTEX "Enable mutex debug instrumentation" OFF)
@@ -80,10 +81,12 @@ include(cmake/endian.cmake)
 include(cmake/shared_ptr.cmake)
 include(cmake/unordered.cmake)
 include(cmake/check.cmake)
+include(cmake/memorycheck.cmake)
 # Keep the maintainer mode as last to avoid feature checks failing
 # in compiler warnings.
 include(cmake/maintainer_mode.cmake)
 
+include(CTest)
 enable_testing()
 add_subdirectory(galerautils)
 add_subdirectory(gcomm)
@@ -107,7 +110,8 @@ install(FILES ${CMAKE_SOURCE_DIR}/chromium/LICENSE
 
 message(STATUS "")
 message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
-message(STATUS "CMAKE_COMPILE_DEFINITIONS: ${CMAKE_COMPILE_DEFINITIONS}")
+get_directory_property(DirDefs COMPILE_DEFINITIONS)
+message(STATUS "COMPILE_DEFINITIONS: ${DirDefs}")
 message(STATUS "CMAKE_C_FLAGS: ${CMAKE_C_FLAGS}")
 message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 message(STATUS "CMAKE_EXE_LINKER_FLAGS: ${CMAKE_EXE_LINKER_FLAGS}")
