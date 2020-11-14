@@ -124,7 +124,7 @@ target_link_libraries(avalanche galerautils)
 #
 add_executable(gu_to_test gu_to_test.c)
 
-target_link_libraries(gu_to_test galerautils pthread)
+target_link_libraries(gu_to_test galerautils)
 
 target_compile_options(gu_to_test
   PRIVATE

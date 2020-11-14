@@ -38,6 +38,8 @@ target_compile_options(galerautils
   -Wno-conversion
   -Wno-unused-parameter)
 
+target_link_libraries(galerautils ${GALERA_SYSTEM_LIBS})
+
 add_library(galerautilsxx
   gu_vlq.cpp
   gu_datetime.cpp
@@ -70,4 +72,4 @@ target_compile_options(galerautilsxx
   -Wno-conversion
   -Wno-unused-parameter)
 
-target_link_libraries(galerautilsxx galerautils)
+target_link_libraries(galerautilsxx galerautils ${GALERA_SSL_LIBS})

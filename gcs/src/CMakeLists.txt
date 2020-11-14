@@ -83,7 +83,7 @@ target_compile_options(gcs_test
   PRIVATE
   -Wno-conversion)
 
-target_link_libraries(gcs_test gcs gcomm ${GALERA_SSL_LIBS} pthread rt)
+target_link_libraries(gcs_test gcs gcomm)
 
 add_subdirectory(unit_tests)
 

@@ -29,8 +29,7 @@ target_compile_options(garbd
   )
 
 target_link_libraries(garbd gcs4garb gcomm gcache
-  ${Boost_PROGRAM_OPTIONS_LIBRARIES}
-  ${GALERA_SSL_LIBS} pthread rt dl)
+  ${Boost_PROGRAM_OPTIONS_LIBRARIES})
 
 install(TARGETS garbd DESTINATION bin)
 install(FILES

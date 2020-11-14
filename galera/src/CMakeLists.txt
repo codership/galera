@@ -39,7 +39,7 @@ target_compile_options(galera
   )
 
 if (GALERA_STATIC)
-  target_link_libraries(galera gcs ${GALERA_SSL_LIBS} -static-libgcc)
+  target_link_libraries(galera gcs -static-libgcc)
 else()
   target_link_libraries(galera gcs)
 endif()
@@ -151,6 +151,6 @@ else()
   endif()
 endif()
 
-target_link_libraries(galera_smm galera ${GALERA_SSL_LIBS} ${GALERA_LINK_OPTIONS})
+target_link_libraries(galera_smm galera ${GALERA_LINK_OPTIONS})
 
 install(TARGETS galera_smm DESTINATION lib)
