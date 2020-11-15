@@ -52,6 +52,7 @@ docs/build
 CMakeCache.txt
 CPackConfig.cmake
 CPackSourceConfig.cmake
+DartConfiguration.tcl
 **/cmake_install.cmake
 **/CMakeFiles/
 **/CTestTestfile.cmake

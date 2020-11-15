@@ -60,5 +60,5 @@ target_compile_options(ssl_test
   PRIVATE
   -Wno-unused-parameter)
 
-target_link_libraries(ssl_test gcomm ${GALERA_SSL_LIBS} pthread rt)
+target_link_libraries(ssl_test gcomm)
 

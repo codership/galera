@@ -33,6 +33,11 @@ thread_routine (void* arg)
 
 static const int max_threads(16);
 static gu_thread_t threads[max_threads];
+#if defined(GALERA_WITH_VALGRIND)
+static const int iterations(10);
+#else
+static const int iterations(100);
+#endif // GALERA_WITH_VALGRIND
 
 static void
 start_threads(void* arg)
@@ -119,7 +124,7 @@ START_TEST(test_unsafe)
 
     st.set(uuid, WSREP_SEQNO_UNDEFINED, false);
 
-    for (int i = 0; i < 100; ++i)
+    for (int i = 0; i < iterations; ++i)
     {
         start_threads(&st);
         mark_point();
@@ -167,7 +172,7 @@ START_TEST(test_corrupt)
 
     long marks(0), locks(0), writes(0);
 
-    for (int i = 0; i < 100; ++i)
+    for (int i = 0; i < iterations; ++i)
     {
         SavedState st(fname);
         // explicitly overwrite corruption mark.
@@ -210,9 +215,6 @@ START_TEST(test_corrupt)
     unlink (fname);
 }
 END_TEST
-
-#define WAIT_FOR(cond)                                                  \
-    { int count = 1000; while (--count && !(cond)) { usleep (TEST_USLEEP); }}
 
 Suite* saved_state_suite()
 {
