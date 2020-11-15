@@ -34,6 +34,7 @@ option(GALERA_STATIC "Build statically linked binaries" OFF)
 # Developer options and instrumentation.
 option(GALERA_WITH_ASAN "Enable ASAN instrumentation" OFF)
 option(GALERA_WITH_VALGRIND "Optionally run tests with valgrind" OFF)
+option(GALERA_WITH_COVERAGE "Compile with coverage instrumentation" OFF)
 option(GALERA_GCS_SM_DEBUG
   "Enable dumping of send monitor state and history" OFF)
 option(GALERA_GU_DEBUG_MUTEX "Enable mutex debug instrumentation" OFF)
@@ -82,6 +83,7 @@ include(cmake/shared_ptr.cmake)
 include(cmake/unordered.cmake)
 include(cmake/check.cmake)
 include(cmake/memorycheck.cmake)
+include(cmake/coverage.cmake)
 # Keep the maintainer mode as last to avoid feature checks failing
 # in compiler warnings.
 include(cmake/maintainer_mode.cmake)
