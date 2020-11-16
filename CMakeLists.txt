@@ -19,6 +19,7 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/gcomm/src
   ${CMAKE_SOURCE_DIR}/gcache/src
   ${CMAKE_SOURCE_DIR}/gcs/src
+  ${CMAKE_SOURCE_DIR}/wsrep/src
   )
 
 # Options to control compiler options and error behavior.
@@ -95,6 +96,7 @@ add_subdirectory(gcs)
 add_subdirectory(garb)
 add_subdirectory(galera)
 add_subdirectory(scripts/packages)
+add_subdirectory(wsrep/tests)
 
 install(FILES
   ${CMAKE_SOURCE_DIR}/AUTHORS
