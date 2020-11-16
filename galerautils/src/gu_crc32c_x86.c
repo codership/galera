@@ -88,33 +88,16 @@ gu_crc32c_x86_64(gu_crc32c_t state, const void* data, size_t len)
 }
 #endif /* GU_CRC32C_X86_64 */
 
+#include <cpuid.h>
+
 static uint32_t
 x86_cpuid(uint32_t input)
 {
     uint32_t eax, ebx, ecx, edx;
-
-    /* The code below adapted from http://en.wikipedia.org/wiki/CPUID
-     * and seems to work for both PIC and non-PIC cases */
-    __asm__ __volatile__(
-#if defined(GU_CRC32C_X86_64)
-        "pushq %%rbx     \n\t" /* save %rbx */
-#else /* 32-bit */
-        "pushl %%ebx     \n\t" /* save %ebx */
-#endif
-
-        "cpuid              \n\t"
-        "movl %%ebx, %[ebx] \n\t" /* copy %ebx contents into output var */
-
-#if defined(GU_CRC32C_X86_64)
-        "popq %%rbx \n\t"      /* restore %rbx */
-#else /* 32-bit */
-        "popl %%ebx \n\t"      /* restore %ebx */
-#endif
-        : "=a"(eax), [ebx] "=r"(ebx), "=c"(ecx), "=d"(edx)
-        : "a"(input)
-    );
-
-    return ecx;
+    if (__get_cpuid(input, &eax, &ebx, &ecx, &edx))
+        return ecx;
+    else
+        return 0;
 }
 
 gu_crc32c_func_t

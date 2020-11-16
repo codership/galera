@@ -51,7 +51,6 @@ endif()
 target_compile_options(gcs_tests
   PRIVATE
   -Wno-conversion
-  -Wno-effc++
   -Wno-unused-parameter
   )
 

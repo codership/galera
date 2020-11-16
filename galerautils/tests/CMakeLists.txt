@@ -25,10 +25,13 @@ add_executable(gu_tests
   )
 
 # TODO: These should be eventually fixed.
+# - Wno-unused-parameter
+#
+# Suppress -Wself-assign which may emit unwanted warnings when
+# using byte swapping macros in way like k = gu_le64(k).
+#
 target_compile_options(gu_tests
   PRIVATE
-  -Wno-conversion
-  -Wno-sign-conversion
   -Wno-unused-parameter
   )
 
@@ -128,5 +131,4 @@ target_link_libraries(gu_to_test galerautils)
 
 target_compile_options(gu_to_test
   PRIVATE
-  -Wno-conversion
-  -Wno-sign-conversion)
+  -Wno-conversion)

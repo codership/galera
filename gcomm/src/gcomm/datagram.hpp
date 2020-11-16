@@ -95,11 +95,8 @@ namespace gcomm
         static const uint32_t version_mask_  = 0xf0000000;
         static const uint32_t version_shift_ = 28;
 
-        enum
-        {
-            F_CRC32  = 1 << 24, /* backward compatible */
-            F_CRC32C = 1 << 25
-        };
+        static const uint32_t F_CRC32  = 1 << 24; /* backward compatible */
+        static const uint32_t F_CRC32C = 1 << 25;
 
         uint32_t len_;
         uint32_t crc32_;
@@ -234,7 +231,9 @@ namespace gcomm
                 offset_ -= header_len();
             }
             header_offset_ = header_size_;
-            payload_->insert(payload_->end(), old_payload->begin() + offset_,
+            payload_->insert(payload_->end(),
+                             old_payload->begin()
+                             + gu::Buffer::difference_type(offset_),
                              old_payload->end());
             offset_ = 0;
         }
