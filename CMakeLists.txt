@@ -24,8 +24,6 @@ include_directories(
 
 # Options to control compiler options and error behavior.
 option(GALERA_MAINTAINER_MODE "Fail compilation on warnings" OFF)
-option(GALERA_STRICT_BUILD_FLAGS "Enable strict build flags (mainly -Weffc++)"
-  NO)
 
 # Galera library options.
 option(GALERA_WITH_SSL "Compile Galera with SSL" ON)
@@ -98,6 +96,7 @@ add_subdirectory(gcs)
 add_subdirectory(garb)
 add_subdirectory(galera)
 add_subdirectory(scripts/packages)
+add_subdirectory(wsrep/tests)
 
 install(FILES
   ${CMAKE_SOURCE_DIR}/AUTHORS

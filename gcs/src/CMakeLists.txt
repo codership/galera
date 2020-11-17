@@ -44,7 +44,6 @@ endif()
 target_compile_options(gcs
   PRIVATE
   -Wno-conversion
-  -Wno-effc++
   -Wno-unused-parameter
   -Wno-overloaded-virtual
   )
@@ -68,7 +67,6 @@ target_compile_definitions(gcs4garb
 target_compile_options(gcs4garb
   PRIVATE
   -Wno-conversion
-  -Wno-effc++
   -Wno-unused-parameter
   -Wno-overloaded-virtual
   )

@@ -17,4 +17,4 @@ if (HAVE_SUBUNIT_LIB)
   set(CHECK_LIBS ${CHECK_LIBS} subunit)
 endif()
 
-set(GALERA_UNIT_TEST_LIBS ${CHECK_LIBS} m ${GALERA_SSL_LIBS} dl pthread rt)
+set(GALERA_UNIT_TEST_LIBS ${CHECK_LIBS} m)

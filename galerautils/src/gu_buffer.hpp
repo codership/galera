@@ -30,6 +30,7 @@ namespace gu
         typedef std::vector<byte_t> buffer_type;
         typedef buffer_type::iterator iterator;
         typedef buffer_type::const_iterator const_iterator;
+        typedef buffer_type::difference_type difference_type;
         Buffer() : buf_() { }
         Buffer(size_t size) : buf_(size) { }
         template <class InputIt>

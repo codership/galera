@@ -204,13 +204,14 @@ std::ostream& operator << (std::ostream& os, const PrintBase<base, T>& b)
 /*! template to do arithmetics on void and byte pointers, compiler will
  *  catch anything else.
  * @return input type */
-template <typename T>
+template <typename T, typename PtrOffsetType>
 inline T*
-ptr_offset(T* ptr, ptrdiff_t i) { return static_cast<byte_t*>(ptr) + i; }
+ptr_offset(T* ptr, PtrOffsetType i) { return static_cast<byte_t*>(ptr) + i; }
 
-template <typename T>
+template <typename T, typename PtrOffsetType>
 inline const T*
-ptr_offset(const T* ptr, ptrdiff_t i) { return static_cast<const byte_t*>(ptr)+i; }
+ptr_offset(const T* ptr, PtrOffsetType i)
+    { return static_cast<const byte_t*>(ptr)+i; }
 
 } // namespace gu
 
