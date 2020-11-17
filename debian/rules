@@ -1,9 +1,11 @@
 #!/usr/bin/make -f
 
-export DH_VERBOSE=1
-export DEB_BUILD_HARDENING=1
+# Enable Debian Hardening
+# https://wiki.debian.org/Hardening
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 DPKG_EXPORT_BUILDFLAGS = 1
-include /usr/share/dpkg/buildflags.mk
+# Include all defaults, includes buildflags.mk
+include /usr/share/dpkg/default.mk
 
 override_dh_auto_test:
 	dh_auto_test -O--no-parallel -- ARGS=--output-on-failure
