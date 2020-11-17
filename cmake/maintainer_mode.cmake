@@ -30,6 +30,9 @@ if (GALERA_MAINTAINER_MODE)
   GALERA_SET_CXX_WARNING(Wnon-virtual-dtor)
   GALERA_SET_CXX_WARNING(Wmissing-field-initializers)
   GALERA_SET_CXX_WARNING(Wself-assign)
+  # Code contains several real to integer implicit conversions which
+  # are warned about.
+  GALERA_SET_CXX_WARNING(Wno-float-conversion)
 
   # Turn warnings as errors
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
