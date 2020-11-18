@@ -39,7 +39,7 @@ CONTENTS:
 1. WHAT IS MYSQL/GALERA CLUSTER
 
 MySQL/Galera cluster is a synchronous multi-master cluster solution for InnoDB
-engine based on wsrep API (https://launchpad.net/wsrep) which Galera is
+engine based on wsrep API (https://github.com/codership/wsrep-API) which Galera is
 implementation of. It requires MySQL server patched to use this API
 (https://launchpad.net/codership-mysql).
 

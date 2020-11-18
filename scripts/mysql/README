@@ -21,7 +21,7 @@ Licensing Information.
 Please see ./mysql/LICENSE.mysql and ./galera/LICENSE.galera
 
 Project source code can be found at
-wsrep API:    https://launchpad.net/wsrep/
+wsrep API:    https://github.com/codership/wsrep-API/
 MySQL patch:  https://launchpad.net/codership-mysql/
 Galera libs:  https://launchpad.net/galera/
 

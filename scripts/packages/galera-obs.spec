@@ -135,7 +135,7 @@ Provides:      galera, galera3, Percona-XtraDB-Cluster-galera-25
 %description
 Galera is a fast synchronous multimaster wsrep provider (replication engine)
 for transactional databases and similar applications. For more information
-about wsrep API see http://launchpad.net/wsrep. For a description of Galera
+about wsrep API see https://github.com/codership/wsrep-API. For a description of Galera
 replication engine see http://www.codership.com.
 
 %{copyright}
