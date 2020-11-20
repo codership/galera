@@ -2,19 +2,40 @@
 # Copyright (C) 2020 Codership Oy <info@codership.com>
 #
 
-find_library(HAVE_CHECK_LIB check)
-if (NOT HAVE_CHECK_LIB)
-  message(FATAL_ERROR "Check library not found")
+#
+# Some older platforms, most notably Ubuntu/Xenial, ship with
+# two versions of Check library. One compiled with PIC, another
+# without. If found, we prefer check_pic since all of the code
+# is compiled with PIC option.
+#
+find_library(GALERA_HAVE_CHECK_PIC_LIB check_pic)
+if (GALERA_HAVE_CHECK_PIC_LIB)
+  set(GALERA_UNIT_TEST_LIBS check_pic)
+else()
+  find_library(GALERA_HAVE_CHECK_LIB check)
+  if (NOT GALERA_HAVE_CHECK_LIB)
+    message(FATAL_ERROR "Check library not found")
+  endif()
+  set(GALERA_UNIT_TEST_LIBS check)
 endif()
 
-find_library(HAVE_SUBUNIT_LIB subunit)
-if (NOT HAVE_SUBUNIT_LIB)
-  message(STATUS "Subunit library not found")
+find_library(GALERA_HAVE_SUBUNIT_LIB subunit)
+if (GALERA_HAVE_SUBUNIT_LIB)
+  list(APPEND GALERA_UNIT_TEST_LIBS subunit)
 endif()
 
-set(CHECK_LIBS check)
-if (HAVE_SUBUNIT_LIB)
-  set(CHECK_LIBS ${CHECK_LIBS} subunit)
+list(APPEND GALERA_UNIT_TEST_LIBS m)
+list(APPEND GALERA_UNIT_TEST_LIBS ${GALERA_SYSTEM_LIBS})
+
+set(REQUIRED_LIBRARIES_TMP ${CMAKE_REQUIRED_LIBRARIES})
+
+set(CMAKE_REQUIRED_LIBRARIES ${GALERA_UNIT_TEST_LIBS})
+check_c_source_compiles("
+#include <check.h>
+int main() { Suite *s = suite_create(\"test\"); (void)s; return 0; }
+ " GALERA_CHECK_COMPILES)
+if (NOT GALERA_CHECK_COMPILES)
+  message(FATAL_ERROR "Could not compile or link with check library")
 endif()
 
-set(GALERA_UNIT_TEST_LIBS ${CHECK_LIBS} m)
+set(CMAKE_REQUIRED_LIBRARIES ${REQUIRED_LIBRARIES_TMP})
