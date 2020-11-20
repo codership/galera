@@ -1,1 +1,1 @@
-usr/lib/galera/libgalera_smm.so usr/lib/libgalera_smm.so
+usr/lib/libgalera_smm.so usr/lib/galera/libgalera_smm.so

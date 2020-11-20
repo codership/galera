@@ -1,3 +1,5 @@
+dist: bionic
+
 language: cpp
 
 sudo: false
@@ -17,12 +19,13 @@ addons:
 #     https://github.com/travis-ci/travis-ci/issues/3668
 #     for alternatives in container builds
     packages:
+      - check
+      - cmake
+      - debhelper
+      - libasio-dev
+      - libboost-dev
       - libboost-program-options-dev
       - libssl-dev
-      - check
-      - scons
-      - gcc-5
-      - g++-5
 
 script:
   - if [ ${CC} != "clang" ]; then

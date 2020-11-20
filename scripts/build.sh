@@ -35,7 +35,7 @@ Options:
     --dl            set debug level for Scons build (1, implies -c)
     -r|--release    release number
     -m32/-m64       build 32/64-bit binaries for x86
-    -p|--package    build RPM and DEB packages at the end.
+    -p|--package    build RPM packages at the end (DEB not supported).
     --with-spread   configure build with spread backend (implies -c to gcs)
     --source        build source packages
     --sb            skip actual build, use the existing binaries
@@ -92,8 +92,6 @@ elif [ "$OS" == "FreeBSD" ]; then
   EXTRA_SYSROOT=/usr/local
 fi
 
-which dpkg >/dev/null 2>&1 && DEBIAN=${DEBIAN:-1} || DEBIAN=${DEBIAN:-0}
-
 if [ "$OS" == "FreeBSD" ]; then
     CC=${CC:-"gcc48"}
     CXX=${CXX:-"g++48"}
@@ -119,9 +117,9 @@ last_stage="galera"
 gainroot=""
 TARGET=${TARGET:-""} # default target
 
-while test $# -gt 0 
+while test $# -gt 0
 do
-    case $1 in 
+    case $1 in
         --stage)
             initial_stage=$2
             shift
@@ -220,9 +218,9 @@ done
 # check whether sudo accepts -E to preserve environment
 if [ "$PACKAGE" == "yes" ]
 then
-    if [ $DEBIAN ]
+    if which dpkg >/dev/null 2>&1
     then
-        echo "Error: Package build not supported on debian, use dpkg-buildpackage"
+        echo "Error: Package build not supported on Debian, use dpkg-buildpackage"
         exit 1
     fi
     echo "testing sudo"
@@ -380,10 +378,11 @@ pushd "$build_base"
 #fi
 popd
 
-#if [ -z "$RELEASE" ]
-#then
-#    RELEASE=$GALERA_REV
-#fi
+if [ -z "$RELEASE" ]
+then
+    source GALERA_VERSION
+    RELEASE="$GALERA_VERSION_WSREP_API.$GALERA_VERSION_MAJOR.$GALERA_VERSION_MINOR"
+fi
 
 if [ "$CMAKE" == "yes" ] # Build using CMake
 then
@@ -447,5 +446,3 @@ if test "$SOURCE" == "yes"
 then
     build_sources
 fi
-
-

@@ -42,7 +42,7 @@ CONTENTS:
 1. WHAT IS GALERA
 
 Galera is a synchronous multi-master replication engine that provides its
-service through wsrep API (https://launchpad.net/wsrep). It features optimistic
+service through wsrep API (https://github.com/codership/wsrep-API). It features optimistic
 transaction execution and commit time replication and certification of
 writesets.
 
