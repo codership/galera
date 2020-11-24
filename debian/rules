@@ -1,11 +1,11 @@
 #!/usr/bin/make -f
 
-# enable Debian Hardening
-# see: https://wiki.debian.org/Hardening
-export DEB_BUILD_HARDENING = 1
+# Enable Debian Hardening
+# https://wiki.debian.org/Hardening
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 DPKG_EXPORT_BUILDFLAGS = 1
+# Include all defaults, includes buildflags.mk
 include /usr/share/dpkg/default.mk
-include /usr/share/dpkg/buildflags.mk
 
 override_dh_auto_test:
 	dh_auto_test -O--no-parallel -- ARGS=--output-on-failure
@@ -19,4 +19,4 @@ override_dh_installsystemd:
 
 %:
 
-	dh $@ --list-missing --parallel
+	dh $@ --list-missing

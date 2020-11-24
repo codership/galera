@@ -6,13 +6,13 @@ Priority: optional
 Standards-Version: 4.5.0
 Rules-Requires-Root: no
 Build-Depends: check,
+               cmake (>= 2.8),
                debhelper (>= 10),
                libasio-dev,
                libboost-dev (>= 1.41),
                libboost-program-options-dev (>= 1.41),
-               libssl-dev,
-               cmake (>= 2.8)
-Homepage: http://www.galeracluster.com/
+               libssl-dev
+Homepage: https://www.galeracluster.com/
 Vcs-Git: https://github.com/codership/galera.git
 Vcs-Browser: https://github.com/codership/galera
 
@@ -43,8 +43,8 @@ Provides: galera,
 Description: Replication framework for transactional applications
  Galera is a fast synchronous multimaster wsrep provider (replication engine)
  for transactional databases and similar applications. For more information
- about wsrep API see https://launchpad.net/wsrep. For a description of Galera
- replication engine see http://galeracluster.com.
+ about wsrep API see https://github.com/codership/wsrep-API. For a description
+ of Galera replication engine see http://galeracluster.com.
  .
  This package contains the Galera library/plugin.
 
@@ -64,7 +64,7 @@ Depends: lsb-base (>= 3.0-6),
 Description: Galera arbitrator daemon
  Galera is a fast synchronous multimaster wsrep provider (replication engine)
  for transactional databases and similar applications. For more information
- about wsrep API see http://launchpad.net/wsrep. For a description of Galera
- replication engine see http://galeracluster.com.
+ about wsrep API see https://github.com/codership/wsrep-API. For a description
+ of Galera replication engine see http://galeracluster.com.
  .
  This package contains the Galera arbitrator daemon (garbd).
