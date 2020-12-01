@@ -17,7 +17,7 @@
 
 %define name @CMAKE_PROJECT_NAME@
 %define wsrep_api @GALERA_VERSION_WSREP_API@
-%define version @GALERA_VERSION_WSREP_API@.@GALERA_VERSION_MAJOR@.@GALERA_VERSION_MINOR@@GALERA_VERSION_EXTRA@@GALERA_REVISION@
+%{!?version: %define version @GALERA_VERSION_WSREP_API@.@GALERA_VERSION_MAJOR@.@GALERA_VERSION_MINOR@@GALERA_VERSION_EXTRA@@GALERA_REVISION@}
 %{!?release: %define release 1}
 %define copyright Copyright 2007-2020 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
 %define libs %{_libdir}/%{name}
