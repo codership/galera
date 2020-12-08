@@ -29,6 +29,8 @@ option(GALERA_MAINTAINER_MODE "Fail compilation on warnings" OFF)
 option(GALERA_WITH_SSL "Compile Galera with SSL" ON)
 option(GALERA_VERSION_SCRIPT "Limit symbols visible from Galera DSO" ON)
 option(GALERA_STATIC "Build statically linked binaries" OFF)
+option(GALERA_SOURCE
+  "Configure for source package only, skipping build configuration" OFF)
 
 # Developer options and instrumentation.
 option(GALERA_WITH_ASAN "Enable ASAN instrumentation" OFF)
@@ -60,6 +62,11 @@ endif()
 # Determine version first to have it near the top of build log.
 include(cmake/version.cmake)
 include(cmake/package.cmake)
+
+# Do not execute other configuration steps if building source only.
+if (GALERA_SOURCE)
+  return()
+endif()
 
 # Source compiler/OS settings first as it sets used C/C++ standards,
 # common compiler flags and include/link paths.
