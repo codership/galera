@@ -4,7 +4,7 @@
 
 message(STATUS "Checking for hardware CRC support for ${CMAKE_SYSTEM_PROCESSOR}")
 
-if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL x86_64)
+if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL x86_64 OR ${CMAKE_SYSTEM_PROCESSOR} STREQUAL amd64)
   #
   # CPU feature detection requires __get_cpuid().
   #
