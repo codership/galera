@@ -26,21 +26,30 @@ namespace gcache
     bool
     GCache::discard_seqno (seqno_t seqno)
     {
-        assert(mtx.locked() && mtx.owned());
-
-        /* if we can't complete the operation, let's not even start */
-        if (seqno >= seqno_locked) return false;
-
 #ifndef NDEBUG
-        seqno_t begin(0);
+        seqno_t const begin(params.debug() ?
+                            (seqno2ptr.empty() ?
+                             seqno2ptr.index_begin() : SEQNO_NONE) : SEQNO_NONE);
         if (params.debug())
         {
-            begin = (seqno2ptr.empty() ? seqno2ptr.index_begin() : SEQNO_NONE);
             assert(begin > 0);
             log_info << "GCache::discard_seqno(" << begin << " - "
                      << seqno << ")";
         }
 #endif
+        /* if we can't complete the operation, let's not even start */
+        if (seqno >= seqno_locked)
+        {
+#ifndef NDEBUG
+            if (params.debug())
+            {
+                log_info << "GCache::discard_seqno(" << begin << " - " << seqno
+                         << "): " << seqno_locked << " is locked, bailing out.";
+            }
+#endif
+            return false;
+        }
+
         while (seqno2ptr.index_begin() <= seqno && !seqno2ptr.empty())
         {
             BufferHeader* const bh(ptr2BH(seqno2ptr.front()));

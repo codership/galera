@@ -6,21 +6,31 @@ then
     exit -1
 fi
 
-MYSQL=""
+MYSQL_VERSION_FILE=""
+if test -f "$MYSQL_SRC/VERSION"
+then
+    MYSQL_VERSION_FILE="$MYSQL_SRC/VERSION"
+else
+    if test -f "$MYSQL_SRC/MYSQL_VERSION"
+    then
+        MYSQL_VERSION_FILE="$MYSQL_SRC/MYSQL_VERSION"
+    fi
+fi
 
-use_mysql_5.5_sources()
+extract_versions()
 {
-    export MYSQL_MAJOR_VER=`grep MYSQL_VERSION_MAJOR $MYSQL_SRC/VERSION | cut -d = -f 2`
-    export MYSQL_MINOR_VER=`grep MYSQL_VERSION_MINOR $MYSQL_SRC/VERSION | cut -d = -f 2`
-    export MYSQL_PATCH_VER=`grep MYSQL_VERSION_PATCH $MYSQL_SRC/VERSION | cut -d = -f 2`
+    export MYSQL_MAJOR_VER=`grep MYSQL_VERSION_MAJOR $MYSQL_VERSION_FILE | cut -d = -f 2`
+    export MYSQL_MINOR_VER=`grep MYSQL_VERSION_MINOR $MYSQL_VERSION_FILE | cut -d = -f 2`
+    export MYSQL_PATCH_VER=`grep MYSQL_VERSION_PATCH $MYSQL_VERSION_FILE | cut -d = -f 2`
     MYSQL_MAJOR=$MYSQL_MAJOR_VER.$MYSQL_MINOR_VER
     export MYSQL_MAJOR # for DEB build
     MYSQL_VER=$MYSQL_MAJOR.$MYSQL_PATCH_VER
 }
 
-if test -f "$MYSQL_SRC/VERSION"
+MYSQL=""
+if test -n "$MYSQL_VERSION_FILE"
 then
-    use_mysql_5.5_sources
+    extract_versions
     if grep -q -i "mariadb" $MYSQL_SRC/CMakeLists.txt
     then
         export MYSQL="mariadb"
@@ -32,7 +42,7 @@ fi
 if [ -z "$MYSQL" ]
 then
     echo "Unrecognized MySQL/MariaDB version in MYSQL_SRC path. "\
-"MySQL versions 5.5, 5.6, 5.7 and MariaDB version 10.4 are supported. "\
+"MySQL versions 5.5, 5.6, 5.7, 8.0 and MariaDB version 10.4, 10.5 are supported. "\
 "Can't continue."
     exit -1
 fi
@@ -446,9 +456,9 @@ then
 
         if [ "$MYSQL" == "mysql" ] # remove this distinction when MySQL
         then                       # fixes its SSL support
-            BUILD_OPT+="-DWITH_SSL=yes"
+            BUILD_OPT+=" -DWITH_SSL=yes"
         else
-            BUILD_OPT+="-DWITH_SSL=system"
+            BUILD_OPT+=" -DWITH_SSL=system"
         fi
 
         if [ "$MYSQL" = "mysql" ]

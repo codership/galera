@@ -376,7 +376,6 @@ pushd "$build_base"
     # trim spaces (sed is not working on Solaris, so using bash built-in)
     GALERA_REV=${GALERA_REV//[[:space:]]/}
 #fi
-popd
 
 if [ -z "$RELEASE" ]
 then
@@ -391,7 +390,9 @@ then
         echo "WARN: TARGET=$TARGET ignored by CMake build"
     [ -n "$RELEASE"       ] && \
         echo "WARN: RELEASE=$RELEASE ignored by CMake build"
-    [ "$DEBUG" == "yes"   ] && cmake_args="$cmake_args -DCMAKE_BUILD_TYPE=Debug"
+    [ "$DEBUG" == "yes"   ] && \
+        cmake_args="$cmake_args -DCMAKE_BUILD_TYPE=Debug" || \
+        cmake_args="$cmake_args -DCMAKE_BUILD_TYPE=RelWithDebInfo"
     [ -n "$EXTRA_SYSROOT" ] && \
         echo "EXTRA_SYSROOT=$EXTRA_SYSROOT ignored by CMake build"
 
@@ -404,7 +405,7 @@ then
 
     if [ "$SKIP_BUILD" != "yes" ]
     then
-        make -j $JOBS
+        make -j $JOBS VERBOSE=1
     fi
 
     if [ $RUN_TESTS ]
@@ -446,3 +447,5 @@ if test "$SOURCE" == "yes"
 then
     build_sources
 fi
+
+popd # $build_base
