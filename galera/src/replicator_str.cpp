@@ -406,11 +406,8 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
     wsrep_seqno_t rcode (0);
     bool join_now = true;
 
-    if (streq->ist_len())
+    if (not skip_sst)
     {
-        IST_request istr;
-        get_ist_request(streq, &istr);
-
         struct sgl
         {
             gcache::GCache& gcache_;
@@ -421,68 +418,74 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
         }
         seqno_lock_guard(gcache_);
 
-        if (istr.uuid() == state_uuid_ && istr.last_applied() >= 0)
+        if (streq->ist_len())
         {
-            log_info << "IST request: " << istr;
+            IST_request istr;
+            get_ist_request(streq, &istr);
 
-            wsrep_seqno_t const first
-                ((str_proto_ver < 3 || cc_lowest_trx_seqno_ == 0) ?
-                 istr.last_applied() + 1 :
-                 std::min(cc_lowest_trx_seqno_, istr.last_applied()+1));
-
-            try
+            if (istr.uuid() == state_uuid_ && istr.last_applied() >= 0)
             {
-                gcache_.seqno_lock(first);
-                seqno_lock_guard.unlock_ = true;
-            }
-            catch(gu::NotFound& nf)
-            {
-                log_info << "IST first seqno " << istr.last_applied() + 1
-                         << " not found from cache, falling back to SST";
-                // @todo: close IST channel explicitly
-                goto full_sst;
-            }
+                log_info << "IST request: " << istr;
 
-            if (streq->sst_len()) // if joiner is waiting for SST, notify it
-            {
-                wsrep_gtid_t const state_id =
-                    { istr.uuid(), istr.last_applied() };
+                wsrep_seqno_t const first
+                    ((str_proto_ver < 3 || cc_lowest_trx_seqno_ == 0) ?
+                    istr.last_applied() + 1 :
+                    std::min(cc_lowest_trx_seqno_, istr.last_applied()+1));
 
-                rcode = donate_sst(recv_ctx, *streq, state_id, true);
-
-                // we will join in sst_sent.
-                join_now = false;
-            }
-
-            if (rcode >= 0)
-            {
                 try
                 {
-                    ist_senders_.run(config_,
-                                     istr.peer(),
-                                     first,
-                                     cc_seqno_,
-                                     cc_lowest_trx_seqno_,
-                                     /* Historically IST messages versioned
-                                      * with the global replicator protocol.
-                                      * Need to keep it that way for backward
-                                      * compatibility */
-                                     protocol_version_);
-                    // seqno will be unlocked when sender exists
-                    seqno_lock_guard.unlock_ = false;
+                    gcache_.seqno_lock(first);
+                    seqno_lock_guard.unlock_ = true;
                 }
-                catch (gu::Exception& e)
+                catch(gu::NotFound& nf)
                 {
-                    log_error << "IST failed: " << e.what();
-                    rcode = -e.get_errno();
+                    log_info << "IST first seqno " << istr.last_applied() + 1
+                             << " not found from cache, falling back to SST";
+                    // @todo: close IST channel explicitly
+                    goto full_sst;
                 }
-            }
-            else
-            {
-                log_error << "Failed to bypass SST";
-            }
 
-            goto out;
+                if (streq->sst_len()) // if joiner is waiting for SST, notify it
+                {
+                    wsrep_gtid_t const state_id =
+                        { istr.uuid(), istr.last_applied() };
+
+                    rcode = donate_sst(recv_ctx, *streq, state_id, true);
+
+                    // we will join in sst_sent.
+                    join_now = false;
+                }
+
+                if (rcode >= 0)
+                {
+                    try
+                    {
+                        ist_senders_.run(config_,
+                                         istr.peer(),
+                                         first,
+                                         cc_seqno_,
+                                         cc_lowest_trx_seqno_,
+                                         /* Historically IST messages versioned
+                                          * with the global replicator protocol.
+                                          * Need to keep it that way for backward
+                                          * compatibility */
+                                         protocol_version_);
+                        // seqno will be unlocked when sender exists
+                        seqno_lock_guard.unlock_ = false;
+                    }
+                    catch (gu::Exception& e)
+                    {
+                        log_error << "IST failed: " << e.what();
+                        rcode = -e.get_errno();
+                    }
+                }
+                else
+                {
+                    log_error << "Failed to bypass SST";
+                }
+
+                goto out;
+            }
         }
 
     full_sst:
@@ -570,12 +573,9 @@ void ReplicatorSMM::process_state_req(void*       recv_ctx,
                 }
             }
 
-            if (not skip_sst)
-            {
-                rcode = donate_sst(recv_ctx, *streq, state_id, false);
-                // we will join in sst_sent.
-                join_now = false;
-            }
+            rcode = donate_sst(recv_ctx, *streq, state_id, false);
+            // we will join in sst_sent.
+            join_now = false;
         }
         else
         {
