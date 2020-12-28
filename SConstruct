@@ -159,7 +159,7 @@ static_ssl = ARGUMENTS.get('static_ssl', None)
 install = ARGUMENTS.get('install', None)
 version_script = int(ARGUMENTS.get('version_script', 1))
 
-GALERA_VER = ARGUMENTS.get('version', '4.6')
+GALERA_VER = ARGUMENTS.get('version', '4.7')
 GALERA_REV = ARGUMENTS.get('revno', 'XXXX')
 
 # Attempt to read from file if not given
