@@ -16,12 +16,12 @@ else()
   if (NOT GALERA_HAVE_CHECK_LIB)
     message(FATAL_ERROR "Check library not found")
   endif()
-  set(GALERA_UNIT_TEST_LIBS check)
+  set(GALERA_UNIT_TEST_LIBS "${GALERA_HAVE_CHECK_LIB}")
 endif()
 
 find_library(GALERA_HAVE_SUBUNIT_LIB subunit)
 if (GALERA_HAVE_SUBUNIT_LIB)
-  list(APPEND GALERA_UNIT_TEST_LIBS subunit)
+  list(APPEND GALERA_UNIT_TEST_LIBS "${GALERA_HAVE_SUBUNIT_LIB}")
 endif()
 
 list(APPEND GALERA_UNIT_TEST_LIBS m)
@@ -29,7 +29,7 @@ list(APPEND GALERA_UNIT_TEST_LIBS ${GALERA_SYSTEM_LIBS})
 
 set(REQUIRED_LIBRARIES_TMP ${CMAKE_REQUIRED_LIBRARIES})
 
-set(CMAKE_REQUIRED_LIBRARIES ${GALERA_UNIT_TEST_LIBS})
+list(APPEND CMAKE_REQUIRED_LIBRARIES ${GALERA_UNIT_TEST_LIBS})
 check_c_source_compiles("
 #include <check.h>
 int main() { Suite *s = suite_create(\"test\"); (void)s; return 0; }
