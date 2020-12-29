@@ -34,8 +34,22 @@ static const char* get_provider()
 int wsrep_load_unload()
 {
     wsrep_t* wsrep = 0;
+    char expected_version[128] = {0};
     FAIL_UNLESS(wsrep_load(get_provider(), &wsrep, &log_fn) == 0);
     FAIL_UNLESS(wsrep != NULL);
+    if (strlen(GALERA_GIT_REVISION) == 0)
+    {
+        fprintf(stderr, "Galera git revision not given\n");
+        abort();
+    }
+    snprintf(expected_version, sizeof(expected_version) - 1,
+             "%s(r%s)", GALERA_VERSION, GALERA_GIT_REVISION);
+    if (strcmp(wsrep->provider_version, expected_version))
+    {
+        fprintf(stderr, "Provider version string '%s' not expected '%s'\n",
+                wsrep->provider_version, expected_version);
+        abort();
+    }
     wsrep_unload(wsrep);
     return 0;
 }

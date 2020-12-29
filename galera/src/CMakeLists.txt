@@ -53,7 +53,7 @@ add_library(galera_smm_static
 target_compile_definitions(galera_smm_static
   PRIVATE
   -DGALERA_VER="${GALERA_VERSION}"
-  -DGALERA_REV="${GALERA_REVISION}"
+  -DGALERA_REV="${GALERA_GIT_REVISION}"
   -DGALERA_MULTIMASTER
   )
 
@@ -88,7 +88,7 @@ target_include_directories(galera_smm
 target_compile_definitions(galera_smm
   PRIVATE
   -DGALERA_VER="${GALERA_VERSION}"
-  -DGALERA_REV="${GALERA_REVISION}"
+  -DGALERA_REV="${GALERA_GIT_REVISION}"
   -DGALERA_MULTIMASTER
   )
 
