@@ -56,5 +56,6 @@ DartConfiguration.tcl
 **/CTestTestfile.cmake
 Testing/
 **/Makefile
+GALERA_GIT_REVISION
 GALERA_REVISION
 *~
