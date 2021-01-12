@@ -39,7 +39,9 @@ crc32c_env.Append(CPPFLAGS = crc32c_cppflags)
 crc32c_objs = crc32c_env.SharedObject(['gu_crc32c_test.c'])
 
 # Path to certificates used in SSL tests.
-os.environ['GU_ASIO_TEST_CERT_DIR'] = Dir('#').abspath + '/tests/conf'
+asio_test_cert_dir = '\\"' + Dir('#').abspath + '/tests/conf' + '\\"'
+env.Append(CPPFLAGS = ' -DGU_ASIO_TEST_CERT_DIR=' + asio_test_cert_dir)
+
 
 gu_tests = env.Program(target = 'gu_tests',
                        source = gu_tests_objs + crc32c_objs)

@@ -709,6 +709,7 @@ gu::AsioAcceptorReact::AsioAcceptorReact(AsioIoService& io_service,
     , acceptor_(io_service_.impl().native())
     , scheme_(scheme)
     , listening_()
+    , engine_()
 { }
 
 void gu::AsioAcceptorReact::open(const gu::URI& uri)
