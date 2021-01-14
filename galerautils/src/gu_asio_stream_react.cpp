@@ -799,6 +799,17 @@ catch (const asio::system_error& e)
         << "', asio error '" << e.what() << "'";
 }
 
+unsigned short gu::AsioAcceptorReact::listen_port() const try
+{
+    return acceptor_.local_endpoint().port();
+}
+catch (const asio::system_error& e)
+{
+    gu_throw_error(e.code().value())
+        << "failed to read listen port "
+        << "', asio error '" << e.what() << "'";
+}
+
 void gu::AsioAcceptorReact::set_receive_buffer_size(size_t size)
 {
     assert(not listening_);

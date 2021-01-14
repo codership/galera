@@ -33,21 +33,16 @@ static void set_tcp_defaults (gu::URI* uri)
 
 static bool check_tcp_uri(const gu::URI& uri)
 {
-    return (uri.get_scheme() == gu::scheme::tcp
-#ifdef GALERA_HAVE_SSL
-            || uri.get_scheme() == gu::scheme::ssl
-#endif // GALERA_HAVE_SSL
-        );
+    return (uri.get_scheme() == gu::scheme::tcp ||
+            uri.get_scheme() == gu::scheme::ssl);
 }
 
 static std::string get_scheme(bool use_ssl)
 {
-#ifdef GALERA_HAVE_SSL
     if (use_ssl == true)
     {
         return gu::scheme::ssl;
     }
-#endif // GALERA_HAVE_SSL
     return gu::scheme::tcp;
 }
 
@@ -197,12 +192,10 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri,
 
     listen_addr_ = gu::net::resolve(listen_addr_).to_string();
     // resolving sets scheme to tcp, have to rewrite for ssl
-#ifdef GALERA_HAVE_SSL
     if (use_ssl_ == true)
     {
         listen_addr_.replace(0, 3, gu::scheme::ssl);
     }
-#endif // GALERA_HAVE_SSL
     std::set<std::string>::iterator iaself(initial_addrs_.find(listen_addr_));
     if (iaself != initial_addrs_.end())
     {
@@ -295,13 +288,11 @@ void gcomm::GMCast::set_initial_addr(const gu::URI& uri)
             log_warn << "Failed to resolve " << initial_uri;
             continue;
         }
-#ifdef GALERA_HAVE_SSL
         // resolving sets scheme to tcp, have to rewrite for ssl
         if (use_ssl_ == true)
         {
             initial_addr.replace(0, 3, gu::scheme::ssl);
         }
-#endif // GALERA_HAVE_SSL
 
         if (check_tcp_uri(initial_addr) == false)
         {

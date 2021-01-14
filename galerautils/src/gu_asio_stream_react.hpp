@@ -239,6 +239,7 @@ namespace gu
             GALERA_OVERRIDE;
         virtual std::shared_ptr<AsioSocket> accept() GALERA_OVERRIDE;
         virtual std::string listen_addr() const GALERA_OVERRIDE;
+        virtual unsigned short listen_port() const GALERA_OVERRIDE;
         virtual void set_receive_buffer_size(size_t) GALERA_OVERRIDE;
         virtual size_t get_receive_buffer_size() GALERA_OVERRIDE;
         virtual void set_send_buffer_size(size_t) GALERA_OVERRIDE;

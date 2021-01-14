@@ -28,7 +28,6 @@ gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
     io_service_(conf),
     timer_handler_(std::make_shared<TimerHandler>(*this)),
     timer_(io_service_),
-    // ssl_context_(io_service_, asio::ssl::context::sslv23),
     mtu_(1 << 15),
     checksum_(NetHeader::checksum_type(
                   conf.get<int>(gcomm::Conf::SocketChecksum,

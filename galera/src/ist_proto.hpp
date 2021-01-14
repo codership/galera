@@ -676,7 +676,7 @@ namespace galera
                                 gu_throw_error(EPROTO)
                                     << "error reading write set data, "
                                     << "expected " << wsize
-                                    << " got " << r;
+                                    << " bytes, got " << r << " bytes";
                             }
 
                             wbuf = ptr;

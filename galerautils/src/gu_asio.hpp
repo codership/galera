@@ -28,9 +28,7 @@ namespace gu
     {
         const std::string tcp("tcp"); /// TCP scheme
         const std::string udp("udp"); /// UDP scheme
-#ifdef GALERA_HAVE_SSL
         const std::string ssl("ssl"); /// SSL scheme
-#endif // GALERA_HAVE_SSL
         const std::string def("tcp"); /// default scheme (TCP)
     }
 
@@ -590,6 +588,7 @@ namespace gu
                                   const std::shared_ptr<AsioStreamEngine>& engine = nullptr) = 0;
         virtual std::shared_ptr<AsioSocket> accept() = 0;
         virtual std::string listen_addr() const = 0;
+        virtual unsigned short listen_port() const = 0;
 
         /**
          * Set receive buffer size for the acceptor. This must be called

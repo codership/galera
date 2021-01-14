@@ -295,7 +295,12 @@ galera::ist::Receiver::prepare(wsrep_seqno_t const first_seqno,
         acceptor_ = io_service_.make_acceptor(uri_bind);
         acceptor_->listen(uri_bind);
         // read recv_addr_ from acceptor_ in case zero port was specified
-        recv_addr_ = acceptor_->listen_addr();
+        gu::URI const uri_addr(recv_addr_);
+        recv_addr_ = uri_addr.get_scheme()
+            + "://"
+            + uri_addr.get_host()
+            + ":"
+            + gu::to_string(acceptor_->listen_port());
     }
     catch (const gu::Exception& e)
     {
