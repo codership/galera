@@ -188,6 +188,7 @@ namespace gcomm
         static const int  max_version_ = GCOMM_GMCAST_MAX_VERSION;
         uint8_t           segment_;
         UUID              my_uuid_;
+        bool              dynamic_socket_;
         bool              use_ssl_;
         std::string       group_name_;
         std::string       listen_addr_;

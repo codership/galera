@@ -165,7 +165,12 @@ static void IST_fix_addr_scheme(const gu::Config& conf, std::string& addr)
         try
         {
             std::string ssl_key = conf.get(gu::conf::ssl_key);
-            if (ssl_key.length() != 0)
+            bool dynamic_socket = false;
+            if (conf.has(gu::conf::socket_dynamic))
+            {
+                dynamic_socket = conf.get<bool>(gu::conf::socket_dynamic, false);
+            }
+            if (ssl_key.length() != 0 && not dynamic_socket)
             {
                 addr.insert(0, "ssl://");
                 return;

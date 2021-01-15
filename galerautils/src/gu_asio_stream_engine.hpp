@@ -65,6 +65,11 @@ namespace gu
         AsioStreamEngine& operator=(const AsioStreamEngine&) = delete;
 
         /**
+         * Return scheme string corresponding to underlying engine.
+         */
+        virtual std::string scheme() const = 0;
+
+        /**
          * Used to assign file descriptor to engines which were
          * dependency injected when AsioStreamReact was constructured.
          * This should be never called for engines which were created
@@ -109,7 +114,8 @@ namespace gu
          * @param fd File descriptor associated to the stream.
          */
         static std::shared_ptr<AsioStreamEngine> make(
-            AsioIoService&, const std::string& scheme, int fd);
+            AsioIoService&, const std::string& scheme, int fd,
+            bool non_blocking);
 
     protected:
         AsioStreamEngine() { }

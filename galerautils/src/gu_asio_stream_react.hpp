@@ -86,7 +86,7 @@ namespace gu
         friend class AsioAcceptorReact;
 
         void assign_addresses();
-        void prepare_engine();
+        void prepare_engine(bool non_blocking);
         // Start async read if not in progress. May be called several times
         // without handling read in between.
         template <typename Fn, typename ...FnArgs>

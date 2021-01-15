@@ -33,6 +33,12 @@ namespace gu
         const std::string def("tcp"); /// default scheme (TCP)
     }
 
+    namespace conf
+    {
+        // Enable dynamic socket support
+        const std::string socket_dynamic("socket.dynamic");
+    }
+
 #ifdef GALERA_HAVE_SSL
     //
     // SSL
@@ -633,6 +639,19 @@ namespace gu
         void handle_signal(const gu::Signals::SignalType&);
 
         /**
+         * Is dynamic socket enabled
+         */
+        bool dynamic_socket_enabled() const
+        {
+            return dynamic_socket_;
+        }
+
+        /**
+         * Is SSL enabled and configured
+         */
+        bool ssl_enabled() const;
+
+        /**
          * Load crypto context.
          */
         void load_crypto_context();
@@ -709,6 +728,7 @@ namespace gu
         std::unique_ptr<Impl> impl_;
         const gu::Config& conf_;
         gu::Signals::signal_connection signal_connection_;
+        bool dynamic_socket_;
     };
 
     class AsioSteadyTimerHandler

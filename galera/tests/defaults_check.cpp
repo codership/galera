@@ -109,6 +109,7 @@ static const char* Defaults[] =
     "socket.checksum",             "2",
     "socket.recv_buf_size",        "auto",
     "socket.send_buf_size",        "auto",
+//  "socket.dynamic",              no default,
 //  "socket.ssl",                  no default,
 //  "socket.ssl_cert",             no default,
 //  "socket.ssl_cipher",           no default,

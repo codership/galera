@@ -1223,6 +1223,10 @@ class MockStreamEngine : public gu::AsioStreamEngine
 public:
     MockStreamEngine();
 
+    std::string scheme() const GALERA_OVERRIDE
+    {
+        return "mock";
+    };
     void assign_fd(int fd) GALERA_OVERRIDE
     {
         fd_ = fd;

@@ -13,6 +13,8 @@
 #include "gu_throw.hpp"
 #include "gu_compiler.hpp"
 
+#include "gu_datetime.hpp"
+
 #include <unistd.h>
 #include <cassert>
 
@@ -26,6 +28,11 @@ public:
         : fd_(fd)
         , last_error_()
     { }
+
+    virtual std::string scheme() const GALERA_OVERRIDE
+    {
+        return gu::scheme::tcp;
+    }
 
     virtual enum op_status client_handshake() GALERA_OVERRIDE
     {
@@ -118,6 +125,11 @@ public:
 
     AsioSslStreamEngine(const AsioSslStreamEngine&) = delete;
     AsioSslStreamEngine& operator=(const AsioSslStreamEngine&) = delete;
+
+    virtual std::string scheme() const GALERA_OVERRIDE
+    {
+        return gu::scheme::ssl;
+    }
 
     virtual enum op_status client_handshake() GALERA_OVERRIDE
     {
@@ -296,19 +308,337 @@ private:
 
 #endif // GALERA_HAVE_SSL
 
+/*
+ * DynamicStreamEngine is used to choose either TCP or SSL for socket communication.
+ * Following condition should be true: Ts(server timeout) > Tc(client timeout).  
+ *
+ * Following diagrams show combinations possible with TCP/SSL/Dynamic stream engine. 
+ *
+ * 1. CLIENT - dynamic, SERVER - standard
+ *
+ *       C(d)           S(s/TCP)
+ * |------|   <--TCP--   |
+ * |  Tc  |              |
+ * |----->|              |
+ *        |              |
+ *
+ * 2. CLIENT - dynamic (with SSL), SERVER - standard (with SSL)
+ *
+ *       C(d)           S(s/TLS)
+ * |------|              |
+ * |  Tc  |              |
+ * |----->|              |
+ *        |   --SSL-->   |
+ * |------|   <--SSL--   |
+ * |  Tc  |              | * (A)
+ * |----->|              |
+ *
+ * (A) Packet is received on second client timeout period, it should be SSL response packet
+ *
+ * 3. CLIENT - standard, SERVER - dynamic (with SSL)
+ *
+ *       C(s/TLS)       S(d)
+ *       |   --SSL-->   |------|
+ *       |              |      |
+ *       |              |  Ts  |
+ *       |              |      |
+ *       |              |<-----|
+ *       |              |
+ *
+ * 4. CLIENT - standard, SERVER - dynamic
+ *
+ *       C(s/TCP)       S(d)
+ *       |              |------|
+ *       |              |      |
+ *       |              |  Ts  |
+ *       |              |      |
+ *       |              |<-----|
+ *       |              |------|
+ *       |              |      |
+ *       |              |  Ts  |
+ *       |              |      |
+ *       |              |<-----|
+ *       |   <--TCP--   |
+ *       |              |
+ *
+ * 5. CLIENT - dynamic (with SSL), SERVER - dynamic (with SSL)
+ *
+ *       C(d)           S(d)
+ * |------|              |------|
+ * |  Tc  |              |      |
+ * |----->|              |  Ts  |
+ *        |   --SSL-->   |      | * (A)
+ * |------|   <--SSL--   |<-----| * (B)
+ * |  Tc  |              |
+ * |----->|              |
+ *
+ * (A) Packet is received on first server timeout, it should be SSL request packet,
+       we support SSL so we'll send SSL response
+ * (B) Packet is received on second client timeout, it should be SSL response packet
+ *
+ * 6. CLIENT - dynamic (with SSL), SERVER - dynamic (without SSL)
+ *
+ *       C(d)           S(d)
+ * |------|              |------|
+ * |  Tc  |              |      |
+ * |----->|              |  Ts  |
+ *        |   --SSL-->   |      | * (A)
+ * |------|              |<-----|
+ * |  Tc  |              |<-----|
+ * |----->|              |      |
+ *        |              |  Ts  |
+ *        |              |      |
+ *        |              |<-----|
+ *        |   <--TCP--   |
+ *        |   --TCP-->   |
+ *
+ * (A) Packet is received on first timeout, it should be SSL request packet, but we don't
+ *     support SSL so we should timeout
+ * (B) Nothing is received on second timeout period, so it should be TCP packet
+ *
+ * 7. CLIENT - dynamic (without SSL), SERVER - dynamic (with/without SSL)
+ *
+ *       C(d)           S(d)
+ * |------|              |------|
+ * |  Tc  |              |      |
+ * |----->|              |  Ts  |
+ *        |              |      |
+ *        |              |<-----|
+ *        |              |<-----|
+ *        |              |      |
+ *        |              |  Ts  |
+ *        |              |      |
+ *        |              |<-----|
+ *        |   <--TCP--   |        * (A)
+ *        |   --TCP-->   |
+ *
+ * (A) Packet is on client received after timeout period, SSL CLIENT HELLO was not
+ *     sent, so it should be TCP packet
+ *
+ */
+
+class AsioDynamicStreamEngine : public gu::AsioStreamEngine
+{
+public:
+    AsioDynamicStreamEngine(gu::AsioIoService& io_service, int fd, 
+                            bool non_blocking, bool encrypted_protocol)
+        : client_timeout_(500 * gu::datetime::MSec)
+        , server_timeout_(750 * gu::datetime::MSec)
+        , fd_(fd)
+        , io_service_(io_service)
+        , engine_(std::make_shared<AsioTcpStreamEngine>(fd_))
+        , non_blocking_(non_blocking)
+        , have_encrypted_protocol_(encrypted_protocol)
+        , timer_check_done_(false)
+        , client_encrypted_message_sent_(false)
+        , client_encrypted_message_sent_ts_(gu::datetime::Date::zero())
+    {
+    }
+
+    ~AsioDynamicStreamEngine()
+    {
+    }
+
+    AsioDynamicStreamEngine(const AsioDynamicStreamEngine&) = delete;
+    AsioDynamicStreamEngine& operator=(const AsioDynamicStreamEngine&) = delete;
+
+    virtual std::string scheme() const GALERA_OVERRIDE
+    {
+        return engine_->scheme();
+    }
+
+    virtual enum op_status client_handshake() GALERA_OVERRIDE
+    {
+        if (not timer_check_done_)
+        {
+            if (not client_encrypted_message_sent_)
+            {
+                bool received = socket_poll(client_timeout_.get_nsecs() / gu::datetime::MSec);
+                if (have_encrypted_protocol_ && not received)
+                {
+                    engine_.reset();
+                    engine_ = std::make_shared<AsioSslStreamEngine>(io_service_, fd_);
+                    client_encrypted_message_sent_ = true;
+                    client_encrypted_message_sent_ts_ = gu::datetime::Date::monotonic();
+                    if (not non_blocking_)
+                    {
+                        fcntl(fd_, F_SETFL, fcntl(fd_, F_GETFL, 0) | O_NONBLOCK);
+                    }
+                    op_status result = success;
+                    bool tcp_engine_switch = false;
+                    while(true)
+                    {
+                        result = engine_->client_handshake() ;
+                        if (non_blocking_) 
+                        {
+                            return result;
+                        }
+                        if (result == AsioStreamEngine::success ||
+                            result == AsioStreamEngine::error)
+                        {
+                            break;
+                        }
+                        received = socket_poll(client_timeout_.get_nsecs() / gu::datetime::MSec);
+                        if (not received)
+                        {
+                            engine_.reset();
+                            engine_ = std::make_shared<AsioTcpStreamEngine>(fd_);
+                            tcp_engine_switch = true;
+                            break;
+                        }
+                    }
+                    if (not non_blocking_)
+                    {
+                        fcntl(fd_, F_SETFL, fcntl(fd_, F_GETFL, 0) ^ O_NONBLOCK);
+                        if (not tcp_engine_switch)
+                        {
+                            return result;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                gu::datetime::Date now(gu::datetime::Date::monotonic());
+                if (client_encrypted_message_sent_ts_ + client_timeout_ < now)
+                {
+                    engine_.reset();
+                    engine_ = std::make_shared<AsioTcpStreamEngine>(fd_);
+                }
+            }
+            timer_check_done_ = true;
+        }
+        return engine_->client_handshake();
+    }
+
+    virtual enum op_status server_handshake() GALERA_OVERRIDE
+    {
+        if (not timer_check_done_)
+        {
+            bool received = socket_poll(server_timeout_.get_nsecs() / gu::datetime::MSec);
+            int bytes_available;
+            ioctl(fd_, FIONREAD, &bytes_available);
+            if (have_encrypted_protocol_ && received && bytes_available)
+            {
+                engine_.reset();
+                engine_ = std::make_shared<AsioSslStreamEngine>(io_service_, fd_);
+                timer_check_done_ = true;
+                return engine_->server_handshake();
+            }
+            else if (not have_encrypted_protocol_)
+            {
+                if (received && bytes_available)
+                {
+                    std::vector<char> pending_data(bytes_available);
+                    engine_->read(pending_data.data(), bytes_available);
+                }
+                socket_poll(server_timeout_.get_nsecs() / gu::datetime::MSec);
+            }
+            timer_check_done_ = true;
+        }
+        return engine_->server_handshake();
+    }
+
+    virtual void shutdown() GALERA_OVERRIDE
+    {
+        engine_->shutdown();
+        timer_check_done_ = false;
+        client_encrypted_message_sent_ = false;
+        engine_ = std::make_shared<AsioTcpStreamEngine>(fd_);
+    }
+
+    virtual op_result read(void* buf, size_t max_count) GALERA_OVERRIDE
+    {
+        return engine_->read(buf, max_count);
+    }
+
+    virtual op_result write(const void* buf, size_t count) GALERA_OVERRIDE
+    {
+        return engine_->write(buf, count);
+    }
+
+    virtual gu::AsioErrorCode last_error() const GALERA_OVERRIDE
+    {
+        return engine_->last_error();
+    }
+
+private:
+    bool socket_poll(long msec)
+    {
+        struct pollfd pfd;
+        pfd.fd = fd_;
+        pfd.events = POLLIN;
+        switch (poll(&pfd, 1, msec))
+        {
+            // Timeout
+            case 0:
+            {
+                return false;
+            }
+            // Error
+            case -1:
+            {
+                return false;
+            }
+            // Data available
+            default:
+            {
+                if (pfd.revents & POLLIN)
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+        }
+    }
+    gu::datetime::Period client_timeout_;
+    gu::datetime::Period server_timeout_;
+    int fd_;
+    gu::AsioIoService& io_service_;
+    std::shared_ptr<AsioStreamEngine> engine_;
+    bool non_blocking_;
+    bool have_encrypted_protocol_;
+    bool timer_check_done_;
+    bool client_encrypted_message_sent_;
+    gu::datetime::Date client_encrypted_message_sent_ts_;
+};
+
 std::shared_ptr<gu::AsioStreamEngine> gu::AsioStreamEngine::make(
-    AsioIoService& io_service, const std::string& scheme, int fd)
+    AsioIoService& io_service, const std::string& scheme, int fd, bool non_blocking)
 {
     if (scheme == "tcp")
     {
-        GU_ASIO_DEBUG("AsioStreamEngine::make use TCP engine");
-        return std::make_shared<AsioTcpStreamEngine>(fd);
+        if (not io_service.dynamic_socket_enabled())
+        {
+            GU_ASIO_DEBUG("AsioStreamEngine::make use TCP engine");
+            return std::make_shared<AsioTcpStreamEngine>(fd);
+        }
+        else
+        {
+            GU_ASIO_DEBUG("AsioStreamEngine::make use Dynamic engine")
+            return std::make_shared<AsioDynamicStreamEngine>(io_service, fd,
+                                                            non_blocking,
+                                                            io_service.ssl_enabled());
+        }
     }
 #ifdef GALERA_HAVE_SSL
     else if (scheme == "ssl")
     {
-        GU_ASIO_DEBUG("AsioStreamEngine::make use SSL engine");
-        return std::make_shared<AsioSslStreamEngine>(io_service, fd);
+        if (not io_service.dynamic_socket_enabled())
+        {
+           GU_ASIO_DEBUG("AsioStreamEngine::make use SSL engine");
+           return std::make_shared<AsioSslStreamEngine>(io_service, fd);
+        }
+        else
+        {
+            GU_ASIO_DEBUG("AsioStreamEngine::make use Dynamic engine");
+           return std::make_shared<AsioDynamicStreamEngine>(io_service, fd,
+                                                            non_blocking,
+                                                            io_service.ssl_enabled());
+        }
     }
 #endif // GALERA_HAVE_SSL
     else

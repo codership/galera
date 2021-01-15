@@ -37,9 +37,9 @@ static bool check_tcp_uri(const gu::URI& uri)
             uri.get_scheme() == gu::scheme::ssl);
 }
 
-static std::string get_scheme(bool use_ssl)
+static std::string get_scheme(bool use_ssl, bool dynamic_socket)
 {
-    if (use_ssl == true)
+    if (use_ssl == true && not dynamic_socket)
     {
         return gu::scheme::ssl;
     }
@@ -81,6 +81,7 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri,
                           param<int>(conf_, uri, Conf::GMCastSegment, "0"),
                           0, 255)),
     my_uuid_      (my_uuid ? *my_uuid : UUID(0, 0)),
+    dynamic_socket_ (param<bool>(conf_, uri, gu::conf::socket_dynamic, "false")),
 #ifdef GALERA_HAVE_SSL
     use_ssl_      (param<bool>(conf_, uri, gu::conf::use_ssl, "false")),
 #else
@@ -91,7 +92,7 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri,
     listen_addr_  (
         param<std::string>(
             conf_, uri, Conf::GMCastListenAddr,
-            get_scheme(use_ssl_) + "://0.0.0.0")), // how to make it IPv6 safe?
+            get_scheme(use_ssl_, dynamic_socket_) + "://0.0.0.0")), // how to make it IPv6 safe?
     initial_addrs_(),
     mcast_addr_   (param<std::string>(conf_, uri, Conf::GMCastMCastAddr, "")),
     bind_ip_      (""),
@@ -147,7 +148,7 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri,
     catch (gu::Exception&)
     {
         /* most probably no scheme, try to append one and see if it succeeds */
-        listen_addr_ = uri_string(get_scheme(use_ssl_), listen_addr_);
+        listen_addr_ = uri_string(get_scheme(use_ssl_, dynamic_socket_), listen_addr_);
         gu_trace(gu::URI uri(listen_addr_));
     }
 
@@ -192,7 +193,7 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri,
 
     listen_addr_ = gu::net::resolve(listen_addr_).to_string();
     // resolving sets scheme to tcp, have to rewrite for ssl
-    if (use_ssl_ == true)
+    if (use_ssl_ == true && not dynamic_socket_)
     {
         listen_addr_.replace(0, 3, gu::scheme::ssl);
     }
@@ -277,7 +278,7 @@ void gcomm::GMCast::set_initial_addr(const gu::URI& uri)
             }
         }
 
-        std::string initial_uri = uri_string(get_scheme(use_ssl_), host, port);
+        std::string initial_uri = uri_string(get_scheme(use_ssl_, dynamic_socket_), host, port);
         std::string initial_addr;
         try
         {
@@ -289,7 +290,7 @@ void gcomm::GMCast::set_initial_addr(const gu::URI& uri)
             continue;
         }
         // resolving sets scheme to tcp, have to rewrite for ssl
-        if (use_ssl_ == true)
+        if (use_ssl_ == true && not dynamic_socket_)
         {
             initial_addr.replace(0, 3, gu::scheme::ssl);
         }
@@ -1800,7 +1801,7 @@ void gcomm::GMCast::add_or_del_addr(const std::string& val)
     if (val.compare(0, 4, "add:") == 0)
     {
         gu::URI uri(val.substr(4));
-        std::string addr(gu::net::resolve(uri_string(get_scheme(use_ssl_),
+        std::string addr(gu::net::resolve(uri_string(get_scheme(use_ssl_, dynamic_socket_),
                                                      uri.get_host(),
                                                      uri.get_port())).to_string());
         log_info << "inserting address '" << addr << "'";
