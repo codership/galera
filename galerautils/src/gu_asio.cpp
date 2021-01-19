@@ -205,20 +205,27 @@ gu::AsioErrorCategory gu_asio_ssl_category(asio::error::get_ssl_category());
 gu::AsioErrorCode::AsioErrorCode()
     : value_()
     , category_(&gu_asio_system_category)
-    , wsrep_category_()
+    , error_extra_()
 { }
 
 gu::AsioErrorCode::AsioErrorCode(int err)
     : value_(err)
     , category_(&gu_asio_system_category)
-    , wsrep_category_()
+    , error_extra_()
 { }
 
 std::string gu::AsioErrorCode::message() const
 {
     if (category_)
     {
-        return asio::error_code(value_, category_->native()).message();
+        std::string ret(
+            asio::error_code(value_, category_->native()).message());
+        if (*category_ == gu_asio_ssl_category && error_extra_)
+        {
+            ret += std::string(": ")
+                + X509_verify_cert_error_string(error_extra_);
+        }
+        return ret;
     }
     else
     {
@@ -230,14 +237,7 @@ std::string gu::AsioErrorCode::message() const
 
 std::ostream& gu::operator<<(std::ostream& os, const gu::AsioErrorCode& ec)
 {
-    if (ec.category())
-    {
-        return (os << asio::error_code(ec.value(), ec.category()->native()));
-    }
-    else
-    {
-        return (os << ::strerror(ec.value()));
-    }
+    return (os << ec.message());
 }
 
 bool gu::AsioErrorCode::is_eof() const
@@ -247,14 +247,9 @@ bool gu::AsioErrorCode::is_eof() const
             value_ == asio::error::misc_errors::eof);
 }
 
-bool gu::AsioErrorCode::is_wsrep() const
-{
-    return wsrep_category_;
-}
-
 bool gu::AsioErrorCode::is_system() const
 {
-    return (not (category_ || wsrep_category_) ||
+    return (not category_ ||
             (category_ &&
              *category_ == gu_asio_system_category));
 }
@@ -416,7 +411,7 @@ static void ssl_prepare_context(const gu::Config& conf, asio::ssl::context& ctx,
         param = gu::conf::ssl_key;
         ctx.use_private_key_file(conf.get(param), asio::ssl::context::pem);
         param = gu::conf::ssl_cert;
-        ctx.use_certificate_file(conf.get(param), asio::ssl::context::pem);
+        ctx.use_certificate_chain_file(conf.get(param));
         param = gu::conf::ssl_ca;
         ctx.load_verify_file(conf.get(param, conf.get(gu::conf::ssl_cert)));
         param = gu::conf::ssl_cipher;

@@ -105,6 +105,7 @@ public:
         : fd_(fd)
         , ssl_(::SSL_new(io_service.impl().ssl_context_->native_handle()))
         , last_error_()
+        , last_verify_error_()
         , last_error_category_()
     {
         ::SSL_set_fd(ssl_, fd_);
@@ -170,11 +171,17 @@ public:
         return gu::AsioErrorCode(last_error_,
                                  last_error_category_ ?
                                  *last_error_category_ :
-                                 gu_asio_system_category);
+                                 gu_asio_system_category,
+                                 last_verify_error_);
     }
 
 private:
-    void clear_error() { last_error_ = 0; last_error_category_ = 0; }
+    void clear_error()
+    {
+        last_error_ = 0;
+        last_verify_error_ = 0;
+        last_error_category_ = 0;
+    }
 
 #ifdef HAVE_READ_EX
     // Read method with SSL_read_ex which was introduced in 1.1.1.
@@ -272,9 +279,7 @@ private:
         {
             last_error_ = sys_error;
             last_error_category_ = &gu_asio_ssl_category;
-            char error_str[120];
-            log_error << op << " error: "
-                      << ERR_error_string(sys_error, error_str);
+            last_verify_error_ = SSL_get_verify_result(ssl_);
             return error;
         }
         }
@@ -285,6 +290,7 @@ private:
     int fd_;
     SSL* ssl_;
     int last_error_;
+    int last_verify_error_;
     const gu::AsioErrorCategory* last_error_category_;
 };
 

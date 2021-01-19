@@ -1132,6 +1132,85 @@ START_TEST(test_ssl_compression_option)
 }
 END_TEST
 
+static gu::Config get_ssl_chain_config(int index)
+{
+    gu::Config ret;
+    gu::ssl_register_params(ret);
+    std::string cert_dir(get_cert_dir());
+    ret.set(gu::conf::use_ssl, "1");
+    ret.set(gu::conf::ssl_key, cert_dir + "/galera-server-"
+            + gu::to_string(index) + ".key");
+    ret.set(gu::conf::ssl_cert, cert_dir + "/bundle-galera-server-"
+            + gu::to_string(index) + ".pem");
+    ret.set(gu::conf::ssl_ca, cert_dir + "/galera-ca.pem");
+    gu::ssl_init_options(ret);
+
+    // Block SIGPIPE in SSL tests. OpenSSL calls may cause
+    // signal to be generated.
+    struct sigaction sa;
+    ::memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = SIG_IGN;
+    sigaction(SIGPIPE, &sa, 0);
+    return ret;
+}
+
+START_TEST(test_ssl_certificate_chain)
+{
+    auto client_conf(get_ssl_chain_config(1));
+    gu::AsioIoService client_io_service(client_conf);
+    auto server_conf(get_ssl_chain_config(2));
+    gu::AsioIoService server_io_service(server_conf);
+
+    gu::URI uri("ssl://127.0.0.1:0");
+    auto acceptor(server_io_service.make_acceptor(uri));
+    acceptor->listen(uri);
+    auto acceptor_handler(std::make_shared<MockAcceptorHandler>());
+    acceptor->async_accept(acceptor_handler);
+
+    auto handler(std::make_shared<MockSocketHandler>());
+    auto socket(client_io_service.make_socket(acceptor->listen_addr()));
+    socket->async_connect(acceptor->listen_addr(), handler);
+    client_io_service.run_one(); // Process async connect
+    server_io_service.run_one(); // Accept
+    client_io_service.run_one(); // Client hello
+    server_io_service.run_one(); // Server handles
+    ck_assert(acceptor_handler->accepted_socket() != 0);
+}
+END_TEST
+
+// This test uses certificate chain for server and self signed
+// certificate for client. They do not have common trusted CA,
+// so the connection should be rejected.
+START_TEST(test_ssl_invalid_cert)
+{
+    auto client_conf(get_ssl_config());
+    gu::AsioIoService client_io_service(client_conf);
+    auto server_conf(get_ssl_chain_config(2));
+    gu::AsioIoService server_io_service(server_conf);
+
+    gu::URI uri("ssl://127.0.0.1:0");
+    auto acceptor(server_io_service.make_acceptor(uri));
+    acceptor->listen(uri);
+    auto acceptor_handler(std::make_shared<MockAcceptorHandler>());
+    acceptor->async_accept(acceptor_handler);
+
+    auto handler(std::make_shared<MockSocketHandler>());
+    auto socket(client_io_service.make_socket(acceptor->listen_addr()));
+    socket->async_connect(acceptor->listen_addr(), handler);
+    client_io_service.run_one(); // Process async connect
+    server_io_service.run_one(); // Accept
+    client_io_service.run_one(); // Client hello
+    server_io_service.run_one(); // Server handles
+    ck_assert(not acceptor_handler->accepted_socket());
+    ck_assert_msg(handler->last_error_code().message().find(
+                      "unable to get local issuer certificate") !=
+                  std::string::npos,
+                  "verify error 'unable to get local issuer certificate' "
+                  "not found from '%s'",
+                  handler->last_error_code().message().c_str());
+}
+END_TEST
+
 #endif // GALERA_HAVE_SSL
 
 //
@@ -2079,6 +2158,14 @@ Suite* gu_asio_suite()
 
     tc = tcase_create("test_ssl_compression_option");
     tcase_add_test(tc, test_ssl_compression_option);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_ssl_certificate_chain");
+    tcase_add_test(tc, test_ssl_certificate_chain);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_ssl_invalid_cert");
+    tcase_add_test(tc, test_ssl_invalid_cert);
     suite_add_tcase(s, tc);
 
 #endif // GALERA_HAVE_SSL

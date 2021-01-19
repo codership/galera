@@ -203,9 +203,15 @@ namespace gu
         AsioErrorCode(int value, const AsioErrorCategory& category)
             : value_(value)
             , category_(&category)
-            , wsrep_category_()
+            , error_extra_()
         { }
 
+        AsioErrorCode(int value, const AsioErrorCategory& category,
+                      int error_extra)
+            : value_(value)
+            , category_(&category)
+            , error_extra_(error_extra)
+        { }
         /**
          * Return error number.
          */
@@ -228,11 +234,6 @@ namespace gu
         bool is_eof() const;
 
         /**
-         * Return true if the error belongs to wsrep category.
-         */
-        bool is_wsrep() const;
-
-        /**
          * Return true if the error is system error.
          */
         bool is_system() const;
@@ -240,7 +241,8 @@ namespace gu
     private:
         int value_;
         const AsioErrorCategory* category_;
-        const void* wsrep_category_;
+        // Extra category specific error information
+        int error_extra_;
     };
 
     std::ostream& operator<<(std::ostream&, const AsioErrorCode&);

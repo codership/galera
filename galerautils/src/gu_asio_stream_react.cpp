@@ -414,6 +414,7 @@ void gu::AsioStreamReact::server_handshake_handler(
         // server side handshake at the time. To get around this, the
         // actual connect/accept events must be exposed to acceptor/connector
         // handler, forcing them to initiate handshake.
+        log_warn << "Server handshake failed: " << engine_->last_error();
         acceptor->async_accept(acceptor_handler);
         break;
     }
@@ -870,6 +871,7 @@ void gu::AsioAcceptorReact::accept_handler(
         // Continue accepting transparently if socket handshake fails.
         // From user handler point of view this connection never existed
         // and it will go out of scope when this handler returns.
+        log_warn << "Handshake failed: " << socket->engine_->last_error();
         async_accept(handler);
         break;
     }
