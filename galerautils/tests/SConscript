@@ -83,8 +83,8 @@ avalanche = env.Program(target = 'avalanche',
                          '''))
 Import('all_tests')
 if all_tests:
-    env.Test("go_to_test.passed", gu_to_test)
-    env.Test("avalance.passed", avalanche)
+    env.Test("gu_to_test.passed", gu_to_test)
+    env.Test("avalanche.passed", avalanche)
 
 # copy_vs_assignment = env.Program(target = 'copy_vs_assignment',
 #                         source = Split('''

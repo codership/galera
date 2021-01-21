@@ -16,15 +16,18 @@ galera.cache
 gvwstate.dat
 galera/tests/galera_check
 galera/tests/galera_check.passed
+galerautils/src/gu_fnv_bench
 galerautils/tests/gu_tests
 galerautils/tests/gu_tests++
 galerautils/tests/gu_tests++.passed
 galerautils/tests/gu_tests.passed
 galerautils/tests/gu_to_test
 galerautils/tests/avalanche*
+galerautils/tests/avalanche.passed
 galerautils/tests/copy_vs_assignment*
 galerautils/tests/deqmap_bench
 galerautils/tests/crc32c_bench
+galerautils/tests/gu_to_test.passed
 garb/garbd
 gcache.page.*
 gcache/src/gcache_test
@@ -33,6 +36,7 @@ gcache/tests/gcache_tests.passed
 gcomm/test/check_gcomm
 gcomm/test/check_gcomm_nondet
 gcomm/test/gcomm_check.passed
+gcomm/test/gcomm_check_nondet.passed
 gcomm/test/ssl_test
 gcs/src/gcs_test
 gcs/src/unit_tests/gcs_tests
@@ -46,6 +50,8 @@ tests/conf/cluster.conf
 tests/conf/nodes.conf
 tests/conf/common_my.cnf
 tests/conf/my[0-9]*.cnf
+wsrep/tests/wsrep_test
+wsrep/tests/wsrep_test.passed
 docs/build
 CMakeCache.txt
 CPackConfig.cmake
