@@ -28,6 +28,6 @@ test_env.Prepend(LIBS=File('#/galerautils/src/libgalerautils.a'))
 test_env.Prepend(LIBS=File('#/galerautils/src/libgalerautils++.a'))
 test_env.Prepend(LIBS=File('libgcache.a'))
 
-test_env.Program(source='test.cpp')
+test_env.Program(target = 'gcache_test', source = 'test.cpp')
 
 env.Append(LIBGALERA_OBJS = gcache_env.SharedObject(gcache_sources))

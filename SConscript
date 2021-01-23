@@ -3,7 +3,8 @@ SConscript(['galerautils/SConscript',
             'gcomm/SConscript',
             'gcs/SConscript',
             'galera/SConscript',
-            'garb/SConscript'])
+            'garb/SConscript',
+            'wsrep/tests/SConscript'])
 
 Import('env', 'sysname', 'has_version_script', 'galera_script', 'install',
        'have_ssl')
