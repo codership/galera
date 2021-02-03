@@ -236,6 +236,15 @@ galera::ReplicatorSMM::param_set (const std::string& key,
             found = true;
         }
         catch (gu::NotFound&) {}
+
+#ifdef GALERA_HAVE_SSL
+        try
+        {
+            gu::ssl_param_set (key, value, config_);
+            found = true;
+        }
+        catch (gu::NotFound&) {}
+#endif
     }
 
     if (!found) throw gu::NotFound();

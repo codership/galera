@@ -76,6 +76,7 @@ add_library(galerautilsxx
   gu_rset.cpp
   gu_resolver.cpp
   gu_histogram.cpp
+  gu_signals.cpp
   gu_stats.cpp
   gu_asio.cpp
   gu_asio_datagram.cpp

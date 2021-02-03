@@ -114,6 +114,7 @@ static const char* Defaults[] =
 //  "socket.ssl_cipher",           no default,
 //  "socket.ssl_compression",      no default,
 //  "socket.ssl_key",              no default,
+//  "socket.ssl_reload"            no default,
     NULL
 };
 

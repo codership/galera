@@ -12,6 +12,7 @@
 
 #include "gu_config.hpp"
 #include "gu_uri.hpp"
+#include "gu_signals.hpp"
 
 #include <netinet/tcp.h> // tcp_info
 
@@ -54,6 +55,8 @@ namespace gu
         const std::string ssl_ca("socket.ssl_ca");
         /// SSL password file
         const std::string ssl_password_file("socket.ssl_password_file");
+        // SSL reload
+        const std::string ssl_reload("socket.ssl_reload");
     }
 
 
@@ -62,6 +65,9 @@ namespace gu
 
     // initialize defaults, verify set options
     void ssl_init_options(gu::Config&);
+
+    // update ssl parameters
+    void ssl_param_set(const std::string&, const std::string&, gu::Config&);
 #else
     static inline void ssl_register_params(gu::Config&) { }
     static inline void ssl_init_options(gu::Config&) { }
@@ -622,6 +628,11 @@ namespace gu
         AsioIoService operator=(const AsioIoService&) = delete;
 
         /**
+         * Handle global signals.
+         */
+        void handle_signal(const gu::Signals::SignalType&);
+
+        /**
          * Load crypto context.
          */
         void load_crypto_context();
@@ -697,6 +708,7 @@ namespace gu
     private:
         std::unique_ptr<Impl> impl_;
         const gu::Config& conf_;
+        gu::Signals::signal_connection signal_connection_;
     };
 
     class AsioSteadyTimerHandler
