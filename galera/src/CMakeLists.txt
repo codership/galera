@@ -114,7 +114,7 @@ if (GALERA_VERSION_SCRIPT)
     -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/galera-sym.map)
   add_custom_command(TARGET galera_smm POST_BUILD
     COMMAND
-    sh -c "! objdump -T libgalera_smm.so | grep asio 1> /dev/null"
+    sh -c "! ${CMAKE_OBJDUMP} -T libgalera_smm.so | grep asio 1> /dev/null"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
     COMMENT "Checking library symbol visibility (hidden)"
     VERBATIM)
@@ -122,7 +122,7 @@ else()
   set(GALERA_LINK_OPTIONS "")
   add_custom_command(TARGET galera_smm POST_BUILD
     COMMAND
-    sh -c "objdump -T libgalera_smm.so | grep asio 1> /dev/null"
+    sh -c "${CMAKE_OBJDUMP} -T libgalera_smm.so | grep asio 1> /dev/null"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
     COMMENT "Checking library symbol visibility (not hidden)"
     VERBATIM)
@@ -132,7 +132,7 @@ if (NOT GALERA_WITH_SSL)
   message(STATUS "Building Galera without SSL")
   add_custom_command(TARGET galera_smm POST_BUILD
     COMMAND
-    sh -c "! (ldd libgalera_smm.so | grep crypto 1> /dev/null) && ! (ldd libgalera_smm.so | grep ssl 1> /dev/null)"
+    sh -c "! (${CMAKE_OBJDUMP} -x libgalera_smm.so | grep crypto 1> /dev/null) && ! (${CMAKE_OBJDUMP} -x libgalera_smm.so | grep ssl 1> /dev/null)"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
     COMMENT "Verifying that library is not linked with SSL"
     VERBATIM)
@@ -141,7 +141,7 @@ else()
     message(STATUS "Building Galera with static SSL")
     add_custom_command(TARGET galera_smm POST_BUILD
       COMMAND
-      sh -c "(objdump -t libgalera_smm.so | grep OPENSSL 1> /dev/null) && (objdump -t libgalera_smm.so | grep CRYPTO 1> /dev/null)"
+      sh -c "(${CMAKE_OBJDUMP} -t libgalera_smm.so | grep OPENSSL 1> /dev/null) && (${CMAKE_OBJDUMP} -t libgalera_smm.so | grep CRYPTO 1> /dev/null)"
       WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
       COMMENT "Verifying that library has OpenSSL linked statically"
       VERBATIM)
@@ -149,7 +149,7 @@ else()
     message(STATUS "Building Galera with SSL")
     add_custom_command(TARGET galera_smm POST_BUILD
       COMMAND
-      sh -c "(ldd libgalera_smm.so | grep crypto 1> /dev/null) && (ldd libgalera_smm.so | grep ssl 1> /dev/null)"
+      sh -c "(${CMAKE_OBJDUMP} -x libgalera_smm.so | grep NEEDED.*crypto 1> /dev/null) && (${CMAKE_OBJDUMP} -x libgalera_smm.so | grep NEEDED.*ssl 1> /dev/null)"
       COMMENT "Verifying that library is linked with SSL"
       WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
       VERBATIM)
