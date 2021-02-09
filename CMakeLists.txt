@@ -11,6 +11,7 @@ include(CheckCXXCompilerFlag)
 include(CheckIncludeFile)
 include(CheckIncludeFileCXX)
 include(CheckCXXCompilerFlag)
+include(CheckLibraryExists)
 
 include_directories(
   ${CMAKE_SOURCE_DIR}
