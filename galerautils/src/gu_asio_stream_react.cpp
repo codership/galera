@@ -403,8 +403,10 @@ void gu::AsioStreamReact::server_handshake_handler(
                           acceptor,
                           acceptor_handler);
         break;
-    case AsioStreamEngine::eof:
     case AsioStreamEngine::error:
+        log_warn << "Handshake failed: " << engine_->last_error();
+        // Fall through
+    case AsioStreamEngine::eof:
         // Restart accepting transparently. The socket will go out of
         // scope and will be destructed.
         //
@@ -414,7 +416,6 @@ void gu::AsioStreamReact::server_handshake_handler(
         // server side handshake at the time. To get around this, the
         // actual connect/accept events must be exposed to acceptor/connector
         // handler, forcing them to initiate handshake.
-        log_warn << "Server handshake failed: " << engine_->last_error();
         acceptor->async_accept(acceptor_handler);
         break;
     }
@@ -780,7 +781,7 @@ std::shared_ptr<gu::AsioSocket> gu::AsioAcceptorReact::accept()
                                << result;
         return std::shared_ptr<gu::AsioSocket>();
     case AsioStreamEngine::error:
-        throw_sync_op_error(*socket->engine_, "Server handshake failed");
+        throw_sync_op_error(*socket->engine_, "Handshake failed");
         return std::shared_ptr<gu::AsioSocket>(); // Keep compiler happy
     }
     return socket;
@@ -867,11 +868,14 @@ void gu::AsioAcceptorReact::accept_handler(
                                   shared_from_this(),
                                   handler);
         break;
-    default:
+    case AsioStreamEngine::error:
+        log_warn << "Handshake failed: "
+                 << socket->engine_->last_error();
+        // Fall through
+    case AsioStreamEngine::eof:
         // Continue accepting transparently if socket handshake fails.
         // From user handler point of view this connection never existed
         // and it will go out of scope when this handler returns.
-        log_warn << "Handshake failed: " << socket->engine_->last_error();
         async_accept(handler);
         break;
     }
