@@ -990,6 +990,20 @@ galera::Certification::~Certification()
     for_each(trx_map_.begin(), trx_map_.end(), PurgeAndDiscard(*this));
     trx_map_.clear();
     nbo_map_.clear();
+    std::for_each(nbo_index_.begin(), nbo_index_.end(),
+                  [](CertIndexNBO::value_type key_entry)
+                  {
+                      for (int i(0); i <= KeySet::Key::TYPE_MAX; ++i)
+                      {
+                          wsrep_key_type_t key_type(static_cast<wsrep_key_type_t>(i));
+                          const TrxHandleSlave* ts(key_entry->ref_trx(key_type));
+                          if (ts)
+                          {
+                              key_entry->unref(key_type, ts);
+                          }
+                      }
+                      delete key_entry;
+                  });
     if (service_thd_)
     {
         service_thd_->release_seqno(position_);

@@ -50,7 +50,7 @@ namespace galera
             key_ = k;
         }
 
-        void unref(wsrep_key_type_t p, TrxHandleSlave* trx)
+        void unref(wsrep_key_type_t p, const TrxHandleSlave* trx)
         {
             assert(refs_[p] != NULL);
 
