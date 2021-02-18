@@ -32,13 +32,17 @@ if has_version_script:
     env.Depends(galera_lib, galera_script)
 
 def check_dynamic_symbols(target, source, env):
-    import subprocess
 
     # Check if objdump exists
-    p = subprocess.Popen(['objdump', '--version'], stdout=subprocess.PIPE)
-    p.wait()
-    if p.returncode != 0:
+    from subprocess import check_call
+    from os import devnull
+    DEVNULL = open(devnull, 'w')
+    try:
+        check_call(['objdump', '--version'], stdout=DEVNULL)
+        DEVNULL.close()
+    except:
         print('objdump utility is not found. Skipping checks...')
+        DEVNULL.close()
         return 0
 
     # Check that DSO doesn't contain asio-related dynamic symbols
