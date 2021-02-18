@@ -43,12 +43,25 @@ if not crc32c_no_hardware:
             arm64 = True
             test_cflags = ' -march=armv8-a+crc'
             test_source = """
+                            // Here we assume that CPU feature detection and
+                            // CRC32 support in hardware is the same thing and
+                            // if the former is not available, the latter is
+                            // not available as well, so we test for both at
+                            // the same time
+
                             #include <sys/auxv.h>
                             #include <arm_acle.h>
 
                             int main()
                             {
+                            #if defined(__linux__)
                                 (void)getauxval(AT_HWCAP);
+                            #elif defined(__FreeBSD__)
+                                unsigned long info;
+                                (void)elf_aux_info(AT_HWCAP, &info, sizeof(info));
+                            #else
+                                #error Hardware feature detection for OS not supported
+                            #endif
 
                                 (void)__crc32b(0, 0);
                                 (void)__crc32h(0, 0);
