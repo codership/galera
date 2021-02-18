@@ -71,7 +71,8 @@ START_TEST(test_basic)
 {
     unlink (fname);
 
-    wsrep_uuid_t  uuid;
+    union { wsrep_uuid_t uuid; gu_word_t align; } aligned;
+    wsrep_uuid_t& uuid(aligned.uuid);
     wsrep_seqno_t seqno;
     bool safe_to_bootstrap;
 
@@ -113,7 +114,8 @@ START_TEST(test_unsafe)
 {
     SavedState st(fname);
 
-    wsrep_uuid_t  uuid;
+    union { wsrep_uuid_t uuid; gu_word_t align; } aligned;
+    wsrep_uuid_t& uuid(aligned.uuid);
     wsrep_seqno_t seqno;
     bool safe_to_bootstrap;
 
@@ -155,7 +157,8 @@ END_TEST
 
 START_TEST(test_corrupt)
 {
-    wsrep_uuid_t  uuid;
+    union { wsrep_uuid_t uuid; gu_word_t align; } aligned;
+    wsrep_uuid_t& uuid(aligned.uuid);
     wsrep_seqno_t seqno;
     bool safe_to_bootstrap;
 
