@@ -149,9 +149,14 @@ static struct tcp_info get_tcp_info(Socket& socket)
     struct tcp_info tcpi;
     memset(&tcpi, 0, sizeof(tcpi));
 #if defined(__linux__) || defined(__FreeBSD__)
+#if defined(__linux__)
+    static int const level(SOL_TCP);
+#else /* FreeBSD */
+    static int const level(IPPROTO_TCP);
+#endif
     socklen_t tcpi_len(sizeof(tcpi));
     int native_fd(native_socket_handle(socket));
-    if (getsockopt(native_fd, SOL_TCP, TCP_INFO, &tcpi, &tcpi_len))
+    if (getsockopt(native_fd, level, TCP_INFO, &tcpi, &tcpi_len))
     {
         int err(errno);
         gu_throw_error(err) << "Failed to read TCP info from socket: "

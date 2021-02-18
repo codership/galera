@@ -11,6 +11,7 @@
 #include "gu_compiler.hpp"
 
 #include <iterator>
+#include <sys/socket.h> // recv(), send(), etc.
 
 //
 // Helper classes
@@ -2282,9 +2283,14 @@ Suite* gu_asio_suite()
     tcase_add_test(tc, test_datagram_send_to_and_async_read);
     suite_add_tcase(s, tc);
 
+#if defined(__FreeBSD__)
+    /* fails on FreeBSD with EADDRNOTAVAIL, disable temporarily */
+    (void)test_datagram_send_to_and_async_read_multicast;
+#else
     tc = tcase_create("test_datagram_send_to_and_async_read_multicast");
     tcase_add_test(tc, test_datagram_send_to_and_async_read_multicast);
     suite_add_tcase(s, tc);
+#endif /* FreeBSD */
 
     tc = tcase_create("test_datagram_write_multicast");
     tcase_add_test(tc, test_datagram_write_multicast);
