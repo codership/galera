@@ -30,8 +30,8 @@ static void register_params(gu::Config& conf)
 static void test_ist_recv_addr_expect(const std::string& expect,
                                       const std::string& addr)
 {
-    fail_unless(expect == addr, "Expected %s got %s",
-                expect.c_str(), addr.c_str());
+    ck_assert_msg(expect == addr, "Expected %s got %s",
+                  expect.c_str(), addr.c_str());
 }
 
 START_TEST(test_ist_recv_addr_not_set)
@@ -41,11 +41,11 @@ START_TEST(test_ist_recv_addr_not_set)
     try
     {
         galera::IST_determine_recv_addr(conf);
-        fail("Exception not thrown");
+        ck_abort_msg("Exception not thrown");
     }
     catch (const gu::Exception& e)
     {
-        fail_unless(e.get_errno() == EINVAL);
+        ck_assert(e.get_errno() == EINVAL);
     }
 }
 END_TEST
@@ -109,7 +109,7 @@ START_TEST(test_ist_recv_bind_not_set)
     try
     {
         (void)galera::IST_determine_recv_bind(conf);
-        fail("Expcetion not thrown");
+        ck_abort_msg("Exception not thrown");
     }
     catch (const gu::NotSet&) { }
 }
