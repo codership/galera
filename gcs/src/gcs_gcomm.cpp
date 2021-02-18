@@ -169,86 +169,9 @@ public:
 
     const gcomm::UUID& get_uuid() const { return uuid_; }
 
-    static void* run_fn(void* arg)
-    {
-        static_cast<GCommConn*>(arg)->run();
-        return 0;
-    }
-
     void connect(bool) { }
 
-
-    void connect(const string& channel, bool const bootstrap)
-    {
-        if (tp_ != 0)
-        {
-            gu_throw_fatal << "backend connection already open";
-        }
-
-
-        error_ = ENOTCONN;
-        int err;
-        if ((err = gu_thread_create(&thd_, 0, &run_fn, this)) != 0)
-        {
-            gu_throw_error(err) << "Failed to create thread";
-        }
-
-        // Helper to call barrier_.wait() when goes out of scope
-        class StartBarrier
-        {
-        public:
-            StartBarrier(Barrier& barrier) : barrier_(barrier) { }
-            ~StartBarrier()
-            {
-                barrier_.wait();
-            }
-        private:
-            Barrier& barrier_;
-        } start_barrier(barrier_);
-
-        thread_set_schedparam(thd_, schedparam_);
-        log_info << "gcomm thread scheduling priority set to "
-                 << thread_get_schedparam(thd_) << " ";
-
-        uri_.set_option("gmcast.group", channel);
-        tp_ = Transport::create(*net_, uri_);
-        gcomm::connect(tp_, this);
-
-        if (bootstrap)
-        {
-            log_info << "gcomm: bootstrapping new group '" << channel << '\'';
-        }
-        else
-        {
-            string peer;
-            URI::AuthorityList::const_iterator i, i_next;
-            for (i = uri_.get_authority_list().begin();
-                 i != uri_.get_authority_list().end(); ++i)
-            {
-                i_next = i;
-                ++i_next;
-                string host;
-                string port;
-                try { host = i->host(); } catch (NotSet&) { }
-                try { port = i->port(); } catch (NotSet&) { }
-                peer += host != "" ? host + ":" + port : "";
-                if (i_next != uri_.get_authority_list().end())
-                {
-                    peer += ",";
-                }
-            }
-            log_info << "gcomm: connecting to group '" << channel
-                     << "', peer '" << peer << "'";
-        }
-
-        tp_->connect(bootstrap);
-
-        uuid_ = tp_->uuid();
-
-        error_ = 0;
-
-        log_info << "gcomm: connected";
-    }
+    void connect(const string& channel, bool const bootstrap);
 
     void close(bool force = false)
     {
@@ -375,6 +298,85 @@ private:
     View              current_view_;
 };
 
+extern "C"
+void* run_fn(void* arg)
+{
+    static_cast<GCommConn*>(arg)->run();
+    gu_thread_exit(0);
+}
+
+void GCommConn::connect(const string& channel, bool const bootstrap)
+{
+    if (tp_ != 0)
+    {
+        gu_throw_fatal << "backend connection already open";
+    }
+
+
+    error_ = ENOTCONN;
+    int err;
+    if ((err = gu_thread_create(
+             &thd_, 0, run_fn, this)) != 0)
+    {
+        gu_throw_error(err) << "Failed to create thread";
+    }
+
+    // Helper to call barrier_.wait() when goes out of scope
+    class StartBarrier
+    {
+    public:
+        StartBarrier(Barrier& barrier) : barrier_(barrier) { }
+        ~StartBarrier()
+        {
+            barrier_.wait();
+        }
+    private:
+        Barrier& barrier_;
+    } start_barrier(barrier_);
+
+    thread_set_schedparam(thd_, schedparam_);
+    log_info << "gcomm thread scheduling priority set to "
+             << thread_get_schedparam(thd_) << " ";
+
+    uri_.set_option("gmcast.group", channel);
+    tp_ = Transport::create(*net_, uri_);
+    gcomm::connect(tp_, this);
+
+    if (bootstrap)
+    {
+        log_info << "gcomm: bootstrapping new group '" << channel << '\'';
+    }
+    else
+    {
+        string peer;
+        URI::AuthorityList::const_iterator i, i_next;
+        for (i = uri_.get_authority_list().begin();
+             i != uri_.get_authority_list().end(); ++i)
+        {
+            i_next = i;
+            ++i_next;
+            string host;
+            string port;
+            try { host = i->host(); } catch (NotSet&) { }
+            try { port = i->port(); } catch (NotSet&) { }
+            peer += host != "" ? host + ":" + port : "";
+            if (i_next != uri_.get_authority_list().end())
+            {
+                peer += ",";
+            }
+        }
+        log_info << "gcomm: connecting to group '" << channel
+                 << "', peer '" << peer << "'";
+    }
+
+    tp_->connect(bootstrap);
+
+    uuid_ = tp_->uuid();
+
+    error_ = 0;
+
+    log_info << "gcomm: connected";
+}
 
 void
 GCommConn::handle_up(const void* id, const Datagram& dg, const ProtoUpMeta& um)
@@ -415,7 +417,7 @@ GCommConn::handle_up(const void* id, const Datagram& dg, const ProtoUpMeta& um)
 void GCommConn::run()
 {
     barrier_.wait();
-    if (error_ != 0) gu_thread_exit(0);
+    if (error_ != 0) return;
 
     while (true)
     {
@@ -704,7 +706,6 @@ static GCS_BACKEND_NAME_FN(gcomm_name)
     static const char *name = "gcomm";
     return name;
 }
-
 
 static GCS_BACKEND_OPEN_FN(gcomm_open)
 {
