@@ -34,15 +34,22 @@ if has_version_script:
 
 
 def check_executable_exists(command):
-    import subprocess
-    p = subprocess.Popen(command, stdout=subprocess.PIPE)
-    p.wait()
-    return p.returncode
+    from subprocess import check_call
+    from os import devnull
+    DEVNULL = open(devnull, 'w') # when subprocess.DEVNULL is not available
+    try:
+        check_call(command, stdout=DEVNULL)
+        retval = 0
+    except:
+        print(command[0] + ' is not found.')
+        retval = 1
+    DEVNULL.close()
+    return retval
 
 def check_dynamic_symbols(target, source, env):
     # Check if objdump exists
     if check_executable_exists(['objdump', '--version']):
-        print('objdump utility is not found. Skipping checks...')
+        print('Skipping dynamic symbols check.')
         return 0
 
     # Check that DSO doesn't contain asio-related dynamic symbols

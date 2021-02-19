@@ -68,8 +68,18 @@ gu_crc32c_arm64(gu_crc32c_t state, const void* data, size_t len)
     return crc32c_arm64_tail7(state, ptr, len);
 }
 
-#include <asm/hwcap.h>
 #include <sys/auxv.h>
+
+#if defined(__FreeBSD__)
+/* Imitate getauxval() interface */
+static unsigned long int
+getauxval(unsigned long int const type)
+{
+    unsigned long int ret;
+    if (0 != elf_aux_info(type, &ret, sizeof(ret))) ret = 0;
+    return ret;
+}
+#endif /* FreeBSD */
 
 #if defined(HWCAP_CRC32)
 #    define GU_AT_HWCAP    AT_HWCAP
