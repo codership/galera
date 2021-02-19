@@ -97,12 +97,6 @@ target_compile_options(galera_smm
   -Wno-unused-parameter
   )
 
-#
-# Post build checks:
-# - Check that symbol visibility matches GALERA_VERSION_SCRIPT.
-# - Check that SSL linkake matches GALERA_HAVE_SSL and GALERA_STATIC.
-#
-
 if (GALERA_VERSION_SCRIPT)
   # Limit symbols visible from Galera DSO.
   # Doing this allows to:
@@ -112,6 +106,24 @@ if (GALERA_VERSION_SCRIPT)
   # See: https://akkadia.org/drepper/dsohowto.pdf (section 2.2.5)
   set(GALERA_LINK_OPTIONS
     -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/galera-sym.map)
+endif()
+
+target_link_libraries(galera_smm galera ${GALERA_LINK_OPTIONS})
+
+install(TARGETS galera_smm DESTINATION lib)
+
+# The following checks are guaranteed to work only
+# Linux platform, we skip them on others.
+if (NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+  return()
+endif()
+
+#
+# Post build checks:
+# - Check that symbol visibility matches GALERA_VERSION_SCRIPT.
+# - Check that SSL linkage matches GALERA_HAVE_SSL and GALERA_STATIC.
+#
+if (GALERA_VERSION_SCRIPT)
   add_custom_command(TARGET galera_smm POST_BUILD
     COMMAND
     sh -c "! ${CMAKE_OBJDUMP} -T libgalera_smm.so | grep asio 1> /dev/null"
@@ -155,7 +167,3 @@ else()
       VERBATIM)
   endif()
 endif()
-
-target_link_libraries(galera_smm galera ${GALERA_LINK_OPTIONS})
-
-install(TARGETS galera_smm DESTINATION lib)
