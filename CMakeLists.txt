@@ -106,14 +106,16 @@ add_subdirectory(galera)
 add_subdirectory(scripts/packages)
 add_subdirectory(wsrep/tests)
 
-install(FILES
-  ${CMAKE_SOURCE_DIR}/AUTHORS
-  ${CMAKE_SOURCE_DIR}/COPYING
-  ${CMAKE_SOURCE_DIR}/README
-  DESTINATION doc)
-install(FILES ${CMAKE_SOURCE_DIR}/asio/LICENSE_1_0.txt
-  DESTINATION doc
-  RENAME LICENSE.asio)
+if (NOT ${CMAKE_SYSTEM_NAME} MATCHES ".*BSD")
+  install(FILES
+    ${CMAKE_SOURCE_DIR}/AUTHORS
+    ${CMAKE_SOURCE_DIR}/COPYING
+    ${CMAKE_SOURCE_DIR}/README
+    DESTINATION doc)
+  install(FILES ${CMAKE_SOURCE_DIR}/asio/LICENSE_1_0.txt
+    DESTINATION doc
+    RENAME LICENSE.asio)
+endif()
 
 message(STATUS "")
 message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
