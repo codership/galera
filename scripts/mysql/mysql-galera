@@ -299,7 +299,6 @@ galera_start()
             --basedir="$MYSQL_BASE_DIR" \
             --secure-file-priv="$MYSQL_DATA_DIR" \
             --datadir="$MYSQL_DATA_DIR" \
-            --plugin-dir=lib/mysql/plugin \
             --pid-file="$MYSQL_PID" \
             --port=$MYSQL_PORT \
             --socket=$MYSQL_SOCKET \
@@ -329,7 +328,6 @@ galera_start()
             --basedir="$MYSQL_BASE_DIR" \
             --secure-file-priv="$MYSQL_DATA_DIR" \
             --datadir="$MYSQL_DATA_DIR" \
-            --plugin-dir=lib/mysql/plugin \
             --pid-file="$MYSQL_PID" \
             --port=$MYSQL_PORT \
             --socket=$MYSQL_SOCKET \
@@ -351,7 +349,6 @@ galera_start()
             --basedir="$MYSQL_BASE_DIR" \
             --secure-file-priv="$MYSQL_DATA_DIR" \
             --datadir="$MYSQL_DATA_DIR" \
-            --plugin-dir=lib/mysql/plugin \
             --pid-file="$MYSQL_PID" \
             --port=$MYSQL_PORT \
             --socket=$MYSQL_SOCKET \
