@@ -917,7 +917,7 @@ static gu::Config get_ssl_config()
     ret.set(gu::conf::use_ssl, "1");
     ret.set(gu::conf::ssl_key, cert_dir + "/galera_key.pem");
     ret.set(gu::conf::ssl_cert, cert_dir + "/galera_cert.pem");
-    ret.set(gu::conf::ssl_ca, cert_dir + "/galera_cert.pem");
+    ret.set(gu::conf::ssl_ca, cert_dir + "/galera_ca.pem");
     gu::ssl_init_options(ret);
 
     // Block SIGPIPE in SSL tests. OpenSSL calls may cause

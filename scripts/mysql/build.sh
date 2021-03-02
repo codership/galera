@@ -565,7 +565,6 @@ install_mysql_5.5_demo()
     [ -d usr/local ] && ( mv usr/local/* ./ && rmdir usr/local ) # FreeBSD
     [ -d libexec -a ! -d sbin ] && mv libexec sbin # FreeBSD
     mv usr/* ./ && rmdir usr
-    [ -d lib64 -a ! -d lib ] && mv lib64 lib
     popd
 }
 

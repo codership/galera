@@ -250,7 +250,7 @@ galera_start()
     GENERAL_OPTS+=" --basedir=$MYSQL_BASE_DIR"
     GENERAL_OPTS+=" --secure-file-priv=$MYSQL_DATA_DIR"
     GENERAL_OPTS+=" --datadir=$MYSQL_DATA_DIR"
-    GENERAL_OPTS+=" --plugin-dir=lib/mysql/plugin"
+#    GENERAL_OPTS+=" --plugin-dir=lib/mysql/plugin"
     GENERAL_OPTS+=" --pid-file=$MYSQL_PID"
     GENERAL_OPTS+=" --port=$MYSQL_PORT"
     GENERAL_OPTS+=" --socket=$MYSQL_SOCKET"
