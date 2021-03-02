@@ -221,11 +221,13 @@ std::string gu::AsioErrorCode::message() const
     {
         std::string ret(
             asio::error_code(value_, category_->native()).message());
+#ifdef GALERA_HAVE_SSL
         if (*category_ == gu_asio_ssl_category && error_extra_)
         {
             ret += std::string(": ")
                 + X509_verify_cert_error_string(error_extra_);
         }
+#endif // GALERA_HAVE_SSL
         return ret;
     }
     else

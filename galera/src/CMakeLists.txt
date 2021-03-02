@@ -146,7 +146,7 @@ if (NOT GALERA_WITH_SSL)
   message(STATUS "Building Galera without SSL")
   add_custom_command(TARGET galera_smm POST_BUILD
     COMMAND
-    sh -c "! (${CMAKE_OBJDUMP} -x libgalera_smm.so | grep crypto 1> /dev/null) && ! (${CMAKE_OBJDUMP} -x libgalera_smm.so | grep ssl 1> /dev/null)"
+    sh -c "! (${CMAKE_OBJDUMP} -x libgalera_smm.so | grep NEEDED.*crypto 1> /dev/null) && ! (${CMAKE_OBJDUMP} -x libgalera_smm.so | grep NEEDED.*ssl 1> /dev/null)"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
     COMMENT "Verifying that library is not linked with SSL"
     VERBATIM)
