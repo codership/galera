@@ -983,7 +983,10 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     {
         if (sst_req_len != 0 && !sst_is_trivial(sst_req, sst_req_len))
         {
-            st_.mark_uncorrupt(sst_uuid_, sst_seqno_);
+            // Note: not storing sst seqno in state file to avoid
+            // recovering to incorrect state if the node is
+            // killed during IST.
+            st_.mark_uncorrupt(sst_uuid_, WSREP_SEQNO_UNDEFINED);
         }
         else
         {
@@ -994,6 +997,9 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
     }
     else
     {
+        // Clear seqno from state file. Otherwise if node gets killed
+        // during IST, it may recover to incorrect position.
+        st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED, safe_to_bootstrap_);
         st_.mark_safe();
     }
 
