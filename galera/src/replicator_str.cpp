@@ -725,6 +725,9 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         assert (state_uuid_ == group_uuid);
     }
 
+    // Clear seqno from state file. Otherwise if node gets killed
+    // during IST, it may recover to incorrect position.
+    st_.set(state_uuid_, WSREP_SEQNO_UNDEFINED, safe_to_bootstrap_);
     st_.mark_safe();
 
     if (req->ist_len() > 0)
