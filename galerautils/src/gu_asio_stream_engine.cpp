@@ -306,8 +306,6 @@ private:
     const gu::AsioErrorCategory* last_error_category_;
 };
 
-#endif // GALERA_HAVE_SSL
-
 /*
  * DynamicStreamEngine is used to choose either TCP or SSL for socket communication.
  * Following condition should be true: Ts(server timeout) > Tc(client timeout).  
@@ -606,16 +604,26 @@ private:
     gu::datetime::Date client_encrypted_message_sent_ts_;
 };
 
+#endif // GALERA_HAVE_SSL
+
 std::shared_ptr<gu::AsioStreamEngine> gu::AsioStreamEngine::make(
     AsioIoService& io_service, const std::string& scheme, int fd, bool non_blocking)
 {
     if (scheme == "tcp")
     {
+#ifdef GALERA_HAVE_SSL
         if (not io_service.dynamic_socket_enabled())
+#else // GALERA_HAVE_SSL
+        if (io_service.dynamic_socket_enabled())
+        {
+            GU_ASIO_DEBUG("Dynamic socket enabled without SSL compiled, using TCP engine")
+        }
+#endif
         {
             GU_ASIO_DEBUG("AsioStreamEngine::make use TCP engine");
             return std::make_shared<AsioTcpStreamEngine>(fd);
         }
+#ifdef GALERA_HAVE_SSL
         else
         {
             GU_ASIO_DEBUG("AsioStreamEngine::make use Dynamic engine")
@@ -623,6 +631,7 @@ std::shared_ptr<gu::AsioStreamEngine> gu::AsioStreamEngine::make(
                                                             non_blocking,
                                                             io_service.ssl_enabled());
         }
+#endif // GALERA_HAVE_SSL
     }
 #ifdef GALERA_HAVE_SSL
     else if (scheme == "ssl")
@@ -634,7 +643,7 @@ std::shared_ptr<gu::AsioStreamEngine> gu::AsioStreamEngine::make(
         }
         else
         {
-            GU_ASIO_DEBUG("AsioStreamEngine::make use Dynamic engine");
+           GU_ASIO_DEBUG("AsioStreamEngine::make use Dynamic engine");
            return std::make_shared<AsioDynamicStreamEngine>(io_service, fd,
                                                             non_blocking,
                                                             io_service.ssl_enabled());

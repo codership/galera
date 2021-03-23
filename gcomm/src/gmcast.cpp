@@ -81,7 +81,10 @@ gcomm::GMCast::GMCast(Protonet& net, const gu::URI& uri,
                           param<int>(conf_, uri, Conf::GMCastSegment, "0"),
                           0, 255)),
     my_uuid_      (my_uuid ? *my_uuid : UUID(0, 0)),
-    dynamic_socket_ (param<bool>(conf_, uri, gu::conf::socket_dynamic, "false")),
+    dynamic_socket_ (conf_.has(gu::conf::socket_dynamic) ?
+                     param<bool>(conf_, uri, gu::conf::socket_dynamic,
+                                 "false") :
+                     false),
 #ifdef GALERA_HAVE_SSL
     use_ssl_      (param<bool>(conf_, uri, gu::conf::use_ssl, "false")),
 #else

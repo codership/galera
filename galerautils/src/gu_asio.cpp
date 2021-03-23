@@ -657,7 +657,9 @@ void gu::AsioIoService::handle_signal(const gu::Signals::SignalType& type)
     switch(type)
     {
     case gu::Signals::SignalType::S_CONFIG_RELOAD_CERTIFICATE:
+#ifdef GALERA_HAVE_SSL
         load_crypto_context();
+#endif // GALERA_HAVE_SSL
         break;
     default:
         break;
@@ -666,7 +668,11 @@ void gu::AsioIoService::handle_signal(const gu::Signals::SignalType& type)
 
 bool gu::AsioIoService::ssl_enabled() const
 {
+#ifdef GALERA_HAVE_SSL
     return impl_->ssl_context_.get();
+#else // GALERA_HAVE_SSL
+    return false;
+#endif
 }
 
 void gu::AsioIoService::load_crypto_context()
