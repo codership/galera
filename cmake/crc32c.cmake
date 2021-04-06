@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2020 Codership Oy <info@codership.com>
+# Copyright (C) 2020-2021 Codership Oy <info@codership.com>
 #
 
 message(STATUS "Checking for hardware CRC support for ${CMAKE_SYSTEM_PROCESSOR}")
@@ -26,7 +26,38 @@ int main() { __get_cpuid(1, &eax, &ebx, &ecx, &edx); return 0; }
     set(GALERA_CRC32C_X86_64 ON)
   endif()
 elseif (${CMAKE_SYSTEM_PROCESSOR} STREQUAL aarch64)
-  check_c_compiler_flag(-march=armv8-a+crc HAVE_CRC_FLAG)
+  set(CMAKE_REQUIRED_FLAGS -march=armv8-a+crc)
+  check_c_source_compiles(
+"
+// Here we assume that CPU feature detection and
+// CRC32 support in hardware is the same thing and
+// if the former is not available, the latter is
+// not available as well, so we test for both at
+// the same time
+
+#include <sys/auxv.h>
+#include <arm_acle.h>
+
+int main()
+{
+#if defined(__linux__)
+    (void)getauxval(AT_HWCAP);
+#elif defined(__FreeBSD__)
+    unsigned long info;
+    (void)elf_aux_info(AT_HWCAP, &info, sizeof(info));
+#else
+    #error Hardware feature detection for OS not supported
+#endif
+
+    (void)__crc32b(0, 0);
+    (void)__crc32h(0, 0);
+    (void)__crc32w(0, 0);
+    (void)__crc32d(0, 0);
+
+    return 0;
+}
+" HAVE_CRC_FLAG)
+  unset(CMAKE_REQUIRED_FLAGS)
   if (HAVE_CRC_FLAG)
     set(GALERA_CRC32C_COMPILER_FLAG "-march=armv8-a+crc")
     set(GALERA_CRC32C_ARM64 ON)
