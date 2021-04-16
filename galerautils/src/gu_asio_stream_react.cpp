@@ -715,14 +715,19 @@ gu::AsioAcceptorReact::AsioAcceptorReact(AsioIoService& io_service,
     , engine_()
 { }
 
-void gu::AsioAcceptorReact::open(const gu::URI& uri)
+void gu::AsioAcceptorReact::open(const gu::URI& uri) try
 {
     auto resolve_result(resolve_tcp(io_service_.impl().native(), uri));
     acceptor_.open(resolve_result->endpoint().protocol());
     set_fd_options(acceptor_);
 }
+catch (const asio::system_error& e)
+{
+    gu_throw_error(e.code().value()) << "Failed to open acceptor: " << e.what();
+}
 
-void gu::AsioAcceptorReact::listen(const gu::URI& uri)
+
+void gu::AsioAcceptorReact::listen(const gu::URI& uri) try
 {
     auto resolve_result(resolve_tcp(io_service_.impl().native(), uri));
     if (not acceptor_.is_open())
@@ -736,8 +741,12 @@ void gu::AsioAcceptorReact::listen(const gu::URI& uri)
     acceptor_.listen();
     listening_ = true;
 }
+catch (const asio::system_error& e)
+{
+    gu_throw_error(e.code().value()) << "Failed to listen: " << e.what();
+}
 
-void gu::AsioAcceptorReact::close()
+void gu::AsioAcceptorReact::close() try
 {
     if (acceptor_.is_open())
     {
@@ -745,10 +754,16 @@ void gu::AsioAcceptorReact::close()
     }
     listening_ = false;
 }
+catch (const asio::system_error& e)
+{
+    gu_throw_error(e.code().value()) << "Failed to close acceptor: "
+                                     << e.what();
+}
+
 
 void gu::AsioAcceptorReact::async_accept(
     const std::shared_ptr<AsioAcceptorHandler>& handler,
-    const std::shared_ptr<AsioStreamEngine>& engine)
+    const std::shared_ptr<AsioStreamEngine>& engine) try
 {
     GU_ASIO_DEBUG(this << " AsioAcceptorReact::async_accept: " << listen_addr());
     auto new_socket(std::make_shared<AsioStreamReact>(
@@ -761,8 +776,13 @@ void gu::AsioAcceptorReact::async_accept(
                                        asio::placeholders::error));
 
 }
+catch (const asio::system_error& e)
+{
+    gu_throw_error(e.code().value()) << "Failed to accept: " << e.what();
+}
 
-std::shared_ptr<gu::AsioSocket> gu::AsioAcceptorReact::accept()
+
+std::shared_ptr<gu::AsioSocket> gu::AsioAcceptorReact::accept() try
 {
     auto socket(std::make_shared<AsioStreamReact>(io_service_, scheme_,
                                                   nullptr));
@@ -786,6 +806,10 @@ std::shared_ptr<gu::AsioSocket> gu::AsioAcceptorReact::accept()
         return std::shared_ptr<gu::AsioSocket>(); // Keep compiler happy
     }
     return socket;
+}
+catch (const asio::system_error& e)
+{
+    gu_throw_error(e.code().value()) << "Failed to accept: " << e.what();
 }
 
 std::string gu::AsioAcceptorReact::listen_addr() const try

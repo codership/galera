@@ -383,6 +383,29 @@ START_TEST(test_tcp_acceptor_listen)
 }
 END_TEST
 
+START_TEST(test_tcp_acceptor_listen_already_bound)
+{
+    gu::AsioIoService io_service;
+    gu::URI uri("tcp://127.0.0.1:0");
+    auto acceptor_handler(std::make_shared<MockAcceptorHandler>());
+    auto acceptor(io_service.make_acceptor(uri));
+    acceptor->listen(uri);
+    auto listen_addr(acceptor->listen_addr());
+    ck_assert(listen_addr.find("tcp://127.0.0.1") != std::string::npos);
+
+    auto acceptor2(io_service.make_acceptor(acceptor->listen_addr()));
+    try
+    {
+        acceptor2->listen(acceptor->listen_addr());
+        ck_abort_msg("Exception not thrown for address already in use");
+    }
+    catch (const gu::Exception& e)
+    {
+        ck_assert(e.get_errno() == EADDRINUSE);
+    }
+}
+END_TEST
+
 START_TEST(test_tcp_acceptor_receive_buffer_size_unopened)
 {
     gu::AsioIoService io_service;
@@ -2030,6 +2053,10 @@ Suite* gu_asio_suite()
 
     tc = tcase_create("test_tcp_acceptor_listen");
     tcase_add_test(tc, test_tcp_acceptor_listen);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_tcp_acceptor_listen_already_bound");
+    tcase_add_test(tc, test_tcp_acceptor_listen_already_bound);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_tcp_acceptor_receive_buffer_size_unopened");
