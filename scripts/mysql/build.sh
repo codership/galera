@@ -299,9 +299,10 @@ if [ "$MYSQL_MAJOR" = "5.1" ]
 then
     MYSQL_BUILD_DIR="$MYSQL_SRC"
 else
+    MYSQL_BUILD_DIR="$MYSQL_SRC/build"
     [ "$DEBUG" == "yes" ] \
-    && MYSQL_BUILD_DIR="$MYSQL_SRC/build_debug" \
-    || MYSQL_BUILD_DIR="$MYSQL_SRC/build_release"
+    && MYSQL_BUILD_SUBDIR="$MYSQL_BUILD_DIR/debug" \
+    || MYSQL_BUILD_SUBDIR="$MYSQL_BUILD_DIR/release"
 fi
 
 
@@ -365,7 +366,7 @@ then
         cd $mysql_tag/
     fi
     MYSQL_SRC=$(pwd -P)
-    MYSQL_BUILD_DIR=$MYSQL_SRC
+    MYSQL_BUILD_SUBDIR=$MYSQL_SRC
     if [ "$CONFIGURE" == "yes" ]
     then
         echo "Regenerating config files"
@@ -456,7 +457,7 @@ then
 
             if [ "$MYSQL_MM_VER" -ge "57" ]
             then
-                BOOST_OPT="-DWITH_BOOST=boost_$MYSQL_MM_VER"
+                BOOST_OPT="-DWITH_BOOST=$MYSQL_BUILD_DIR/boost_$MYSQL_MM_VER"
                 [ "yes" = "$BOOTSTRAP" ] && \
                     BOOST_OPT="$BOOST_OPT -DDOWNLOAD_BOOST=1"
                 SSL_OPT="-DWITH_SSL=yes"
@@ -465,13 +466,13 @@ then
                 SSL_OPT="-DWITH_SSL=yes"
             fi
 
-            if [ "$MYSQL_BUILD_DIR" != "$MYSQL_SRC" ]
+            if [ "$MYSQL_BUILD_SUBDIR" != "$MYSQL_SRC" ]
             then
-               [ "$BOOTSTRAP" = "yes" ] && rm -rf $MYSQL_BUILD_DIR
-               [ -d "$MYSQL_BUILD_DIR" ] || mkdir -p $MYSQL_BUILD_DIR
+               [ "$BOOTSTRAP" = "yes" ] && rm -rf $MYSQL_BUILD_SUBDIR
+               [ -d "$MYSQL_BUILD_SUBDIR" ] || mkdir -p $MYSQL_BUILD_SUBDIR
             fi
 
-            pushd $MYSQL_BUILD_DIR
+            pushd $MYSQL_BUILD_SUBDIR
 
             # cmake wants either absolute path or a link from build directory
             # Incidentally link trick also allows us to use ccache
@@ -502,7 +503,7 @@ then
         then
             make -j $JOBS -S > /dev/null
         else
-            pushd $MYSQL_BUILD_DIR
+            pushd $MYSQL_BUILD_SUBDIR
             CC=$(pwd)/$(basename $CC) CXX=$(pwd)/$(basename $CXX) \
             make -j $JOBS -S > /dev/null
             popd
@@ -598,7 +599,7 @@ install_mysql_5.5_dist()
 {
     export DESTDIR=$BUILD_ROOT/dist/mysql
     mkdir -p $DESTDIR
-    pushd $MYSQL_BUILD_DIR
+    pushd $MYSQL_BUILD_SUBDIR
     make install
     popd
     unset DESTDIR
@@ -608,7 +609,7 @@ install_mysql_5.5_demo()
 {
     export DESTDIR=$BUILD_ROOT/dist/mysql
     mkdir -p $DESTDIR
-    pushd $MYSQL_BUILD_DIR
+    pushd $MYSQL_BUILD_SUBDIR
     cmake -DCMAKE_INSTALL_COMPONENT=Server -P cmake_install.cmake
     cmake -DCMAKE_INSTALL_COMPONENT=Client -P cmake_install.cmake
     cmake -DCMAKE_INSTALL_COMPONENT=SharedLibraries -P cmake_install.cmake
@@ -646,7 +647,7 @@ if [ $TAR == "yes" ]; then
         install -m 644 my-5.5.cnf $MYSQL_DIST_CNF
     fi
 
-    cat $MYSQL_BUILD_DIR/support-files/wsrep.cnf | \
+    cat $MYSQL_BUILD_SUBDIR/support-files/wsrep.cnf | \
         sed 's/root:$/root:rootpass/' >> $MYSQL_DIST_CNF
     pushd $MYSQL_BINS; ln -s wsrep_sst_rsync wsrep_sst_rsync_wan; popd
     tar -xzf mysql_var_$MYSQL_MAJOR.tgz -C $MYSQL_DIST_DIR
@@ -813,7 +814,7 @@ build_freebsd_packages()
     install -m 755 -d $(dirname $MYSQL_DIST_CNF)
     install -m 644 my-5.5.cnf $MYSQL_DIST_CNF
 
-    cat $MYSQL_BUILD_DIR/support-files/wsrep.cnf | \
+    cat $MYSQL_BUILD_SUBDIR/support-files/wsrep.cnf | \
         sed 's/root:$/root:rootpass/' >> $MYSQL_DIST_CNF
     pushd $MYSQL_BINS; ln -s wsrep_sst_rsync wsrep_sst_rsync_wan; popd
 
