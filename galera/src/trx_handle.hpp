@@ -639,7 +639,6 @@ namespace galera
 
         void mark_dummy()
         {
-            set_depends_seqno(WSREP_SEQNO_UNDEFINED);
             set_flags(flags() | F_ROLLBACK);
         }
 

@@ -993,7 +993,7 @@ wsrep_status_t galera::ReplicatorSMM::certify(TrxHandleMaster&  trx,
             /* committing fragment fails certification or non-committing BF'ed */
             // If the ts was queued, the depends seqno cannot be trusted
             // as it may be modified concurrently.
-            assert(ts->queued() || ts->depends_seqno() < 0 ||
+            assert(ts->queued() || ts->is_dummy() ||
                    (ts->flags() & TrxHandle::F_COMMIT) == 0);
             assert(ts->state() == TrxHandle::S_CERTIFYING ||
                    ts->state() == TrxHandle::S_REPLICATING);
@@ -3274,7 +3274,7 @@ wsrep_status_t galera::ReplicatorSMM::handle_local_monitor_interrupted(
     }
     else
     {
-        assert(WSREP_SEQNO_UNDEFINED == ts->depends_seqno());
+        assert(ts->is_dummy());
         pending_cert_queue_.push(ts);
     }
 
@@ -3333,6 +3333,7 @@ wsrep_status_t galera::ReplicatorSMM::finish_cert(
         assert(ts->depends_seqno() >= 0);
         break;
     case Certification::TEST_FAILED:
+        assert(ts->is_dummy());
         if (ts->nbo_end()) assert(ts->ends_nbo() == WSREP_SEQNO_UNDEFINED);
         local_cert_failures_ += ts->local();
         if (trx != 0) TX_SET_STATE(*trx, TrxHandle::S_ABORTING);

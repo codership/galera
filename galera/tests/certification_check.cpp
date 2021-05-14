@@ -193,7 +193,7 @@ START_TEST(test_certification_trx_v3)
         // 6: collides with 5
         { { {1, } }, 1, 6,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, true,
-          6, 6, 4, -1, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          6, 6, 4, 5, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
           Certification::TEST_FAILED, {0}, 0},
         // 7: depends on 5
         { { {2, } }, 1, 7,
@@ -203,7 +203,7 @@ START_TEST(test_certification_trx_v3)
         // 8: collides with 5
         { { {1, } }, 1, 8,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1}}, 3, true,
-          8, 8, 4, -1, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          8, 8, 4, 5, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
           Certification::TEST_FAILED, {0}, 0},
         // 9 - 10: shared key shadows dependency to 5
         // 9: depends on 5
@@ -232,7 +232,7 @@ START_TEST(test_certification_trx_v3)
         // 14: conflicts with 13
         { { {1, } }, 1, 14,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1}}, 3, false,
-          14, 14, 12, -1, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          14, 14, 12, 13, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
           Certification::TEST_FAILED, {0}, 0}
     };
 
@@ -272,7 +272,7 @@ START_TEST(test_certification_trx_different_level_v3)
           Certification::TEST_OK, {0}, 0},
         { { {1, } }, 1, 1,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, false,
-          4, 4, 2, -1, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          4, 4, 2, 3, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
           Certification::TEST_FAILED, {0}, 0}
     };
 
@@ -320,7 +320,7 @@ START_TEST(test_certification_toi_v3)
         // Trx 4 from different source conflicts with 3
         { { {3, } }, 3, 3,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1}}, 3, false,
-          4, 4, 2, -1,
+          4, 4, 2, 3,
           TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
           Certification::TEST_FAILED, {0}, 0},
         // Non conflicting TOI 5 depends on 4
@@ -332,7 +332,7 @@ START_TEST(test_certification_toi_v3)
         // Trx 6 from different source conflicts with TOI 5
         { { {3, } }, 3, 3,
           { {void_cast("2"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1}}, 3, false,
-          6, 6, 4, -1,
+          6, 6, 4, 5,
           TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
           Certification::TEST_FAILED, {0}, 0}
     };
@@ -366,12 +366,12 @@ START_TEST(test_certification_nbo)
           Certification::TEST_OK, {0}, 0},
         { { {1, } }, 2, 2,
           { {void_cast("1"), 1}, }, 1, false,
-          2, 2, 0, -1,
+          2, 2, 0, 1,
           TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
           Certification::TEST_FAILED, {0}, 0},
         { { {1, } }, 3, 3,
           { {void_cast("1"), 1}, }, 1, false,
-          3, 3, 0, -1,
+          3, 3, 0, 2,
           TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN,
           Certification::TEST_FAILED, {0}, 0},
         // 4 - 5 no conflict, different key
@@ -446,7 +446,7 @@ START_TEST(test_certification_commit_fragment)
           Certification::TEST_OK, {0}, 0},
         { { {1, } }, 1, 1,
           { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2, true,
-          4, 4, 2, -1, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT | TrxHandle::F_PA_UNSAFE,
+          4, 4, 2, 3, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT | TrxHandle::F_PA_UNSAFE,
           Certification::TEST_FAILED, {0}, 0},
 
         // commit fragment vs TOI
