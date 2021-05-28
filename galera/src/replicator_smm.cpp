@@ -3330,7 +3330,7 @@ wsrep_status_t galera::ReplicatorSMM::finish_cert(
         {
             retval = WSREP_OK;
         }
-        assert(ts->depends_seqno() >= 0);
+        assert(!ts->is_dummy());
         break;
     case Certification::TEST_FAILED:
         assert(ts->is_dummy());
@@ -3351,7 +3351,7 @@ wsrep_status_t galera::ReplicatorSMM::finish_cert(
 
     // we must do seqno assignment 'in order' for std::map reasons,
     // so keeping it inside the monitor. NBO end should never be skipped.
-    bool const skip(ts->depends_seqno() < 0 && !ts->nbo_end());
+    bool const skip(ts->is_dummy() && !ts->nbo_end());
     gcache_.seqno_assign (ts->action().first, ts->global_seqno(),
                           GCS_ACT_WRITESET, skip);
 
