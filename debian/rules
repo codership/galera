@@ -7,6 +7,10 @@ DPKG_EXPORT_BUILDFLAGS = 1
 # Include all defaults, includes buildflags.mk
 include /usr/share/dpkg/default.mk
 
+# Set unit test timeout multiplier to make slow tests
+# pass on loaded builders.
+export CK_TIMEOUT_MULTIPLIER=5
+
 override_dh_auto_test:
 	dh_auto_test -O--no-parallel -- ARGS=--output-on-failure
 
