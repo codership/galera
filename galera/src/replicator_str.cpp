@@ -991,7 +991,7 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         else
         {
             log_fatal << "Application state is corrupt and cannot "
-                      << "be recorvered. Restart required.";
+                      << "be recovered. Restart required.";
             abort();
         }
     }
@@ -1117,7 +1117,15 @@ void ReplicatorSMM::process_IST_writeset(void* recv_ctx,
         assert(ts.is_dummy());
     }
 
-    gu_trace(apply_trx(recv_ctx, ts));
+    try
+    {
+        apply_trx(recv_ctx, ts);
+    }
+    catch (...)
+    {
+        st_.mark_corrupt();
+        throw;
+    }
     GU_DBUG_SYNC_WAIT("recv_IST_after_apply_trx");
 
     if (gu_unlikely
@@ -1204,7 +1212,8 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
 
         log_fatal << os.str();
 
-        mark_corrupt_and_close();
+        gu::Lock lock(closing_mutex_);
+        start_closing();
     }
 }
 

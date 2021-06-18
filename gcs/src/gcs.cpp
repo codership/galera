@@ -713,7 +713,8 @@ _release_flow_control (gcs_conn_t* conn)
 static void
 gcs_become_primary (gcs_conn_t* conn)
 {
-    assert(conn->join_gtid.seqno() == GCS_SEQNO_ILL ||
+    assert(conn->join_gtid.seqno() <= 0      ||
+           conn->state == GCS_CONN_PRIMARY   ||
            conn->state == GCS_CONN_JOINER    ||
            conn->state == GCS_CONN_OPEN /* joiner that has received NON_PRIM */);
 
