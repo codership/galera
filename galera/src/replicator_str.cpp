@@ -764,6 +764,7 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
     {
         TrxHandle* trx(0);
         int err;
+        bool fail(false);
         try
         {
             if ((err = ist_receiver_.recv(&trx)) == 0)
@@ -789,7 +790,15 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
                     // processed on donor, just adjust states here
                     trx->set_state(TrxHandle::S_REPLICATING);
                     trx->set_state(TrxHandle::S_CERTIFYING);
-                    apply_trx(recv_ctx, trx);
+                    try
+                    {
+                        apply_trx(recv_ctx, trx);
+                    }
+                    catch (...)
+                    {
+                         st_.mark_corrupt();
+                         throw;
+                    }
                     GU_DBUG_SYNC_WAIT("recv_IST_after_apply_trx");
                 }
             }
@@ -799,15 +808,25 @@ void ReplicatorSMM::recv_IST(void* recv_ctx)
             }
             trx->unref();
         }
-        catch (gu::Exception& e)
+        catch (std::exception& e)
         {
             log_fatal << "receiving IST failed, node restart required: "
                       << e.what();
+            fail = true;
+        }
+        catch (...)
+        {
+            log_fatal << "receiving IST failed, node restart required: "
+                         "unknown exception.";
+            fail = true;
+        }
+
+        if (fail)
+        {
             if (trx)
             {
                 log_fatal << "failed trx: " << *trx;
             }
-            st_.mark_corrupt();
             abort();
         }
     }
