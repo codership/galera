@@ -2302,6 +2302,11 @@ Suite* gu_asio_suite()
     tcase_add_test(tc, test_datagram_open_connect);
     suite_add_tcase(s, tc);
 
+    tc = tcase_create("test_datagram_send_to_and_async_read");
+    tcase_add_test(tc, test_datagram_send_to_and_async_read);
+    suite_add_tcase(s, tc);
+
+#if defined(GALERA_ASIO_TEST_MULTICAST)
     tc = tcase_create("test_datagram_connect_multicast");
     tcase_add_test(tc, test_datagram_connect_multicast);
     suite_add_tcase(s, tc);
@@ -2310,22 +2315,19 @@ Suite* gu_asio_suite()
     tcase_add_test(tc, test_datagram_connect_multicast_local_if);
     suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_datagram_send_to_and_async_read");
-    tcase_add_test(tc, test_datagram_send_to_and_async_read);
-    suite_add_tcase(s, tc);
-
-#if defined(__FreeBSD__)
-    /* fails on FreeBSD with EADDRNOTAVAIL, disable temporarily */
-    (void)test_datagram_send_to_and_async_read_multicast;
-#else
     tc = tcase_create("test_datagram_send_to_and_async_read_multicast");
     tcase_add_test(tc, test_datagram_send_to_and_async_read_multicast);
     suite_add_tcase(s, tc);
-#endif /* FreeBSD */
 
     tc = tcase_create("test_datagram_write_multicast");
     tcase_add_test(tc, test_datagram_write_multicast);
     suite_add_tcase(s, tc);
+#else
+    (void)test_datagram_connect_multicast;
+    (void)test_datagram_connect_multicast_local_if;
+    (void)test_datagram_send_to_and_async_read_multicast;
+    (void)test_datagram_write_multicast;
+#endif /* GALERA_ASIO_TEST_MULTICAST */
 
     //
     // Steady timer
