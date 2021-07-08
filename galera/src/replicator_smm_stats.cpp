@@ -100,6 +100,7 @@ typedef enum status_vars
     STATS_APPLY_OOOE,
     STATS_APPLY_OOOL,
     STATS_APPLY_WINDOW,
+    STATS_APPLY_WAITS,
     STATS_COMMIT_OOOE,
     STATS_COMMIT_OOOL,
     STATS_COMMIT_WINDOW,
@@ -150,6 +151,7 @@ static const struct wsrep_stats_var wsrep_stats[STATS_MAX + 1] =
     { "apply_oooe",               WSREP_VAR_DOUBLE, { 0 }  },
     { "apply_oool",               WSREP_VAR_DOUBLE, { 0 }  },
     { "apply_window",             WSREP_VAR_DOUBLE, { 0 }  },
+    { "apply_waits",              WSREP_VAR_INT64,  { 0 }  },
     { "commit_oooe",              WSREP_VAR_DOUBLE, { 0 }  },
     { "commit_oool",              WSREP_VAR_DOUBLE, { 0 }  },
     { "commit_window",            WSREP_VAR_DOUBLE, { 0 }  },
@@ -236,13 +238,14 @@ galera::ReplicatorSMM::stats_get() const
     double oooe;
     double oool;
     double win;
-    apply_monitor_.get_stats(&oooe, &oool, &win);
+    long long waits;
+    apply_monitor_.get_stats(&oooe, &oool, &win, &waits);
 
     sv[STATS_APPLY_OOOE          ].value._double = oooe;
     sv[STATS_APPLY_OOOL          ].value._double = oool;
     sv[STATS_APPLY_WINDOW        ].value._double = win;
-
-    commit_monitor_.get_stats(&oooe, &oool, &win);
+    sv[STATS_APPLY_WAITS         ].value._int64 = waits;
+    commit_monitor_.get_stats(&oooe, &oool, &win, &waits);
 
     sv[STATS_COMMIT_OOOE         ].value._double = oooe;
     sv[STATS_COMMIT_OOOL         ].value._double = oool;
