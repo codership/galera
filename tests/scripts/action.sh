@@ -172,7 +172,7 @@ wait_sync()
     local node
     for node in $nodes
     do
-        mysql_query "$node" "set wsrep_causal_reads=1; select 0;" 1>/dev/null
+        mysql_query "$node" "SET SESSION wsrep_sync_wait=1; select 0;" 1>/dev/null
     done
 }
 

@@ -475,6 +475,10 @@ then
                 BUILD_OPT+=" -DWITH_BOOST=$MYSQL_BUILD_DIR/boost_$MYSQL_MM_VER"
                 [ "yes" = "$BOOTSTRAP" ] && BUILD_OPT+=" -DDOWNLOAD_BOOST=1"
             fi
+            if [ "$MYSQL_MM_VER" -ge "80" ]
+            then
+                BUILD_OPT+=" -DWITH_CURL=system"
+            fi
         else # MariaDB-specific build options
             BUILD_OPT+=" -DWITH_READLINE=system"
             BUILD_OPT+=" -DWITH_DEBUG:BOOL=ON"
