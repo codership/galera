@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2021 Codership Oy <info@codership.com>
  */
 
 #include "gcache_bh.hpp"
@@ -121,7 +121,18 @@ namespace gcache
 
             gu::Lock lock(mtx);
 
-            assert(seqno >= seqno_released);
+            if (seqno < seqno_released || seqno >= seqno_locked)
+            {
+#ifndef NDEBUG
+                if (params.debug())
+                {
+                    log_info << "GCache::seqno_release(" << seqno
+                             << "): seqno_locked: " << seqno_locked
+                             << ": exiting.";
+                }
+#endif
+                break;
+            }
 
             seqno_t idx(seqno2ptr.upper_bound(seqno_released));
 
