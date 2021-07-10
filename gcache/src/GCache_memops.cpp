@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2021 Codership Oy <info@codership.com>
  */
 
 #include "GCache.hpp"
@@ -29,7 +29,7 @@ namespace gcache
 #ifndef NDEBUG
         seqno_t const begin(params.debug() ?
                             (seqno2ptr.empty() ?
-                             seqno2ptr.index_begin() : SEQNO_NONE) : SEQNO_NONE);
+                             SEQNO_NONE : seqno2ptr.index_begin()) : SEQNO_NONE);
         if (params.debug())
         {
             assert(begin > 0);
