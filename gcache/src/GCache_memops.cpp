@@ -182,13 +182,6 @@ namespace gcache
         }
         rb.assert_size_free();
 
-#ifndef NDEBUG
-        if (params.debug())
-        {
-            log_info << "GCache::free_common(): seqno_released: "
-                     << seqno_released << " -> " << new_released;
-        }
-#endif
         seqno_released = new_released;
     }
 
@@ -202,8 +195,16 @@ namespace gcache
 
 #ifndef NDEBUG
             if (params.debug()) { log_info << "GCache::free() " << bh; }
+            seqno_t const old_sr(seqno_released);
 #endif
             free_common (bh);
+#ifndef NDEBUG
+            if (params.debug())
+            {
+                log_info << "GCache::free() seqno_released: "
+                         << old_sr << " -> " << seqno_released;
+            }
+#endif
         }
         else {
             log_warn << "Attempt to free a null pointer";
