@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2020 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2021 Codership Oy <info@codership.com>
 //
 
 #include "galera_common.hpp"
@@ -155,6 +155,7 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     sst_mutex_          (),
     sst_cond_           (),
     sst_retry_sec_      (1),
+    last_st_type_       (ST_TYPE_NONE),
     gcache_             (config_, config_.get(BASE_DIR)),
     gcs_                (config_, gcache_, proto_max_, args->proto_ver,
                          args->node_name, args->node_incoming),
@@ -1759,9 +1760,31 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandle* trx)
     if (!applicable)
     {
         // this can happen after state transfer position has been submitted
-        // but not all actions preceding it have been processed
+        // but not all actions preceding it have been processed.
+        //
+        // Cert index preload after SST:
+        // ----------------------------
+        // If the trx global seqno is in the half open range
+        // (cc_seqno_ , sst_seqno_], the write set was contained in the SST.
+        // In this case do the certification for trx to populate the index,
+        // but ignore the result. Always set state as S_MUST_ABORT and
+        // return WSREP_TRX_FAIL to make calling code to discard this trx.
+        if (last_st_type_ == ST_TYPE_SST &&
+            cc_seqno_ < trx->global_seqno() &&
+            trx->global_seqno() <= sst_seqno_)
+        {
+            (void)cert_.append_trx(trx);
+            trx->verify_checksum();
+            gcache_.seqno_assign (trx->action(),
+                                  trx->global_seqno(),
+                                  trx->depends_seqno());
+            cert_.set_trx_committed(trx);
+        }
+        else
+        {
+            gcache_.free(const_cast<void*>(trx->action()));
+        }
         trx->set_state(TrxHandle::S_MUST_ABORT);
-        gcache_.free(const_cast<void*>(trx->action()));
         if (interrupted)
             local_monitor_.self_cancel(lo);
         else

@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2018 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2021 Codership Oy <info@codership.com>
 //
 
 //! @file replicator_smm.hpp
@@ -542,6 +542,12 @@ namespace galera
         gu::Mutex     sst_mutex_;
         gu::Cond      sst_cond_;
         int           sst_retry_sec_;
+        enum st_type
+        {
+            ST_TYPE_NONE,
+            ST_TYPE_SST,
+            ST_TYPE_IST
+        } last_st_type_;
 
         // services
         gcache::GCache gcache_;
