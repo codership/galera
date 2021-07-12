@@ -472,7 +472,7 @@ local DUMP_OPTIONS=" --skip-opt --compact --quick --order-by-primary \
 DB=${DB:-"--all-databases"}
 #set -x
 mysqldump $DUMP_OPTIONS $ROOT_USER $ROOT_PSWD --socket $MYSQL_SOCKET  \
-          $IGNORE_TABLES $DB
+          $IGNORE_TABLES $DB | grep -v AUTO_INCREMENT=
 #set +x
 }
 
