@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2013-2018 Codership Oy <info@codership.com>
+// Copyright (C) 2013-2021 Codership Oy <info@codership.com>
 //
 
 #include "key_set.hpp"
@@ -151,28 +151,50 @@ KeySet::KeyPart::print_annotation(std::ostream& os, const gu::byte_t* buf)
 void
 KeySet::KeyPart::throw_buffer_too_short (size_t expected, size_t got)
 {
-    gu_throw_error (EINVAL) << "Buffer too short: expected "
-                            << expected << ", got " << got;
+#ifndef NDEBUG
+    log_fatal
+#else
+    gu_throw_error(EINVAL)
+#endif /* NDEBUG */
+        << "Buffer too short: expected " << expected << ", got " << got;
+    assert(0);
 }
 
 void
 KeySet::KeyPart::throw_bad_type_version (wsrep_key_type_t t, int v)
 {
-    gu_throw_error(EINVAL) << "Internal program error: wsrep key type: " << t
-                           << ", writeset version: " << v;
+#ifndef NDEBUG
+    log_fatal
+#else
+    gu_throw_error(EINVAL)
+#endif /* NDEBUG */
+        << "Internal program error: wsrep key type: " << t
+        << ", writeset version: " << v;
+    assert(0);
 }
 
 void
 KeySet::KeyPart::throw_bad_prefix (gu::byte_t p)
 {
-    gu_throw_error(EPROTO) << "Unsupported key prefix: " << int(p);
+#ifndef NDEBUG
+    log_fatal
+#else
+    gu_throw_error(EPROTO)
+#endif /* NDEBUG */
+        << "Unsupported key prefix: " << int(p);
+    assert(0);
 }
 
 void
 KeySet::KeyPart::throw_match_empty_key (Version my, Version other)
 {
-    gu_throw_error(EINVAL) << "Attempt to match against an empty key ("
-                           << my << ',' << other << ')';
+#ifndef NDEBUG
+    log_fatal
+#else
+    gu_throw_error(EINVAL)
+#endif /* NDEBUG */
+        << "Attempt to match against an empty key (" << my << ',' << other <<')';
+    assert(0);
 }
 
 void
