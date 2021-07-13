@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2021 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -1620,6 +1620,12 @@ long gcs_caused(gcs_conn_t* conn, gcs_seqno_t& seqno)
     return gcs_core_caused(conn->core, seqno);
 }
 
+static inline bool
+fc_active(gcs_conn_t* conn)
+{
+    return conn->stop_count > 0;
+}
+
 /* Puts action in the send queue and returns after it is replicated */
 long gcs_replv (gcs_conn_t*          const conn,      //!<in
                 const struct gu_buf* const act_in,    //!<in
@@ -1663,9 +1669,8 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
             // if (conn->state >= GCS_CONN_CLOSE) or (act_ptr == NULL)
             // ret will be -ENOTCONN
             if ((ret = -EAGAIN,
-                 conn->upper_limit >= conn->queue_len ||
-                 act->type         != GCS_ACT_TORDERED)         &&
-                (ret = -ENOTCONN, GCS_CONN_OPEN >= conn->state) &&
+                 !fc_active(conn) || act->type != GCS_ACT_TORDERED) &&
+                (ret = -ENOTCONN, GCS_CONN_OPEN >= conn->state)     &&
                 (act_ptr = (struct gcs_repl_act**)gcs_fifo_lite_get_tail (conn->repl_q)))
             {
                 *act_ptr = &repl_act;
@@ -2055,7 +2060,7 @@ gcs_get_stats (gcs_conn_t* conn, struct gcs_stats* stats)
     stats->fc_ssent    = conn->stats_fc_stop_sent;
     stats->fc_csent    = conn->stats_fc_cont_sent;
     stats->fc_received = conn->stats_fc_received;
-    stats->fc_active   = conn->stop_count > 0;
+    stats->fc_active   = fc_active(conn);
     stats->fc_requested= conn->stop_sent_ > 0;
 }
 
