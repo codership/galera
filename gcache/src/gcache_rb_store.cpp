@@ -723,22 +723,9 @@ namespace gcache
                 if (gu_likely(seqno_g > 0))
                 {
                     bool const collision(
-                        seqno_g > seqno_max
-                        ?
-                        (
-                            seqno_max = seqno_g,
-                            seqno2ptr_.insert(seqno_g, bh + 1), false
-                        )
-                        :
-                        (
-                            (seqno_g >= seqno2ptr_.index_begin() &&
-                             seqno2ptr_[seqno_g])
-                            ?
-                            true /* already exists */
-                            :
-                            (seqno2ptr_.insert(seqno_g, bh + 1), false)
-                         )
-                    );
+                        seqno_g <= seqno_max &&
+                        seqno_g >= seqno2ptr_.index_begin() &&
+                        seqno2ptr_[seqno_g] != seqno2ptr_t::null_value());
 
                     if (gu_unlikely(collision))
                     {
@@ -804,6 +791,26 @@ namespace gcache
                         } else {
                             log_info << "Contents differ. Discarding both.";
                         }
+                    }
+                    else
+                    {
+                        try
+                        {
+                            seqno2ptr_.insert(seqno_g, bh + 1);
+                        }
+                        catch (std::exception& e)
+                        {
+                            seqno_t const sb(seqno2ptr_.empty() ? SEQNO_ILL :
+                                             seqno2ptr_.index_begin());
+                            seqno_t const se(seqno2ptr_.empty() ? SEQNO_ILL :
+                                             seqno2ptr_.index_end());
+                            log_warn << "Exception while mapping writeset "
+                                     << seqno_g << " into [" << sb << ", " << se
+                                     << "): '" << e.what()
+                                     << "'. Aborting GCache recovery.";
+                            goto out;
+                        }
+                        seqno_max = std::max(seqno_g, seqno_max);
                     }
                 }
 
@@ -894,7 +901,7 @@ namespace gcache
             }
 #undef GCACHE_SCAN_BUFFER_TEST
         } // while (segment_scans < 2)
-
+    out:
         progress.finish();
 
         return erase_up_to;
