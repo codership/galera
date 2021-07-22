@@ -557,6 +557,7 @@ void gu::ssl_init_options(gu::Config& conf)
     if (use_ssl == true)
     {
         // set defaults
+        conf.set(conf::ssl_reload, 1);
 
         // cipher list
         const std::string cipher_list(conf.get(conf::ssl_cipher, ""));

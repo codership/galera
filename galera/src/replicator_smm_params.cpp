@@ -197,7 +197,15 @@ galera::ReplicatorSMM::param_set (const std::string& key,
 {
     try
     {
+#ifdef GALERA_HAVE_SSL
+        // Param `socket.ssl_reload` is used as trigger. We should
+        // skip checking if value is changed.
+        if (key != gu::conf::ssl_reload) {
+#endif
         if (config_.get(key) == value) return;
+#ifdef GALERA_HAVE_SSL
+        }
+#endif
     }
     catch (gu::NotSet&) {}
 
