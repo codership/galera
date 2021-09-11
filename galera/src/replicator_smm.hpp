@@ -539,6 +539,12 @@ namespace galera
                         mutex.lock();
                     }
                 }
+                else
+                {
+                    mutex.unlock();
+                    GU_DBUG_SYNC_WAIT("local_monitor_enter_sync");
+                    mutex.lock();
+                }
             }
 #endif //GU_DBUG_ON
 
