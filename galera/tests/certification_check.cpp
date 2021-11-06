@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2015-2019 Codership Oy <info@codership.com>
+// Copyright (C) 2015-2021 Codership Oy <info@codership.com>
 //
 
 #include "replicator_smm.hpp" // ReplicatorSMM::InitConfig
@@ -21,7 +21,10 @@ namespace
         TestEnv() :
             conf_   (),
             init_   (conf_),
-            gcache_ (conf_, ".")
+            gcache_pcb_
+            (galera::ProgressCallback<int64_t>(WSREP_MEMBER_UNDEFINED,
+                                               WSREP_MEMBER_UNDEFINED)),
+            gcache_ (&gcache_pcb_, conf_, ".")
         { }
 
         ~TestEnv() { ::unlink(GCACHE_NAME.c_str()); }
@@ -44,6 +47,7 @@ namespace
                 conf.set("gcache.size", "1M");
             }
         }                                 init_;
+        galera::ProgressCallback<int64_t> gcache_pcb_;
         gcache::GCache                    gcache_;
     };
 

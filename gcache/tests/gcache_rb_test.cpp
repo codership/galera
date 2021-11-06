@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2011-2021 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -34,7 +34,7 @@ START_TEST(test1)
 
     seqno2ptr_t s2p(SEQNO_NONE);
     gu::UUID   gid(GID);
-    RingBuffer rb(RB_NAME, rb_size, s2p, gid, 0, false);
+    RingBuffer rb(NULL, RB_NAME, rb_size, s2p, gid, 0, false);
 
     ck_assert_msg(rb.size() == rb_size,
                   "Expected %zd, got %zd", rb_size, rb.size());
@@ -158,7 +158,7 @@ START_TEST(recovery)
 
         rb_ctx(size_t s, bool recover = true) :
             size(s), s2p(SEQNO_NONE), gid(GID),
-            rb(RB_NAME, size, s2p, gid, 0, recover)
+            rb(NULL, RB_NAME, size, s2p, gid, 0, recover)
         {}
 
         void seqno_assign (seqno2ptr_t& s2p, void* const ptr,

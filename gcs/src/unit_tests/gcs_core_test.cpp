@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2021 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -369,7 +369,7 @@ core_test_init (gu::Config* config,
 
     gcs_test::InitConfig(*config, CacheName);
 
-    Cache = new gcache::GCache(*config, ".");
+    Cache = new gcache::GCache(NULL, *config, ".");
 
     Core = gcs_core_create (reinterpret_cast<gu_config_t*>(config),
                             reinterpret_cast<gcache_t*>(Cache),

@@ -43,13 +43,15 @@ namespace gcache
     void
     RingBuffer::constructor_common() {}
 
-    RingBuffer::RingBuffer (const std::string& name,
+    RingBuffer::RingBuffer (ProgressCallback*  pcb,
+                            const std::string& name,
                             size_t             size,
                             seqno2ptr_t&       seqno2ptr,
                             gu::UUID&          gid,
                             int const          dbg,
                             bool const         recover)
     :
+        pcb_       (pcb),
         fd_        (name, check_size(size)),
         mmap_      (fd_),
         preamble_  (static_cast<char*>(mmap_.ptr)),
@@ -641,7 +643,7 @@ namespace gcache
         {
             if (gid_ != gu::UUID())
             {
-                log_info << "Recovering GCache ring buffer: version: " << version
+                log_info << "Recovering GCache ring buffer: version: " <<version
                          << ", UUID: " << gid_ << ", offset: " << offset;
 
                 try
@@ -671,6 +673,25 @@ namespace gcache
         write_preamble(true);
     }
 
+    /* Helper callback class to specilize for different progress types */
+    template <typename T>
+    class recover_progress_callback : public gu::Progress<T>::Callback
+    {
+    public:
+        recover_progress_callback(gcache::ProgressCallback* pcb)
+            : pcb_(pcb)
+        {}
+        ~recover_progress_callback() {}
+        void operator()(T const total, T const done)
+        {
+            if (pcb_) (*pcb_)(total, done);
+        }
+    private:
+        recover_progress_callback(const recover_progress_callback&);
+        recover_progress_callback& operator=(recover_progress_callback);
+        ProgressCallback* pcb_;
+    };
+
     seqno_t
     RingBuffer::scan(off_t const offset, int const scan_step)
     {
@@ -696,7 +717,9 @@ namespace gcache
                 segment_scans = 1;
         }
 
-        gu::Progress<ptrdiff_t> progress(NULL,"GCache::RingBuffer initial scan",
+        recover_progress_callback<ptrdiff_t> scan_progress_callback(pcb_);
+        gu::Progress<ptrdiff_t> progress(&scan_progress_callback,
+                                         "GCache::RingBuffer initial scan",
                                          " bytes", end_ - start_, 1<<22/*4Mb*/);
 
         while (segment_scans < 2)
@@ -1046,8 +1069,10 @@ namespace gcache
             size_t locked(0);
 
             {
+                recover_progress_callback<size_t>
+                    unused_progress_callback(pcb_);
                 gu::Progress<size_t> progress(
-                    NULL,
+                    &unused_progress_callback,
                     "GCache::RingBuffer unused buffers scan",
                     " bytes", size_used_, 1<<22 /* 4Mb */);
 

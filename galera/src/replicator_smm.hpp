@@ -990,6 +990,7 @@ namespace galera
         bool          sst_received_;
 
         // services
+        ProgressCallback<int64_t> gcache_progress_cb_;
         gcache::GCache   gcache_;
         ProgressCallback<gcs_seqno_t> joined_progress_cb_;
         GCS_IMPL         gcs_;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2021 Codership Oy <info@codership.com>
  *
  */
 
@@ -28,7 +28,7 @@ main (int argc, char* argv[])
     gu::Config conf;
     GCache::register_params(conf);
     conf.parse("gcache.name = " TEST_CACHE "; gcache.size = 16K");
-    GCache* cache = new GCache (conf, "");
+    GCache* cache = new GCache (NULL, conf, "");
 
     log_info  << "";
     log_info  << "...do something...";

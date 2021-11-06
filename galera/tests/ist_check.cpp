@@ -549,14 +549,15 @@ static void test_ist_common(int const version)
     std::string const gcache_sender_file("ist_sender.cache");
     conf_sender.set("gcache.name", gcache_sender_file);
     conf_sender.set("gcache.size", "1M");
-    gcache::GCache* gcache_sender = new gcache::GCache(conf_sender, dir);
+    gcache::GCache* gcache_sender = new gcache::GCache(NULL, conf_sender, dir);
 
     gu::Config conf_receiver;
     galera::ReplicatorSMM::InitConfig(conf_receiver, NULL, NULL);
     std::string const gcache_receiver_file("ist_receiver.cache");
     conf_receiver.set("gcache.name", gcache_receiver_file);
     conf_receiver.set("gcache.size", "1M");
-    gcache::GCache* gcache_receiver = new gcache::GCache(conf_receiver, dir);
+    gcache::GCache* gcache_receiver = new gcache::GCache(NULL, conf_receiver,
+                                                         dir);
 
     std::string receiver_addr("tcp://127.0.0.1:0");
     wsrep_uuid_t uuid;
