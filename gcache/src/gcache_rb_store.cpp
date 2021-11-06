@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2021 Codership Oy <info@codership.com>
  */
 
 #include "gcache_rb_store.hpp"
@@ -696,8 +696,8 @@ namespace gcache
                 segment_scans = 1;
         }
 
-        gu::Progress<ptrdiff_t> progress("GCache::RingBuffer initial scan",
-                                         " bytes", end_ - start_, 1<<22 /*4Mb*/);
+        gu::Progress<ptrdiff_t> progress(NULL,"GCache::RingBuffer initial scan",
+                                         " bytes", end_ - start_, 1<<22/*4Mb*/);
 
         while (segment_scans < 2)
         {
@@ -1042,46 +1042,50 @@ namespace gcache
             estimate_space();
 
             /* now discard all the locked-in buffers (see seqno_reset()) */
-            gu::Progress<size_t> progress(
-                "GCache::RingBuffer unused buffers scan",
-                " bytes", size_used_, 1<<22 /* 4Mb */);
-
             size_t total(0);
             size_t locked(0);
-            bh = BH_cast(first_);
-            while (bh != BH_cast(next_))
-            {
-                if (gu_likely(bh->size > 0))
-                {
-                    total++;
 
-                    if (gu_likely(bh->seqno_g > 0))
+            {
+                gu::Progress<size_t> progress(
+                    NULL,
+                    "GCache::RingBuffer unused buffers scan",
+                    " bytes", size_used_, 1<<22 /* 4Mb */);
+
+                bh = BH_cast(first_);
+                while (bh != BH_cast(next_))
+                {
+                    if (gu_likely(bh->size > 0))
                     {
-                        free(bh); // on recovery no buffer is used
+                        total++;
+
+                        if (gu_likely(bh->seqno_g > 0))
+                        {
+                            free(bh); // on recovery no buffer is used
+                        }
+                        else
+                        {
+                            /* anything that is not ordered must be discarded */
+                            assert(SEQNO_NONE == bh->seqno_g ||
+                                   SEQNO_ILL  == bh->seqno_g);
+                            locked++;
+                            empty_buffer(bh);
+                            discard(bh);
+                            size_used_ -= bh->size;
+                            // size_free_ is taken care of in discard()
+                        }
+
+                        bh = BH_next(bh);
                     }
                     else
                     {
-                        /* anything that is not ordered must be discarded */
-                        assert(SEQNO_NONE == bh->seqno_g ||
-                               SEQNO_ILL  == bh->seqno_g);
-                        locked++;
-                        empty_buffer(bh);
-                        discard(bh);
-                        size_used_ -= bh->size;
-                        // size_free_ is taken care of in discard()
+                        bh = BH_cast(start_); // rollover
                     }
 
-                    bh = BH_next(bh);
-                }
-                else
-                {
-                     bh = BH_cast(start_); // rollover
+                    progress.update(bh->size);
                 }
 
-                progress.update(bh->size);
+                progress.finish();
             }
-
-            progress.finish();
 
             /* No buffers on recovery should be in used state */
             assert(0 == size_used_);

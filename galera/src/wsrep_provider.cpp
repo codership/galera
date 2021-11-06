@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2021 Codership Oy <info@codership.com>
 //
 
 #include "key_data.hpp"
@@ -14,6 +14,7 @@
 #endif
 
 #include "wsrep_params.hpp"
+#include "event_service.hpp"
 
 #include <cassert>
 
@@ -1649,4 +1650,15 @@ int wsrep_init_allowlist_service_v1(wsrep_allowlist_service_v1_t *allowlist_serv
 extern "C" void wsrep_deinit_allowlist_service_v1()
 {
     gu::deinit_allowlist_service_v1();
+}
+
+extern "C"
+int wsrep_init_event_service_v1(wsrep_event_service_v1_t *event_service)
+{
+    return galera::EventService::init_v1(event_service);
+}
+
+extern "C" void wsrep_deinit_event_service_v1()
+{
+    galera::EventService::deinit_v1();
 }

@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2020 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2021 Codership Oy <info@codership.com>
 //
 
 #include "galera_common.hpp"
@@ -121,12 +121,18 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     sst_retry_sec_      (1),
     sst_received_       (false),
     gcache_             (config_, config_.get(BASE_DIR)),
-    gcs_                (config_, gcache_, proto_max_, args->proto_ver,
+    joined_progress_cb_ (ProgressCallback<gcs_seqno_t>(WSREP_MEMBER_JOINED,
+                                                       WSREP_MEMBER_SYNCED)),
+    gcs_                (config_, gcache_, &joined_progress_cb_,
+                         proto_max_, args->proto_ver,
                          args->node_name, args->node_incoming),
     service_thd_        (gcs_, gcache_),
     slave_pool_         (sizeof(TrxHandleSlave), 1024, "TrxHandleSlave"),
-    as_                 (new GcsActionSource(slave_pool_, gcs_, *this, gcache_)),
-    ist_receiver_       (config_, gcache_, slave_pool_,*this,args->node_address),
+    as_                 (new GcsActionSource(slave_pool_, gcs_, *this,gcache_)),
+    ist_progress_cb_    (ProgressCallback<wsrep_seqno_t>(WSREP_MEMBER_JOINER,
+                                                         WSREP_MEMBER_JOINED)),
+    ist_receiver_       (config_, gcache_, slave_pool_, *this,
+                         args->node_address, &ist_progress_cb_),
     ist_senders_        (gcache_),
     wsdb_               (),
     cert_               (config_, &service_thd_),

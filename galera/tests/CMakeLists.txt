@@ -13,6 +13,7 @@ add_executable(galera_check
   ist_check.cpp
   saved_state_check.cpp
   defaults_check.cpp
+  progress_check.cpp
   )
 
 target_include_directories(galera_check

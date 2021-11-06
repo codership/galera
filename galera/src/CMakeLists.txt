@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2020 Codership Oy <info@codership.com>
+# Copyright (C) 2020-2021 Codership Oy <info@codership.com>
 #
 
 add_library(galera
@@ -26,6 +26,7 @@ add_library(galera
   replicator_smm.cpp
   replicator_str.cpp
   replicator_smm_stats.cpp
+  event_service.cpp
   )
 
 target_include_directories(galera

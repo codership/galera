@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2019 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2021 Codership Oy <info@codership.com>
 //
 
 #include "ist.hpp"
@@ -92,7 +92,8 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
                                 gcache::GCache&       gc,
                                 TrxHandleSlave::Pool& slave_pool,
                                 EventHandler&         handler,
-                                const char*           addr)
+                                const char*           addr,
+                                gu::Progress<wsrep_seqno_t>::Callback* cb)
     :
     recv_addr_    (),
     recv_bind_    (),
@@ -100,6 +101,7 @@ galera::ist::Receiver::Receiver(gu::Config&           conf,
     acceptor_     (),
     mutex_        (),
     cond_         (),
+    progress_cb_  (cb),
     first_seqno_  (WSREP_SEQNO_UNDEFINED),
     last_seqno_   (WSREP_SEQNO_UNDEFINED),
     current_seqno_(WSREP_SEQNO_UNDEFINED),
@@ -400,6 +402,7 @@ void galera::ist::Receiver::run()
                          << act.seqno_g;
                 current_seqno_ = act.seqno_g;
                 progress = new gu::Progress<wsrep_seqno_t>(
+                    progress_cb_,
                     "Receiving IST", " events",
                     last_seqno_ - current_seqno_ + 1,
                     /* The following means reporting progress NO MORE frequently

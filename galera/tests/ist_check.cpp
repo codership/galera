@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2020 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2021 Codership Oy <info@codership.com>
 //
 
 
@@ -399,7 +399,7 @@ extern "C" void* receiver_thd(void* arg)
     conf.set(galera::ist::Receiver::RECV_ADDR, rargs->listen_addr_);
     ISTHandler isth;
     galera::ist::Receiver receiver(conf, rargs->gcache_, slave_pool,
-                                   isth, 0);
+                                   isth, 0, NULL);
 
     // Prepare starts IST receiver thread
     rargs->listen_addr_ = receiver.prepare(rargs->first_, rargs->last_,
