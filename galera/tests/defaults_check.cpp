@@ -68,6 +68,7 @@ static const char* Defaults[] =
     "gcs.fc_factor",               "1.0",
     "gcs.fc_limit",                "16",
     "gcs.fc_master_slave",         "no",
+    "gcs.fc_single_primary",       "no",
     "gcs.max_packet_size",         "64500",
     "gcs.max_throttle",            "0.25",
 #if (GU_WORDSIZE == 32)

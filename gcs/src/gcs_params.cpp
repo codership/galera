@@ -14,6 +14,7 @@
 const char* const GCS_PARAMS_FC_FACTOR         = "gcs.fc_factor";
 const char* const GCS_PARAMS_FC_LIMIT          = "gcs.fc_limit";
 const char* const GCS_PARAMS_FC_MASTER_SLAVE   = "gcs.fc_master_slave";
+const char* const GCS_PARAMS_FC_SINGLE_PRIMARY = "gcs.fc_single_primary";
 const char* const GCS_PARAMS_FC_DEBUG          = "gcs.fc_debug";
 const char* const GCS_PARAMS_SYNC_DONOR        = "gcs.sync_donor";
 const char* const GCS_PARAMS_MAX_PKT_SIZE      = "gcs.max_packet_size";
@@ -27,6 +28,7 @@ const char* const GCS_PARAMS_SM_DUMP           = "gcs.sm_dump";
 static const char* const GCS_PARAMS_FC_FACTOR_DEFAULT         = "1.0";
 static const char* const GCS_PARAMS_FC_LIMIT_DEFAULT          = "16";
 static const char* const GCS_PARAMS_FC_MASTER_SLAVE_DEFAULT   = "no";
+static const char* const GCS_PARAMS_FC_SINGLE_PRIMARY_DEFAULT = "no";
 static const char* const GCS_PARAMS_FC_DEBUG_DEFAULT          = "0";
 static const char* const GCS_PARAMS_SYNC_DONOR_DEFAULT        = "no";
 static const char* const GCS_PARAMS_MAX_PKT_SIZE_DEFAULT      = "64500";
@@ -45,6 +47,8 @@ gcs_params_register(gu_config_t* conf)
                           GCS_PARAMS_FC_LIMIT_DEFAULT);
     ret |= gu_config_add (conf, GCS_PARAMS_FC_MASTER_SLAVE,
                           GCS_PARAMS_FC_MASTER_SLAVE_DEFAULT);
+    ret |= gu_config_add (conf, GCS_PARAMS_FC_SINGLE_PRIMARY,
+                          GCS_PARAMS_FC_SINGLE_PRIMARY_DEFAULT);
     ret |= gu_config_add (conf, GCS_PARAMS_FC_DEBUG,
                           GCS_PARAMS_FC_DEBUG_DEFAULT);
     ret |= gu_config_add (conf, GCS_PARAMS_SYNC_DONOR,
@@ -178,6 +182,18 @@ params_init_double (gu_config_t* conf, const char* const name,
     return 0;
 }
 
+static void deprecation_warning(gu_config_t* config,
+                                const char* deprecated,
+                                const char* current)
+{
+    if (gu_config_is_set(config, deprecated))
+    {
+        gu_warn("Option '%s' is deprecated and will be removed in the "
+                "future versions, please use '%s' instead. ",
+                deprecated, current);
+    }
+}
+
 long
 gcs_params_init (struct gcs_params* params, gu_config_t* config)
 {
@@ -209,7 +225,12 @@ gcs_params_init (struct gcs_params* params, gu_config_t* config)
     params->recv_q_hard_limit = tmp * gcs_fc_hard_limit_fix;
     // allow for some meta overhead
 
+    deprecation_warning(config, GCS_PARAMS_FC_MASTER_SLAVE,
+                        GCS_PARAMS_FC_SINGLE_PRIMARY);
     if ((ret = params_init_bool (config, GCS_PARAMS_FC_MASTER_SLAVE,
+                                 &params->fc_master_slave))) return ret;
+    // Overrides deprecated GCS_PARAMS_FC_MASTER_SLAVE if set
+    if ((ret = params_init_bool (config, GCS_PARAMS_FC_SINGLE_PRIMARY,
                                  &params->fc_master_slave))) return ret;
 
     if ((ret = params_init_bool (config, GCS_PARAMS_SYNC_DONOR,
