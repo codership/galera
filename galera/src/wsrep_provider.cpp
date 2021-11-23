@@ -4,6 +4,7 @@
 
 #include "key_data.hpp"
 #include "gu_serialize.hpp"
+#include "gu_asio.hpp" //  // gu::init_allowlist_service_v1()
 
 #if defined(GALERA_MULTIMASTER)
 #include "replicator_smm.hpp"
@@ -1637,4 +1638,15 @@ int wsrep_loader(wsrep_t *hptr)
     }
 
     return WSREP_OK;
+}
+
+extern "C"
+int wsrep_init_allowlist_service_v1(wsrep_allowlist_service_v1_t *allowlist_service)
+{
+    return gu::init_allowlist_service_v1(allowlist_service);
+}
+
+extern "C" void wsrep_deinit_allowlist_service_v1()
+{
+    gu::deinit_allowlist_service_v1();
 }

@@ -14,6 +14,8 @@
 #include "gu_uri.hpp"
 #include "gu_signals.hpp"
 
+#include "wsrep_allowlist_service.h"
+
 #include <netinet/tcp.h> // tcp_info
 
 #include <array>
@@ -78,6 +80,9 @@ namespace gu
     static inline void ssl_register_params(gu::Config&) { }
     static inline void ssl_init_options(gu::Config&) { }
 #endif // GALERA_HAVE_SSL
+
+    /* Allowlist check callback */
+    bool allowlist_value_check(wsrep_allowlist_key_t key, const std::string& value);
 
     //
     // Address manipulation helpers
@@ -758,6 +763,10 @@ namespace gu
         class Impl;
         std::unique_ptr<Impl> impl_;
     };
+
+    /* Init/deinit global allowlist service hooks. */
+    int init_allowlist_service_v1(wsrep_allowlist_service_v1_t*);
+    void deinit_allowlist_service_v1();
 }
 
 #endif // GU_ASIO_HPP

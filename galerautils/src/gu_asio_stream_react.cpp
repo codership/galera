@@ -790,6 +790,16 @@ std::shared_ptr<gu::AsioSocket> gu::AsioAcceptorReact::accept() try
     set_socket_options(socket->socket_);
     socket->prepare_engine(false);
     socket->assign_addresses();
+    std::string remote_ip = ::escape_addr(socket->socket_.remote_endpoint().address());
+    
+    auto connection_allowed(gu::allowlist_value_check(WSREP_ALLOWLIST_KEY_IP, remote_ip));
+    if (connection_allowed == false)
+    {
+        log_warn << "Connection not allowed, IP not found in allowlist.";
+        throw_sync_op_error(*socket->engine_, "Connection not allowed, IP not found in allowlist.");
+        return std::shared_ptr<gu::AsioSocket>();
+    }
+
     auto result(socket->engine_->server_handshake());
     switch (result)
     {
@@ -874,9 +884,19 @@ void gu::AsioAcceptorReact::accept_handler(
 
     set_socket_options(socket->socket_);
     socket->set_non_blocking(true);
-    socket->connected_ = true;
     socket->prepare_engine(true);
     socket->assign_addresses();
+   
+    std::string remote_ip = ::escape_addr(socket->socket_.remote_endpoint().address());
+    auto connection_allowed(gu::allowlist_value_check(WSREP_ALLOWLIST_KEY_IP, remote_ip));
+    if (connection_allowed == false)
+    {
+        log_warn << "Connection not allowed, IP " << remote_ip << " not found in allowlist.";
+        async_accept(handler);
+        return;
+    }
+
+    socket->connected_ = true;
     auto result(socket->engine_->server_handshake());
     switch (result)
     {

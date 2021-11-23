@@ -49,6 +49,8 @@
 #include <fstream>
 #include <mutex>
 
+static wsrep_allowlist_service_v1_t* gu_allowlist_service(0);
+
 //
 // AsioIpAddress wrapper
 //
@@ -548,6 +550,27 @@ void gu::ssl_param_set(const std::string& key, const std::string& val,
     }
 }
 
+bool gu::allowlist_value_check(wsrep_allowlist_key_t key, const std::string& value)
+{
+    if (gu_allowlist_service == nullptr)
+    {
+        return true;
+    }
+    wsrep_buf_t const check_value = { value.c_str(), value.length() };
+    wsrep_status_t result(gu_allowlist_service->allowlist_cb(
+        gu_allowlist_service->context, key, &check_value));
+    switch (result)
+    {
+        case WSREP_OK:
+            return true;
+        case WSREP_NOT_ALLOWED:
+            return false;
+        default:
+            gu_throw_error(EINVAL) << "Unknown allowlist callback response: " << result 
+                                   << ", aborting.";
+    }
+}
+
 void gu::ssl_init_options(gu::Config& conf)
 {
     init_use_ssl(conf);
@@ -809,4 +832,32 @@ void gu::AsioSteadyTimer::async_wait(
 void gu::AsioSteadyTimer::cancel()
 {
     impl_->native().cancel();
+}
+
+//
+// Allowlist service hooks.
+//
+
+static std::mutex gu_allowlist_service_init_mutex;
+static size_t gu_allowlist_service_usage;
+
+int gu::init_allowlist_service_v1(wsrep_allowlist_service_v1_t* allowlist_service)
+{
+    std::lock_guard<std::mutex> lock(gu_allowlist_service_init_mutex);
+    ++gu_allowlist_service_usage;
+    if (gu_allowlist_service)
+    {
+        assert(gu_allowlist_service == allowlist_service);
+        return 0;
+    }
+    gu_allowlist_service = allowlist_service;
+    return 0;
+}
+
+void gu::deinit_allowlist_service_v1()
+{
+    std::lock_guard<std::mutex> lock(gu_allowlist_service_init_mutex);
+    assert(gu_allowlist_service_usage > 0);
+    --gu_allowlist_service_usage;
+    if (gu_allowlist_service_usage == 0) gu_allowlist_service = 0;
 }

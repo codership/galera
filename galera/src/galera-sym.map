@@ -1,5 +1,7 @@
 {
     global: wsrep_loader;
             wsrep_interface_version;
+            wsrep_init_allowlist_service_v1;
+            wsrep_deinit_allowlist_service_v1;
     local:  *;
 };
