@@ -45,9 +45,7 @@ namespace galera
 
         void add(typename T::State from, typename T::State to)
         {
-            trans_map_.insert_unique(
-                std::make_pair(typename T::Transition(from, to),
-                               typename T::Fsm::TransAttr()));
+            trans_map_.insert_unique(typename T::Transition(from, to));
         }
     private:
         typename T::Fsm::TransMap& trans_map_;
