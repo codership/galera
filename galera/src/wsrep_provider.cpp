@@ -834,6 +834,9 @@ wsrep_status_t galera_release(wsrep_t*            gh,
     assert(gh != 0);
     assert(gh->ctx != 0);
 
+    // A trx object was not created for this handle
+    if (not ws_handle->opaque) return WSREP_OK;
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     TrxHandleMaster* txp(get_local_trx(repl, ws_handle, false));
 
