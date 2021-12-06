@@ -1072,6 +1072,11 @@ namespace gcache
                     }
 
                     bh = BH_next(bh);
+
+                    // A corrupt buffer segment size could lead out of the ring
+                    if (gu_unlikely(reinterpret_cast<uint8_t*>(bh) > end_)) {
+                        goto full_reset;
+                    }
                 }
                 else
                 {
