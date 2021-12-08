@@ -39,7 +39,7 @@ endif()
 
 if(NOT ASIO_VERSION_OK)
   message(STATUS "Using bundled asio")
-  include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/asio)
+  include_directories(SYSTEM ${PROJECT_SOURCE_DIR}/asio)
 endif()
 
 add_definitions(-DHAVE_ASIO_HPP)

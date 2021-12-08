@@ -14,7 +14,7 @@ add_executable(wsrep_test
   ../src/wsrep_dummy.c)
 target_compile_definitions(wsrep_test
   PRIVATE
-  -DWSREP_PROVIDER="${CMAKE_BINARY_DIR}/libgalera_smm.so"
+  -DWSREP_PROVIDER="${PROJECT_BINARY_DIR}/libgalera_smm.so"
   -DGALERA_VERSION="${GALERA_VERSION}"
   -DGALERA_GIT_REVISION="${GALERA_GIT_REVISION}")
 target_link_libraries(wsrep_test dl)

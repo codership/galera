@@ -12,7 +12,7 @@ add_executable(garbd
 
 target_include_directories(garbd
   PRIVATE
-  ${CMAKE_SOURCE_DIR}/wsrep/src
+  ${PROJECT_SOURCE_DIR}/wsrep/src
   )
 
 target_compile_definitions(garbd
@@ -39,6 +39,6 @@ if (NOT ${CMAKE_SYSTEM_NAME} MATCHES ".*BSD")
     ${CMAKE_CURRENT_SOURCE_DIR}/files/garb-systemd
     DESTINATION share)
   install(FILES
-    ${CMAKE_SOURCE_DIR}/man/garbd.8
+    ${PROJECT_SOURCE_DIR}/man/garbd.8
     DESTINATION man/man8)
 endif()

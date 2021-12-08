@@ -47,7 +47,7 @@ if (GALERA_STATIC)
   if (NOT OPENSSL_ROOT_DIR)
     message(FATAL_ERROR "Specify OPENSSL_ROOT_DIR for GALERA_STATIC")
   endif()
-  install(FILES ${CMAKE_SOURCE_DIR}/docs/LICENSE.OpenSSL DESTINATION doc)
+  install(FILES ${PROJECT_SOURCE_DIR}/docs/LICENSE.OpenSSL DESTINATION doc)
 endif()
 
 # OPENSSL_USE_STATIC_LIBS was introduced in CMake 3.3.2. For earlier versions

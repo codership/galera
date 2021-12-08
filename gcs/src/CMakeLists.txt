@@ -46,6 +46,7 @@ target_compile_options(gcs
   -Wno-conversion
   -Wno-unused-parameter
   -Wno-overloaded-virtual
+  -Wno-vla
   )
 
 target_link_libraries(gcs gcomm gcache)
@@ -69,6 +70,7 @@ target_compile_options(gcs4garb
   -Wno-conversion
   -Wno-unused-parameter
   -Wno-overloaded-virtual
+  -Wno-vla
   )
 
 target_link_libraries(gcs4garb gcomm gcache)

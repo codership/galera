@@ -28,7 +28,7 @@ target_compile_options(check_gcomm
 add_test(
   NAME check_gcomm
   COMMAND check_gcomm
-  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/Testing
+  WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/Testing
   )
 
 #

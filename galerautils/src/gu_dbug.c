@@ -214,6 +214,11 @@ BOOLEAN _gu_no_db_    = TRUE;	         /* TRUE if no debugging at all      */
  */
 
 
+/*
+ * Galera does not provided _sanity which is used when SAFEMALLOC is
+ * defined
+ */
+#undef SAFEMALLOC
 
 IMPORT int _sanity(const char *file, uint line);
 

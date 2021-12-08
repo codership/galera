@@ -50,7 +50,9 @@ add_library(galerautils
 #
 target_compile_options(galerautils
   PRIVATE
-  -Wno-unused-parameter)
+  -Wno-unused-parameter
+  -Wno-declaration-after-statement
+  -Wno-vla)
 
 target_link_libraries(galerautils
   ${GALERAUTILS_HW_CRC32C_LIB}

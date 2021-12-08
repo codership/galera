@@ -2,7 +2,7 @@
 # Copyright (C) 2020 Codership Oy <info@codership.com>
 #
 
-file(READ "${CMAKE_SOURCE_DIR}/GALERA_VERSION" ver)
+file(READ "${PROJECT_SOURCE_DIR}/GALERA_VERSION" ver)
 string(REGEX MATCH "GALERA_VERSION_WSREP_API=([0-9]*)" _ ${ver})
 set(GALERA_VERSION_WSREP_API ${CMAKE_MATCH_1})
 string(REGEX MATCH "GALERA_VERSION_MAJOR=([0-9]*)" _ ${ver})
@@ -18,12 +18,12 @@ set(GALERA_VERSION
 #
 # First determine GALERA_GIT_REVISION. If it is stored into file
 # in source root, the value is taken from there. Otherwise
-# revision is read from CMAKE_SOURCE_DIR with git rev-parse.
+# revision is read from PROJECT_SOURCE_DIR with git rev-parse.
 #
-if (NOT EXISTS ${CMAKE_SOURCE_DIR}/GALERA_GIT_REVISION)
+if (NOT EXISTS ${PROJECT_SOURCE_DIR}/GALERA_GIT_REVISION)
   execute_process(
     COMMAND git rev-parse --short HEAD
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     RESULT_VARIABLE GIT_GALERA_REVISION_RESULT
     OUTPUT_VARIABLE var)
   if (NOT GIT_GALERA_REVISION_RESULT)
@@ -31,9 +31,9 @@ if (NOT EXISTS ${CMAKE_SOURCE_DIR}/GALERA_GIT_REVISION)
   else()
     set(GALERA_GIT_REVISION "XXXX")
   endif()
-  file(WRITE ${CMAKE_SOURCE_DIR}/GALERA_GIT_REVISION ${GALERA_GIT_REVISION})
+  file(WRITE ${PROJECT_SOURCE_DIR}/GALERA_GIT_REVISION ${GALERA_GIT_REVISION})
 else()
-  file (READ ${CMAKE_SOURCE_DIR}/GALERA_GIT_REVISION var)
+  file (READ ${PROJECT_SOURCE_DIR}/GALERA_GIT_REVISION var)
   string(STRIP ${var} GALERA_GIT_REVISION)
 endif()
 
@@ -48,9 +48,9 @@ endif()
 # explicitly specify the revision for package name (see package.cmake).
 #
 if (NOT GALERA_REVISION)
-  file(WRITE ${CMAKE_BINARY_DIR}/GALERA_REVISION ${GALERA_GIT_REVISION})
+  file(WRITE ${PROJECT_BINARY_DIR}/GALERA_REVISION ${GALERA_GIT_REVISION})
 else()
-  file(WRITE ${CMAKE_BINARY_DIR}/GALERA_REVISION ${GALERA_REVISION})
+  file(WRITE ${PROJECT_BINARY_DIR}/GALERA_REVISION ${GALERA_REVISION})
 endif()
 
 message(STATUS

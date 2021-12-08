@@ -17,8 +17,8 @@ add_executable(galera_check
 
 target_include_directories(galera_check
   PRIVATE
-  ${CMAKE_SOURCE_DIR}/galera/src
-  ${CMAKE_SOURCE_DIR}/wsrep/src
+  ${PROJECT_SOURCE_DIR}/galera/src
+  ${PROJECT_SOURCE_DIR}/wsrep/src
   )
 
 # TODO: Fix.
