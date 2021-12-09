@@ -550,27 +550,6 @@ void gu::ssl_param_set(const std::string& key, const std::string& val,
     }
 }
 
-bool gu::allowlist_value_check(wsrep_allowlist_key_t key, const std::string& value)
-{
-    if (gu_allowlist_service == nullptr)
-    {
-        return true;
-    }
-    wsrep_buf_t const check_value = { value.c_str(), value.length() };
-    wsrep_status_t result(gu_allowlist_service->allowlist_cb(
-        gu_allowlist_service->context, key, &check_value));
-    switch (result)
-    {
-        case WSREP_OK:
-            return true;
-        case WSREP_NOT_ALLOWED:
-            return false;
-        default:
-            gu_throw_error(EINVAL) << "Unknown allowlist callback response: " << result 
-                                   << ", aborting.";
-    }
-}
-
 void gu::ssl_init_options(gu::Config& conf)
 {
     init_use_ssl(conf);
@@ -835,8 +814,29 @@ void gu::AsioSteadyTimer::cancel()
 }
 
 //
-// Allowlist service hooks.
+// Allowlist
 //
+
+bool gu::allowlist_value_check(wsrep_allowlist_key_t key, const std::string& value)
+{
+    if (gu_allowlist_service == nullptr)
+    {
+        return true;
+    }
+    wsrep_buf_t const check_value = { value.c_str(), value.length() };
+    wsrep_status_t result(gu_allowlist_service->allowlist_cb(
+        gu_allowlist_service->context, key, &check_value));
+    switch (result)
+    {
+        case WSREP_OK:
+            return true;
+        case WSREP_NOT_ALLOWED:
+            return false;
+        default:
+            gu_throw_error(EINVAL) << "Unknown allowlist callback response: " << result 
+                                   << ", aborting.";
+    }
+}
 
 static std::mutex gu_allowlist_service_init_mutex;
 static size_t gu_allowlist_service_usage;
