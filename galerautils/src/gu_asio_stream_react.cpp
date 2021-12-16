@@ -790,8 +790,8 @@ std::shared_ptr<gu::AsioSocket> gu::AsioAcceptorReact::accept() try
     set_socket_options(socket->socket_);
     socket->prepare_engine(false);
     socket->assign_addresses();
-    std::string remote_ip = ::escape_addr(socket->socket_.remote_endpoint().address());
-    
+
+    std::string remote_ip = gu::unescape_addr(::escape_addr(socket->socket_.remote_endpoint().address()));
     auto connection_allowed(gu::allowlist_value_check(WSREP_ALLOWLIST_KEY_IP, remote_ip));
     if (connection_allowed == false)
     {
@@ -887,7 +887,7 @@ void gu::AsioAcceptorReact::accept_handler(
     socket->prepare_engine(true);
     socket->assign_addresses();
    
-    std::string remote_ip = ::escape_addr(socket->socket_.remote_endpoint().address());
+    std::string remote_ip = gu::unescape_addr(::escape_addr(socket->socket_.remote_endpoint().address()));
     auto connection_allowed(gu::allowlist_value_check(WSREP_ALLOWLIST_KEY_IP, remote_ip));
     if (connection_allowed == false)
     {
