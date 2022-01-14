@@ -2323,7 +2323,18 @@ cleanup:
 long
 gcs_join (gcs_conn_t* conn, const gu::GTID& gtid, int const code)
 {
-    if (code < 0 || gtid.seqno() >= conn->join_gtid.seqno())
+    /*
+     * Always allow sending of join messages when not in JOINER state.
+     * This is required for correct handling of desync counter,
+     * especially in DONOR state:
+     * If the DONOR does desync in combination with SST donation, the
+     * gcs_join() calls from resync() and sst_sent() might
+     * come with out of order seqnos, leaving the desync_count in gcs_group
+     * permanently in non-zero value. In this case the node will not become
+     * synced again unless it is temporarily removed from the group.
+     */
+    if (conn->state != GCS_CONN_JOINER ||
+        code < 0 || gtid.seqno() >= conn->join_gtid.seqno())
     {
         conn->join_gtid    = gtid;
         conn->join_code    = code;
