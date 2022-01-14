@@ -2023,7 +2023,18 @@ gcs_join (gcs_conn_t* conn, gcs_seqno_t const seqno)
 {
     assert(conn->join_seqno <= seqno || seqno < 0);
 
-    if (seqno < 0 || seqno >= conn->join_seqno)
+    /*
+     * Always allow sending of join messages when not in JOINER state.
+     * This is required for correct handling of desync counter,
+     * especially in DONOR state:
+     * If the DONOR does desync in combination with SST donation, the
+     * gcs_join() calls from resync() and sst_sent() might
+     * come with out of order seqnos, leaving the desync_count in gcs_group
+     * permanently in non-zero value. In this case the node will not become
+     * synced again unless it is temporarily removed from the group.
+     */
+    if (conn->state != GCS_CONN_JOINER ||
+        seqno < 0 || seqno >= conn->join_seqno)
     {
         conn->join_seqno   = seqno;
         conn->need_to_join = true;
