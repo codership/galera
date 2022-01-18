@@ -2,6 +2,14 @@
 # Copyright (C) 2020 Codership Oy <info@codership.com>
 #
 
+# Logging facility is extracted into separate library to break
+# circular dependency between crc32c HW and galerautils libraries.
+add_library(galerautils_log STATIC
+  gu_log.c)
+target_compile_options(galerautils_log
+  PRIVATE
+  -Wno-unused-parameter)
+
 #
 # Compile hardware optimized CRC32C code into separate library
 # to keep the optimized code isolated.
@@ -14,19 +22,20 @@ endif()
 
 if (GALERAUTILS_HW_CRC32C_SOURCES)
   set(GALERAUTILS_HW_CRC32C_LIB galerautils_hw_crc32c)
-  add_library(${GALERAUTILS_HW_CRC32C_LIB} ${GALERAUTILS_HW_CRC32C_SOURCES})
+  add_library(${GALERAUTILS_HW_CRC32C_LIB} STATIC
+    ${GALERAUTILS_HW_CRC32C_SOURCES})
   target_compile_options(${GALERAUTILS_HW_CRC32C_LIB}
     PRIVATE
     ${GALERA_CRC32C_COMPILER_FLAG})
+  target_link_libraries(${GALERAUTILS_HW_CRC32C_LIB} galerautils_log)
 endif()
 
-add_library(galerautils
+add_library(galerautils STATIC
   gu_abort.c
   gu_crc32c.c
   gu_dbug.c
   gu_fifo.c
   gu_lock_step.c
-  gu_log.c
   gu_mem.c
   gu_mmh3.c
   gu_spooky.c
@@ -53,10 +62,11 @@ target_compile_options(galerautils
   -Wno-unused-parameter)
 
 target_link_libraries(galerautils
+  galerautils_log
   ${GALERAUTILS_HW_CRC32C_LIB}
   ${GALERA_SYSTEM_LIBS})
 
-add_library(galerautilsxx
+add_library(galerautilsxx STATIC
   gu_vlq.cpp
   gu_datetime.cpp
   gu_exception.cpp
