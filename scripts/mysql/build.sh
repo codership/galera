@@ -432,7 +432,7 @@ then
             CMAKE_LAYOUT_OPTIONS=( \
                 -DINSTALL_LAYOUT=RPM \
                 -DCMAKE_INSTALL_PREFIX="/usr" \
-                -DINSTALL_SBINDIR="/usr/sbin" \
+                -DINSTALL_SBINDIR="sbin" \
                 -DMYSQL_DATADIR="/var/lib/mysql" \
                 -DMYSQL_UNIX_ADDR=$MYSQL_SOCKET_PATH \
                 -DCMAKE_OSX_ARCHITECTURES=$(uname -m) \

@@ -285,7 +285,7 @@ START_TEST(recovery)
 
     /* What we have now is |555|---|444333***| */
     /* Reopening of the file should:
-     * 1) discard discard unordered message at the end
+     * 1) discard unordered message at the end
      * 2) continuous seqno interval should be now 3,4,5
      */
     {
@@ -320,7 +320,8 @@ START_TEST(recovery)
         }
 
         ck_assert(!ctx.s2p.empty());
-        ck_assert(ctx.s2p.size() == 3);
+        ck_assert_msg(ctx.s2p.size() == 3,
+                      "Expected seqno2ptr size 3, got %zd", ctx.s2p.size());
         ck_assert(ctx.s2p.index_front() == seqno_min);
         ck_assert(ctx.s2p.index_back()  == seqno_max);
 
@@ -413,7 +414,7 @@ START_TEST(recovery)
 
     ::unlink(RB_NAME.c_str());
 
-    /* test for singe segment in the middle */
+    /* test for single segment in the middle */
     ptrdiff_t third_buffer_offset(0);
     {
         rb_ctx ctx(rb_3size, false);
@@ -472,7 +473,7 @@ START_TEST(recovery)
         ck_assert(seqno_min == seqno_max);
     }
 
-    /* now the situation should be |---444---| - only one segment, in the middle,
+    /* now the situation should be |---444---| - only one segment,in the middle,
      * reopen the file a second time - to trigger a rollover bug */
     {
         rb_ctx ctx(rb_3size);
@@ -496,7 +497,9 @@ START_TEST(recovery)
         // must be allocated right after the recovered buffer
         void* m(ctx.add_msg(msgs[3]));
         ck_assert(NULL != m);
-        ck_assert(third_buffer_offset == ctx.rb.offset(m));
+        ck_assert_msg(third_buffer_offset == ctx.rb.offset(m),
+                      "expected %zd, got %zd",
+                      third_buffer_offset, ctx.rb.offset(m));
     }
 
     ::unlink(RB_NAME.c_str());

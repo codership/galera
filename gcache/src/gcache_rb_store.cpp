@@ -27,6 +27,13 @@ namespace gcache
     {
         write_preamble(false);
 
+        for (seqno2ptr_iter_t i = seqno2ptr_.begin(); i != seqno2ptr_.end(); ++i)
+        {
+            if (ptr2BH(*i)->ctx == BH_ctx_t(this)) {
+                seqno2ptr_.erase(i);
+            }
+        }
+
         first_ = start_;
         next_  = start_;
 
@@ -828,9 +835,18 @@ namespace gcache
                             seqno_t const se(seqno2ptr_.empty() ? SEQNO_ILL :
                                              seqno2ptr_.index_end());
                             log_warn << "Exception while mapping writeset "
-                                     << seqno_g << " into [" << sb << ", " << se
+                                     << bh << " into [" << sb << ", " << se
                                      << "): '" << e.what()
                                      << "'. Aborting GCache recovery.";
+                            /* Buffer scanning was interrupted ungracefully -
+                             * this means that we failed to recover the most
+                             * recent writesets. As such anything that was
+                             * potentially recovered before is useless.
+                             * This will cause full cache reset in recover() */
+                            seqno2ptr_.clear(SEQNO_ILL);
+
+                            BH_clear(bh); // to pacify assert() below
+                            next_ = ptr;
                             goto out;
                         }
                         seqno_max = std::max(seqno_g, seqno_max);
@@ -851,8 +867,8 @@ namespace gcache
                              << gid_ << ':' << seqno_max;
                 }
 
-                /* end of file, do best effort */
-                if (end_ - sizeof(BufferHeader) == segment_end) BH_clear(bh);
+                /* end of segment, close it */
+                BH_clear(bh);
             }
 
             if (offset > 0 && segment_start == start_ + offset)
@@ -861,7 +877,8 @@ namespace gcache
                 assert(1 == segment_scans);
                 first_ = segment_start;
                 size_trail_ = end_ - ptr;
-                segment_end = segment_start;
+                // there must be at least one buffer header between the segments
+                segment_end = segment_start - sizeof(BufferHeader);
                 segment_start = start_;
             }
             else if (offset < 0 && segment_start == start_)
@@ -869,13 +886,16 @@ namespace gcache
                 /* started with the second segment, try to find the first one */
                 assert(1 == segment_scans);
                 next_ = ptr;
+                ptr += sizeof(BufferHeader);
+                bh = BH_cast(ptr);
+                progress.update(sizeof(BufferHeader));
 
-                while (!GCACHE_SCAN_BUFFER_TEST &&
-                       ptr + sizeof(BufferHeader) < end_)
+                while (ptr + sizeof(BufferHeader) < end_ &&
+                       !GCACHE_SCAN_BUFFER_TEST)
                 {
-                    progress.update(scan_step);
                     ptr += scan_step;
                     bh = BH_cast(ptr);
+                    progress.update(scan_step);
                 }
 
                 if (GCACHE_SCAN_BUFFER_TEST)
@@ -925,6 +945,7 @@ namespace gcache
 #undef GCACHE_SCAN_BUFFER_TEST
         } // while (segment_scans < 2)
     out:
+        assert(BH_is_clear(BH_cast(next_)));
         progress.finish();
 
         return erase_up_to;
@@ -947,7 +968,7 @@ namespace gcache
     void
     RingBuffer::recover(off_t const offset, int version)
     {
-        static const char* const diag_prefix = "Recovering GCache ring buffer: ";
+        static const char* const diag_prefix ="Recovering GCache ring buffer: ";
 
         /* scan the buffer and populate seqno2ptr map */
         seqno_t const lowest(scan(offset, version > 0 ? MemOps::ALIGNMENT : 1)
@@ -1000,7 +1021,7 @@ namespace gcache
                 {
                     if (*r) empty_buffer(ptr2BH(*r));
                 }
-                seqno2ptr_.erase(seqno2ptr_.begin(), seqno2ptr_.find(seqno_min));
+                seqno2ptr_.erase(seqno2ptr_.begin(),seqno2ptr_.find(seqno_min));
             }
             assert(seqno2ptr_.size() > 0);
 
@@ -1014,7 +1035,7 @@ namespace gcache
 
                 bh = BH_next(bh);
 
-                if (gu_unlikely(0 == bh->size)) bh = BH_cast(start_); // rollover
+                if (gu_unlikely(0 == bh->size)) bh = BH_cast(start_);// rollover
             }
             first_ = reinterpret_cast<uint8_t*>(bh);
 
@@ -1026,6 +1047,18 @@ namespace gcache
             {
                 if (gu_likely(bh->size) > 0)
                 {
+                    bool const inconsistency(
+                        BH_next(bh) > BH_cast(end_ - sizeof(BufferHeader)) ||
+                        bh->ctx != BH_ctx_t(this)
+                        );
+
+                    if (gu_unlikely(inconsistency))
+                    {
+                        assert(0);
+                        log_warn << diag_prefix << "Corrupt buffer leak1: " <<bh;
+                        goto full_reset;
+                    }
+
                     assert(bh->size > sizeof(BufferHeader));
 
                     if (bh->seqno_g > 0) last_bh = bh;
@@ -1081,6 +1114,20 @@ namespace gcache
                 {
                     if (gu_likely(bh->size > 0))
                     {
+                        bool const inconsistency(
+                            BH_next(bh) > BH_cast(end_ - sizeof(BufferHeader))
+                            ||
+                            bh->ctx != BH_ctx_t(this)
+                            );
+
+                        if (gu_unlikely(inconsistency))
+                        {
+                            assert(0);
+                            log_warn << diag_prefix << "Corrupt buffer leak2: "
+                                     << bh;
+                            goto full_reset;
+                        }
+
                         total++;
 
                         if (gu_likely(bh->seqno_g > 0))
@@ -1125,7 +1172,7 @@ namespace gcache
         else
         {
         full_reset:
-            log_info << diag_prefix << "didn't recover any events.";
+            log_info << diag_prefix << "Recovery failed, need to do full reset.";
             reset();
         }
     }
