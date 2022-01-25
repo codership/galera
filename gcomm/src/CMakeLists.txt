@@ -2,7 +2,7 @@
 # Copyright (C) 2020 Codership Oy <info@codership.com>
 #
 
-add_library(gcomm
+add_library(gcomm STATIC
   asio_protonet.cpp
   asio_tcp.cpp
   asio_udp.cpp

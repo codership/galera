@@ -2,7 +2,7 @@
 # Copyright (C) 2020-2021 Codership Oy <info@codership.com>
 #
 
-add_library(galera
+add_library(galera STATIC
   mapped_buffer.cpp
   write_set.cpp
   data_set.cpp
@@ -47,7 +47,7 @@ else()
   target_link_libraries(galera gcs)
 endif()
 
-add_library(galera_smm_static
+add_library(galera_smm_static STATIC
   wsrep_provider.cpp
   )
 
@@ -72,8 +72,7 @@ target_compile_options(galera_smm_static
 
 target_link_libraries(galera_smm_static galera)
 
-add_library(galera_smm
-  MODULE
+add_library(galera_smm  MODULE
   wsrep_provider.cpp
   )
 

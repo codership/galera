@@ -28,7 +28,7 @@ set(GCS_SOURCES
 # Gcs library.
 #
 
-add_library(gcs ${GCS_SOURCES})
+add_library(gcs STATIC ${GCS_SOURCES})
 
 target_compile_definitions(gcs
   PRIVATE
@@ -55,7 +55,7 @@ target_link_libraries(gcs gcomm gcache)
 # Gcs library for Garb daemon.
 #
 
-add_library(gcs4garb ${GCS_SOURCES})
+add_library(gcs4garb STATIC ${GCS_SOURCES})
 
 target_compile_definitions(gcs4garb
   PRIVATE

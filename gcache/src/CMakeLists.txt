@@ -6,7 +6,7 @@
 # GCache library
 #
 
-add_library(gcache
+add_library(gcache STATIC
   GCache_seqno.cpp
   gcache_params.cpp
   gcache_page.cpp
