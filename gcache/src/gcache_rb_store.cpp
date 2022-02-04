@@ -832,7 +832,11 @@ namespace gcache
 
             if (!BH_is_clear(bh))
             {
-                if (start_ == segment_start && ptr != first_)
+                if (start_ == segment_start && ptr != first_ &&
+                    ptr + bh->size != first_)
+                    /* ptr + bh->size == first_ means that there is only one
+                     * segment starting at first_ and the space between start_
+                     * and first_ occupied by unused buffers. */
                 {
                     log_warn << "Failed to scan the last segment to the end. "
                             "Last events may be missing. Last recovered event: "
