@@ -292,7 +292,15 @@ void gu::AsioStreamReact::connect_handler(
 
     set_socket_options(socket_);
     prepare_engine(true);
-    assign_addresses();
+    try
+    {
+        assign_addresses();
+    }
+    catch(const asio::system_error& e)
+    {
+        handler->connect_handler(*this, AsioErrorCode(e.code().value()));
+        return;
+    }
     GU_ASIO_DEBUG(debug_print()
                   << " AsioStreamReact::connect_handler: init handshake");
     auto result(engine_->client_handshake());
@@ -790,7 +798,6 @@ std::shared_ptr<gu::AsioSocket> gu::AsioAcceptorReact::accept() try
     set_socket_options(socket->socket_);
     socket->prepare_engine(false);
     socket->assign_addresses();
-
     std::string remote_ip = gu::unescape_addr(::escape_addr(socket->socket_.remote_endpoint().address()));
     auto connection_allowed(gu::allowlist_value_check(WSREP_ALLOWLIST_KEY_IP, remote_ip));
     if (connection_allowed == false)
@@ -885,8 +892,16 @@ void gu::AsioAcceptorReact::accept_handler(
     set_socket_options(socket->socket_);
     socket->set_non_blocking(true);
     socket->prepare_engine(true);
-    socket->assign_addresses();
-   
+    try
+    {
+       socket->assign_addresses();
+    }
+    catch(const asio::system_error& e)
+    {
+        log_warn << "Failed to accept: " << e.what();
+        async_accept(handler);
+        return;
+    }
     std::string remote_ip = gu::unescape_addr(::escape_addr(socket->socket_.remote_endpoint().address()));
     auto connection_allowed(gu::allowlist_value_check(WSREP_ALLOWLIST_KEY_IP, remote_ip));
     if (connection_allowed == false)
