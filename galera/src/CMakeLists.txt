@@ -112,7 +112,12 @@ endif()
 
 target_link_libraries(galera_smm galera ${GALERA_LINK_OPTIONS})
 
-install(TARGETS galera_smm DESTINATION lib)
+# Make the install destination for the shared library configurable
+if(NOT DEFINED INSTALL_LIBDIR)
+  set(INSTALL_LIBDIR "lib" CACHE STRING "path to install shared libraries to")
+endif()
+
+install(TARGETS galera_smm DESTINATION ${INSTALL_LIBDIR})
 
 # The following checks are guaranteed to work only
 # Linux platform, we skip them on others.
