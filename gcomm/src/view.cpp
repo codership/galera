@@ -322,8 +322,17 @@ void gcomm::ViewState::write_file() const
 bool gcomm::ViewState::read_file()
 {
     if (access(file_name_.c_str(), R_OK) != 0) {
-        log_warn << "access file(" << file_name_ << ") failed("
-                 << strerror(errno) << ")";
+        int const errn(errno);
+        std::ostringstream msg;
+        msg << "access file(" << file_name_ << ") failed("
+            << strerror(errn) << ")";
+        if (ENOENT == errn) {
+            // absence of a file should be only a notice since it is removed
+            // on graceful shutdown, so it is an expected situation
+            log_info << msg.str();
+        } else {
+            log_warn << msg.str();
+        }
         return false;
     }
     try {
