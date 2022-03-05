@@ -37,6 +37,7 @@ load_rc_config $name
 : ${garb_galera_options=""}
 : ${garb_log_file=""}
 : ${garb_pid_file="/var/run/garb.pid"}
+: ${garb_working_directory=""}
 
 procname="/usr/local/bin/garbd"
 command="/usr/sbin/daemon"
@@ -73,6 +74,7 @@ garb_prestart()
 	[ -n "$garb_galera_group" ]   && command_args="$command_args -g $garb_galera_group"
 	[ -n "$garb_galera_options" ] && command_args="$command_args -o $garb_galera_options"
 	[ -n "$garb_log_file" ]       && command_args="$command_args -l $garb_log_file"
+	[ -n "$garb_working_directory" ] && command_args="$command_args -w $garb_working_directory"
 	return 0
 }
 

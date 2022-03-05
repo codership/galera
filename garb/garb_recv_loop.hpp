@@ -38,6 +38,7 @@ private:
             {
                 gu_throw_fatal << "Error initializing GCS parameters";
             }
+            cnf.add(COMMON_BASE_DIR_KEY);
         }
     }
         params_;

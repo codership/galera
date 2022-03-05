@@ -15,8 +15,18 @@ namespace garb
 {
 
 void
-become_daemon ()
+become_daemon (const std::string& workdir)
 {
+    if (chdir("/")) // detach from potentially removable block devices
+    {
+        gu_throw_error(errno) << "chdir(" << workdir << ") failed";
+    }
+
+    if (!workdir.empty() && chdir(workdir.c_str()))
+    {
+        gu_throw_error(errno) << "chdir(" << workdir << ") failed";
+    }
+
     if (pid_t pid = fork())
     {
         if (pid > 0) // parent
@@ -37,11 +47,6 @@ become_daemon ()
     if (setsid()<0) // become a new process leader, detach from terminal
     {
         gu_throw_error(errno) << "setsid() failed";
-    }
-
-    if (chdir("/")) // detach from potentially removable block devices
-    {
-        gu_throw_error(errno) << "chdir(\"/\") failed";
     }
 
     // umask(0);
@@ -74,6 +79,13 @@ become_daemon ()
             gu_throw_error(errno) << "Unable to open /dev/null for fd " << fd;
         }
     }
+
+    char* wd(static_cast<char*>(::malloc(PATH_MAX)));
+    if (wd)
+    {
+        log_info << "Currend WD: " << getcwd(wd, PATH_MAX);
+        ::free(wd);
+    }
 }
 
 int
@@ -84,7 +96,7 @@ main (int argc, char* argv[])
 
     log_info << "Read config: " <<  config << std::endl;
 
-    if (config.daemon()) become_daemon();
+    if (config.daemon()) become_daemon(config.workdir());
 
     try
     {
