@@ -139,7 +139,7 @@ Config::Config (int argc, char* argv[])
     strip_quotes(cfg_);
 
     if (options_.length() > 0) options_ += "; ";
-    options_ += "gcs.fc_limit=9999999; gcs.fc_factor=1.0; gcs.fc_master_slave=yes";
+    options_ += "gcs.fc_limit=9999999; gcs.fc_factor=1.0; gcs.fc_single_primary=yes";
 
     // this block must be the very last.
     gu_conf_self_tstamp_on();

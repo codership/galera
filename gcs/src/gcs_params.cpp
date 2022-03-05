@@ -225,13 +225,20 @@ gcs_params_init (struct gcs_params* params, gu_config_t* config)
     params->recv_q_hard_limit = tmp * gcs_fc_hard_limit_fix;
     // allow for some meta overhead
 
-    deprecation_warning(config, GCS_PARAMS_FC_MASTER_SLAVE,
-                        GCS_PARAMS_FC_SINGLE_PRIMARY);
     if ((ret = params_init_bool (config, GCS_PARAMS_FC_MASTER_SLAVE,
-                                 &params->fc_master_slave))) return ret;
-    // Overrides deprecated GCS_PARAMS_FC_MASTER_SLAVE if set
-    if ((ret = params_init_bool (config, GCS_PARAMS_FC_SINGLE_PRIMARY,
-                                 &params->fc_master_slave))) return ret;
+                                 &params->fc_single_primary))) return ret;
+    if (params->fc_single_primary)
+    {
+        // if GCS_PARAMS_FC_MASTER_SLAVE was used, log deprecation warning
+        deprecation_warning(config, GCS_PARAMS_FC_MASTER_SLAVE,
+                            GCS_PARAMS_FC_SINGLE_PRIMARY);
+    }
+    else
+    {
+        // Overrides deprecated GCS_PARAMS_FC_MASTER_SLAVE if set
+        if ((ret = params_init_bool (config, GCS_PARAMS_FC_SINGLE_PRIMARY,
+                                     &params->fc_single_primary))) return ret;
+    }
 
     if ((ret = params_init_bool (config, GCS_PARAMS_SYNC_DONOR,
                                  &params->sync_donor))) return ret;
