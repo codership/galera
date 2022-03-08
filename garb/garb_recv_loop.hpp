@@ -8,6 +8,7 @@
 
 #include <gu_throw.hpp>
 #include <gu_asio.hpp>
+#include <common.h> // COMMON_BASE_DIR_KEY
 
 #include <pthread.h>
 
@@ -38,6 +39,7 @@ private:
             {
                 gu_throw_fatal << "Error initializing GCS parameters";
             }
+            cnf.add(COMMON_BASE_DIR_KEY);
         }
     }
         params_;

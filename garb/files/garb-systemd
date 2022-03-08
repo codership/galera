@@ -43,6 +43,7 @@ start() {
   [ -n "${GALERA_GROUP:-}" ] && OPTIONS="$OPTIONS -g '$GALERA_GROUP'"
   [ -n "${GALERA_OPTIONS:-}" ] && OPTIONS="$OPTIONS -o '$GALERA_OPTIONS'"
   [ -n "${LOG_FILE:-}" ] && OPTIONS="$OPTIONS -l '$LOG_FILE'"
+  [ -n "${WORK_DIR:-}" ] && OPTIONS="$OPTIONS -w '$WORK_DIR'"
 
   eval program_start $OPTIONS
 }
