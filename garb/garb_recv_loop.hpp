@@ -49,6 +49,7 @@ private:
         ParseOptions(gu::Config& cnf, const std::string& opt)
         {
             cnf.parse(opt);
+            gu::ssl_init_options(cnf);
         }
     }
         parse_;
