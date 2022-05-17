@@ -2,7 +2,7 @@
 // detail/impl/signal_set_service.ipp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -18,10 +18,17 @@
 #include "asio/detail/config.hpp"
 
 #include <cstring>
-#include "asio/detail/reactor.hpp"
+#include <stdexcept>
 #include "asio/detail/signal_blocker.hpp"
 #include "asio/detail/signal_set_service.hpp"
 #include "asio/detail/static_mutex.hpp"
+#include "asio/detail/throw_exception.hpp"
+
+#if defined(ASIO_HAS_IO_URING_AS_DEFAULT)
+# include "asio/detail/io_uring_service.hpp"
+#else // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
+# include "asio/detail/reactor.hpp"
+#endif // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
 
 #include "asio/detail/push_options.hpp"
 
@@ -83,15 +90,30 @@ void asio_signal_handler(int signal_number)
 #if !defined(ASIO_WINDOWS) \
   && !defined(ASIO_WINDOWS_RUNTIME) \
   && !defined(__CYGWIN__)
-class signal_set_service::pipe_read_op : public reactor_op
+class signal_set_service::pipe_read_op :
+# if defined(ASIO_HAS_IO_URING_AS_DEFAULT)
+  public io_uring_operation
+# else // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
+  public reactor_op
+# endif // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
 {
 public:
+# if defined(ASIO_HAS_IO_URING_AS_DEFAULT)
   pipe_read_op()
-    : reactor_op(&pipe_read_op::do_perform, pipe_read_op::do_complete)
+    : io_uring_operation(asio::error_code(), &pipe_read_op::do_prepare,
+        &pipe_read_op::do_perform, pipe_read_op::do_complete)
   {
   }
 
-  static bool do_perform(reactor_op*)
+  static void do_prepare(io_uring_operation*, ::io_uring_sqe* sqe)
+  {
+    signal_state* state = get_signal_state();
+
+    int fd = state->read_descriptor_;
+    ::io_uring_prep_poll_add(sqe, fd, POLLIN);
+  }
+
+  static bool do_perform(io_uring_operation*, bool)
   {
     signal_state* state = get_signal_state();
 
@@ -103,8 +125,28 @@ public:
 
     return false;
   }
+# else // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
+  pipe_read_op()
+    : reactor_op(asio::error_code(),
+        &pipe_read_op::do_perform, pipe_read_op::do_complete)
+  {
+  }
 
-  static void do_complete(io_service_impl* /*owner*/, operation* base,
+  static status do_perform(reactor_op*)
+  {
+    signal_state* state = get_signal_state();
+
+    int fd = state->read_descriptor_;
+    int signal_number = 0;
+    while (::read(fd, &signal_number, sizeof(int)) == sizeof(int))
+      if (signal_number >= 0 && signal_number < max_signal_number)
+        signal_set_service::deliver_signal(signal_number);
+
+    return not_done;
+  }
+# endif // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
+
+  static void do_complete(void* /*owner*/, operation* base,
       const asio::error_code& /*ec*/,
       std::size_t /*bytes_transferred*/)
   {
@@ -116,13 +158,17 @@ public:
        //   && !defined(ASIO_WINDOWS_RUNTIME)
        //   && !defined(__CYGWIN__)
 
-signal_set_service::signal_set_service(
-    asio::io_service& io_service)
-  : io_service_(asio::use_service<io_service_impl>(io_service)),
+signal_set_service::signal_set_service(execution_context& context)
+  : execution_context_service_base<signal_set_service>(context),
+    scheduler_(asio::use_service<scheduler_impl>(context)),
 #if !defined(ASIO_WINDOWS) \
   && !defined(ASIO_WINDOWS_RUNTIME) \
   && !defined(__CYGWIN__)
-    reactor_(asio::use_service<reactor>(io_service)),
+# if defined(ASIO_HAS_IO_URING_AS_DEFAULT)
+    io_uring_service_(asio::use_service<io_uring_service>(context)),
+# else // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
+    reactor_(asio::use_service<reactor>(context)),
+# endif // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
 #endif // !defined(ASIO_WINDOWS)
        //   && !defined(ASIO_WINDOWS_RUNTIME)
        //   && !defined(__CYGWIN__)
@@ -134,7 +180,11 @@ signal_set_service::signal_set_service(
 #if !defined(ASIO_WINDOWS) \
   && !defined(ASIO_WINDOWS_RUNTIME) \
   && !defined(__CYGWIN__)
+# if defined(ASIO_HAS_IO_URING_AS_DEFAULT)
+  io_uring_service_.init_task();
+# else // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
   reactor_.init_task();
+# endif // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
 #endif // !defined(ASIO_WINDOWS)
        //   && !defined(ASIO_WINDOWS_RUNTIME)
        //   && !defined(__CYGWIN__)
@@ -150,7 +200,7 @@ signal_set_service::~signal_set_service()
   remove_service(this);
 }
 
-void signal_set_service::shutdown_service()
+void signal_set_service::shutdown()
 {
   remove_service(this);
 
@@ -166,11 +216,10 @@ void signal_set_service::shutdown_service()
     }
   }
 
-  io_service_.abandon_operations(ops);
+  scheduler_.abandon_operations(ops);
 }
 
-void signal_set_service::fork_service(
-    asio::io_service::fork_event fork_ev)
+void signal_set_service::notify_fork(execution_context::fork_event fork_ev)
 {
 #if !defined(ASIO_WINDOWS) \
   && !defined(ASIO_WINDOWS_RUNTIME) \
@@ -180,25 +229,38 @@ void signal_set_service::fork_service(
 
   switch (fork_ev)
   {
-  case asio::io_service::fork_prepare:
+  case execution_context::fork_prepare:
     {
       int read_descriptor = state->read_descriptor_;
       state->fork_prepared_ = true;
       lock.unlock();
+# if defined(ASIO_HAS_IO_URING_AS_DEFAULT)
+      (void)read_descriptor;
+      io_uring_service_.deregister_io_object(io_object_data_);
+      io_uring_service_.cleanup_io_object(io_object_data_);
+# else // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
       reactor_.deregister_internal_descriptor(read_descriptor, reactor_data_);
+      reactor_.cleanup_descriptor_data(reactor_data_);
+# endif // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
     }
     break;
-  case asio::io_service::fork_parent:
+  case execution_context::fork_parent:
     if (state->fork_prepared_)
     {
       int read_descriptor = state->read_descriptor_;
       state->fork_prepared_ = false;
       lock.unlock();
+# if defined(ASIO_HAS_IO_URING_AS_DEFAULT)
+      (void)read_descriptor;
+      io_uring_service_.register_internal_io_object(io_object_data_,
+          io_uring_service::read_op, new pipe_read_op);
+# else // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
       reactor_.register_internal_descriptor(reactor::read_op,
           read_descriptor, reactor_data_, new pipe_read_op);
+# endif // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
     }
     break;
-  case asio::io_service::fork_child:
+  case execution_context::fork_child:
     if (state->fork_prepared_)
     {
       asio::detail::signal_blocker blocker;
@@ -207,8 +269,14 @@ void signal_set_service::fork_service(
       int read_descriptor = state->read_descriptor_;
       state->fork_prepared_ = false;
       lock.unlock();
+# if defined(ASIO_HAS_IO_URING_AS_DEFAULT)
+      (void)read_descriptor;
+      io_uring_service_.register_internal_io_object(io_object_data_,
+          io_uring_service::read_op, new pipe_read_op);
+# else // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
       reactor_.register_internal_descriptor(reactor::read_op,
           read_descriptor, reactor_data_, new pipe_read_op);
+# endif // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
     }
     break;
   default:
@@ -437,7 +505,8 @@ asio::error_code signal_set_service::cancel(
     signal_set_service::implementation_type& impl,
     asio::error_code& ec)
 {
-  ASIO_HANDLER_OPERATION(("signal_set", &impl, "cancel"));
+  ASIO_HANDLER_OPERATION((scheduler_.context(),
+        "signal_set", &impl, 0, "cancel"));
 
   op_queue<operation> ops;
   {
@@ -452,10 +521,37 @@ asio::error_code signal_set_service::cancel(
     }
   }
 
-  io_service_.post_deferred_completions(ops);
+  scheduler_.post_deferred_completions(ops);
 
   ec = asio::error_code();
   return ec;
+}
+
+void signal_set_service::cancel_ops_by_key(
+    signal_set_service::implementation_type& impl, void* cancellation_key)
+{
+  op_queue<operation> ops;
+  {
+    op_queue<signal_op> other_ops;
+    signal_state* state = get_signal_state();
+    static_mutex::scoped_lock lock(state->mutex_);
+
+    while (signal_op* op = impl.queue_.front())
+    {
+      impl.queue_.pop();
+      if (op->cancellation_key_ == cancellation_key)
+      {
+        op->ec_ = asio::error::operation_aborted;
+        ops.push(op);
+      }
+      else
+        other_ops.push(op);
+    }
+
+    impl.queue_.push(other_ops);
+  }
+
+  scheduler_.post_deferred_completions(ops);
 }
 
 void signal_set_service::deliver_signal(int signal_number)
@@ -488,7 +584,7 @@ void signal_set_service::deliver_signal(int signal_number)
       reg = reg->next_in_table_;
     }
 
-    service->io_service_.post_deferred_completions(ops);
+    service->scheduler_.post_deferred_completions(ops);
 
     service = service->next_;
   }
@@ -505,6 +601,22 @@ void signal_set_service::add_service(signal_set_service* service)
     open_descriptors();
 #endif // !defined(ASIO_WINDOWS) && !defined(__CYGWIN__)
 
+  // If a scheduler_ object is thread-unsafe then it must be the only
+  // scheduler used to create signal_set objects.
+  if (state->service_list_ != 0)
+  {
+    if (!ASIO_CONCURRENCY_HINT_IS_LOCKING(SCHEDULER,
+          service->scheduler_.concurrency_hint())
+        || !ASIO_CONCURRENCY_HINT_IS_LOCKING(SCHEDULER,
+          state->service_list_->scheduler_.concurrency_hint()))
+    {
+      std::logic_error ex(
+          "Thread-unsafe execution context objects require "
+          "exclusive access to signal handling.");
+      asio::detail::throw_exception(ex);
+    }
+  }
+
   // Insert service into linked list of all services.
   service->next_ = state->service_list_;
   service->prev_ = 0;
@@ -518,8 +630,14 @@ void signal_set_service::add_service(signal_set_service* service)
   // Register for pipe readiness notifications.
   int read_descriptor = state->read_descriptor_;
   lock.unlock();
+# if defined(ASIO_HAS_IO_URING_AS_DEFAULT)
+  (void)read_descriptor;
+  service->io_uring_service_.register_internal_io_object(
+      service->io_object_data_, io_uring_service::read_op, new pipe_read_op);
+# else // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
   service->reactor_.register_internal_descriptor(reactor::read_op,
       read_descriptor, service->reactor_data_, new pipe_read_op);
+# endif // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
 #endif // !defined(ASIO_WINDOWS)
        //   && !defined(ASIO_WINDOWS_RUNTIME)
        //   && !defined(__CYGWIN__)
@@ -538,9 +656,17 @@ void signal_set_service::remove_service(signal_set_service* service)
     // Disable the pipe readiness notifications.
     int read_descriptor = state->read_descriptor_;
     lock.unlock();
-    service->reactor_.deregister_descriptor(
-        read_descriptor, service->reactor_data_, false);
+# if defined(ASIO_HAS_IO_URING_AS_DEFAULT)
+    (void)read_descriptor;
+    service->io_uring_service_.deregister_io_object(service->io_object_data_);
+    service->io_uring_service_.cleanup_io_object(service->io_object_data_);
     lock.lock();
+# else // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
+    service->reactor_.deregister_internal_descriptor(
+        read_descriptor, service->reactor_data_);
+    service->reactor_.cleanup_descriptor_data(service->reactor_data_);
+    lock.lock();
+# endif // defined(ASIO_HAS_IO_URING_AS_DEFAULT)
 #endif // !defined(ASIO_WINDOWS)
        //   && !defined(ASIO_WINDOWS_RUNTIME)
        //   && !defined(__CYGWIN__)
@@ -617,7 +743,7 @@ void signal_set_service::close_descriptors()
 void signal_set_service::start_wait_op(
     signal_set_service::implementation_type& impl, signal_op* op)
 {
-  io_service_.work_started();
+  scheduler_.work_started();
 
   signal_state* state = get_signal_state();
   static_mutex::scoped_lock lock(state->mutex_);
@@ -629,7 +755,7 @@ void signal_set_service::start_wait_op(
     {
       --reg->undelivered_;
       op->signal_number_ = reg->signal_number_;
-      io_service_.post_deferred_completion(op);
+      scheduler_.post_deferred_completion(op);
       return;
     }
 

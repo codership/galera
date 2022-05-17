@@ -2,7 +2,7 @@
 // detail/select_reactor.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2016 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -30,12 +30,13 @@
 #include "asio/detail/op_queue.hpp"
 #include "asio/detail/reactor_op.hpp"
 #include "asio/detail/reactor_op_queue.hpp"
+#include "asio/detail/scheduler_task.hpp"
 #include "asio/detail/select_interrupter.hpp"
 #include "asio/detail/socket_types.hpp"
 #include "asio/detail/timer_queue_base.hpp"
 #include "asio/detail/timer_queue_set.hpp"
 #include "asio/detail/wait_op.hpp"
-#include "asio/io_service.hpp"
+#include "asio/execution_context.hpp"
 
 #if defined(ASIO_HAS_IOCP)
 # include "asio/detail/thread.hpp"
@@ -47,7 +48,10 @@ namespace asio {
 namespace detail {
 
 class select_reactor
-  : public asio::detail::service_base<select_reactor>
+  : public execution_context_service_base<select_reactor>
+#if !defined(ASIO_HAS_IOCP)
+    , public scheduler_task
+#endif // !defined(ASIO_HAS_IOCP)
 {
 public:
 #if defined(ASIO_WINDOWS) || defined(__CYGWIN__)
@@ -64,17 +68,17 @@ public:
   };
 
   // Constructor.
-  ASIO_DECL select_reactor(asio::io_service& io_service);
+  ASIO_DECL select_reactor(asio::execution_context& ctx);
 
   // Destructor.
   ASIO_DECL ~select_reactor();
 
   // Destroy all user-defined handler objects owned by the service.
-  ASIO_DECL void shutdown_service();
+  ASIO_DECL void shutdown();
 
   // Recreate internal descriptors following a fork.
-  ASIO_DECL void fork_service(
-      asio::io_service::fork_event fork_ev);
+  ASIO_DECL void notify_fork(
+      asio::execution_context::fork_event fork_ev);
 
   // Initialise the task, but only if the reactor is not in its own thread.
   ASIO_DECL void init_task();
@@ -90,10 +94,7 @@ public:
       per_descriptor_data& descriptor_data, reactor_op* op);
 
   // Post a reactor operation for immediate completion.
-  void post_immediate_completion(reactor_op* op, bool is_continuation)
-  {
-    io_service_.post_immediate_completion(op, is_continuation);
-  }
+  void post_immediate_completion(reactor_op* op, bool is_continuation);
 
   // Start a new operation. The reactor operation will be performed when the
   // given descriptor is flagged as ready, or an error has occurred.
@@ -105,14 +106,28 @@ public:
   // operation_aborted error.
   ASIO_DECL void cancel_ops(socket_type descriptor, per_descriptor_data&);
 
+  // Cancel all operations associated with the given descriptor and key. The
+  // handlers associated with the descriptor will be invoked with the
+  // operation_aborted error.
+  ASIO_DECL void cancel_ops_by_key(socket_type descriptor,
+      per_descriptor_data& descriptor_data,
+      int op_type, void* cancellation_key);
+
   // Cancel any operations that are running against the descriptor and remove
-  // its registration from the reactor.
+  // its registration from the reactor. The reactor resources associated with
+  // the descriptor must be released by calling cleanup_descriptor_data.
   ASIO_DECL void deregister_descriptor(socket_type descriptor,
       per_descriptor_data&, bool closing);
 
-  // Remote the descriptor's registration from the reactor.
+  // Remove the descriptor's registration from the reactor. The reactor
+  // resources associated with the descriptor must be released by calling
+  // cleanup_descriptor_data.
   ASIO_DECL void deregister_internal_descriptor(
-      socket_type descriptor, per_descriptor_data& descriptor_data);
+      socket_type descriptor, per_descriptor_data&);
+
+  // Perform any post-deregistration cleanup tasks associated with the
+  // descriptor data.
+  ASIO_DECL void cleanup_descriptor_data(per_descriptor_data&);
 
   // Move descriptor registration from one descriptor_data object to another.
   ASIO_DECL void move_descriptor(socket_type descriptor,
@@ -141,8 +156,20 @@ public:
       typename timer_queue<Time_Traits>::per_timer_data& timer,
       std::size_t max_cancelled = (std::numeric_limits<std::size_t>::max)());
 
+  // Cancel the timer operations associated with the given key.
+  template <typename Time_Traits>
+  void cancel_timer_by_key(timer_queue<Time_Traits>& queue,
+      typename timer_queue<Time_Traits>::per_timer_data* timer,
+      void* cancellation_key);
+
+  // Move the timer operations associated with the given timer.
+  template <typename Time_Traits>
+  void move_timer(timer_queue<Time_Traits>& queue,
+      typename timer_queue<Time_Traits>::per_timer_data& target,
+      typename timer_queue<Time_Traits>::per_timer_data& source);
+
   // Run select once until interrupted or events are ready to be dispatched.
-  ASIO_DECL void run(bool block, op_queue<operation>& ops);
+  ASIO_DECL void run(long usec, op_queue<operation>& ops);
 
   // Interrupt the select loop.
   ASIO_DECL void interrupt();
@@ -151,9 +178,6 @@ private:
 #if defined(ASIO_HAS_IOCP)
   // Run the select loop in the thread.
   ASIO_DECL void run_thread();
-
-  // Entry point for the select loop thread.
-  ASIO_DECL static void call_run_thread(select_reactor* reactor);
 #endif // defined(ASIO_HAS_IOCP)
 
   // Helper function to add a new timer queue.
@@ -163,15 +187,20 @@ private:
   ASIO_DECL void do_remove_timer_queue(timer_queue_base& queue);
 
   // Get the timeout value for the select call.
-  ASIO_DECL timeval* get_timeout(timeval& tv);
+  ASIO_DECL timeval* get_timeout(long usec, timeval& tv);
 
   // Cancel all operations associated with the given descriptor. This function
   // does not acquire the select_reactor's mutex.
   ASIO_DECL void cancel_ops_unlocked(socket_type descriptor,
       const asio::error_code& ec);
 
-  // The io_service implementation used to post completions.
-  io_service_impl& io_service_;
+  // The scheduler implementation used to post completions.
+# if defined(ASIO_HAS_IOCP)
+  typedef class win_iocp_io_context scheduler_type;
+# else // defined(ASIO_HAS_IOCP)
+  typedef class scheduler scheduler_type;
+# endif // defined(ASIO_HAS_IOCP)
+  scheduler_type& scheduler_;
 
   // Mutex to protect access to internal data.
   asio::detail::mutex mutex_;
@@ -189,6 +218,10 @@ private:
   timer_queue_set timer_queues_;
 
 #if defined(ASIO_HAS_IOCP)
+  // Helper class to run the reactor loop in a thread.
+  class thread_function;
+  friend class thread_function;
+
   // Does the reactor loop thread need to stop.
   bool stop_thread_;
 
