@@ -664,6 +664,12 @@ namespace gu
         void run_one();
 
         /**
+	 * Run at most one IO service handler, return immediately
+	 * if no handlers are ready to run.
+	 */
+        void poll_one();
+
+        /**
          * Run until IO service is stopped or runs out of work.
          */
         void run();

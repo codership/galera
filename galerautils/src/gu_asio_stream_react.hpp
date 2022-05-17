@@ -70,6 +70,13 @@ namespace gu
 
 
         // Handlers for ASIO service.
+        void complete_client_handshake(
+            const std::shared_ptr<AsioSocketHandler>&,
+            AsioStreamEngine::op_status);
+        void complete_server_handshake(
+            const std::shared_ptr<AsioAcceptor>&,
+            AsioStreamEngine::op_status,
+            const std::shared_ptr<AsioAcceptorHandler>&);
         void connect_handler(const std::shared_ptr<AsioSocketHandler>&,
                              const asio::error_code& ec);
         void client_handshake_handler(const std::shared_ptr<AsioSocketHandler>&,

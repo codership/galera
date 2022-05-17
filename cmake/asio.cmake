@@ -10,10 +10,8 @@ macro(CHECK_ASIO_VERSION)
 #define XSTR(x) STR(x)
 #define STR(x) #x
 #pragma message \"Asio version: \" XSTR(ASIO_VERSION)
-#if ASIO_VERSION < 101008
+#if ASIO_VERSION < 102201
 #error Included asio version is too old
-#elif ASIO_VERSION >= 101100
-#error Included asio version is too new
 #endif
 
 int main()
