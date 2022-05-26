@@ -670,6 +670,8 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster& trx,
 
     ssize_t rcode(-1);
 
+    GU_DBUG_SYNC_WAIT("before_replicate_sync");
+
     do
     {
         assert(act.seqno_g == GCS_SEQNO_ILL);
