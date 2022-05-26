@@ -335,12 +335,22 @@ bool exclude_ssl_error(const asio::error_code& ec)
 {
     switch (ERR_GET_REASON(ec.value()))
     {
+        // Short read errors seem to be generated quite frequently
+        // by SSL library because of broken connections. For Galera
+        // connections premature EOFs are not a problem because messages
+        // are framed and the protocols are fault tolerant by design.
+        // The error to suppress are:
+        // SSL_R_SHORT_READ - OpenSSL < 3.0
+        // SSL_R_UNEXPECTED_EOF_WHILE_READING - OpenSSL >= 3.0
 #ifdef SSL_R_SHORT_READ
     case SSL_R_SHORT_READ:
-        // Short read error seems to be generated quite frequently
-        // by SSL library, probably because broken connections.
         return true;
 #endif /* SSL_R_SHORT_READ */
+#ifdef SSL_R_UNEXPECTED_EOF_WHILE_READING
+    case SSL_R_UNEXPECTED_EOF_WHILE_READING:
+        // OpenSSL 3.0 and onwards.
+        return true;
+#endif /* SSL_R_UNEXPECTED_EOF_WHILE_READING */
     default:
         return false;
     }
