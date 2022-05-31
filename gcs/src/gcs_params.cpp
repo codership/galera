@@ -8,6 +8,7 @@
 #include "gcs_fc.hpp" // gcs_fc_hard_limit_fix
 
 #include "gu_inttypes.hpp"
+#include "gu_config.hpp" // gu::Config::Flag
 
 #include <cerrno>
 
@@ -42,31 +43,43 @@ gcs_params_register(gu_config_t* conf)
     bool ret = 0;
 
     ret |= gu_config_add (conf, GCS_PARAMS_FC_FACTOR,
-                          GCS_PARAMS_FC_FACTOR_DEFAULT);
+                          GCS_PARAMS_FC_FACTOR_DEFAULT,
+                          gu::Config::Flag::type_double);
     ret |= gu_config_add (conf, GCS_PARAMS_FC_LIMIT,
-                          GCS_PARAMS_FC_LIMIT_DEFAULT);
+                          GCS_PARAMS_FC_LIMIT_DEFAULT,
+                          gu::Config::Flag::type_integer);
     ret |= gu_config_add (conf, GCS_PARAMS_FC_MASTER_SLAVE,
-                          GCS_PARAMS_FC_MASTER_SLAVE_DEFAULT);
+                          GCS_PARAMS_FC_MASTER_SLAVE_DEFAULT,
+                          gu::Config::Flag::deprecated |
+                          gu::Config::Flag::type_bool);
     ret |= gu_config_add (conf, GCS_PARAMS_FC_SINGLE_PRIMARY,
-                          GCS_PARAMS_FC_SINGLE_PRIMARY_DEFAULT);
+                          GCS_PARAMS_FC_SINGLE_PRIMARY_DEFAULT,
+                          gu::Config::Flag::read_only |
+                          gu::Config::Flag::type_bool);
     ret |= gu_config_add (conf, GCS_PARAMS_FC_DEBUG,
-                          GCS_PARAMS_FC_DEBUG_DEFAULT);
+                          GCS_PARAMS_FC_DEBUG_DEFAULT,
+                          gu::Config::Flag::type_integer);
     ret |= gu_config_add (conf, GCS_PARAMS_SYNC_DONOR,
-                          GCS_PARAMS_SYNC_DONOR_DEFAULT);
+                          GCS_PARAMS_SYNC_DONOR_DEFAULT,
+                          gu::Config::Flag::type_bool);
     ret |= gu_config_add (conf, GCS_PARAMS_MAX_PKT_SIZE,
-                          GCS_PARAMS_MAX_PKT_SIZE_DEFAULT);
+                          GCS_PARAMS_MAX_PKT_SIZE_DEFAULT,
+                          gu::Config::Flag::type_integer);
 
     char tmp[32] = { 0, };
     snprintf (tmp, sizeof(tmp) - 1, "%lld",
               (long long)GCS_PARAMS_RECV_Q_HARD_LIMIT_DEFAULT);
-    ret |= gu_config_add (conf, GCS_PARAMS_RECV_Q_HARD_LIMIT, tmp);
+    ret |= gu_config_add (conf, GCS_PARAMS_RECV_Q_HARD_LIMIT, tmp,
+                          gu::Config::Flag::type_integer);
 
     ret |= gu_config_add (conf, GCS_PARAMS_RECV_Q_SOFT_LIMIT,
-                          GCS_PARAMS_RECV_Q_SOFT_LIMIT_DEFAULT);
+                          GCS_PARAMS_RECV_Q_SOFT_LIMIT_DEFAULT,
+                          gu::Config::Flag::type_double);
     ret |= gu_config_add (conf, GCS_PARAMS_MAX_THROTTLE,
-                          GCS_PARAMS_MAX_THROTTLE_DEFAULT);
+                          GCS_PARAMS_MAX_THROTTLE_DEFAULT,
+                          gu::Config::Flag::type_double);
 #ifdef GCS_SM_DEBUG
-    ret |= gu_config_add (conf, GCS_PARAMS_SM_DUMP, "0");
+    ret |= gu_config_add (conf, GCS_PARAMS_SM_DUMP, "0", 0);
 #endif /* GCS_SM_DEBUG */
     return ret;
 }

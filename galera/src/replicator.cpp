@@ -15,7 +15,7 @@ std::string const Replicator::Param::signal = "signal";
 
 void Replicator::register_params(gu::Config& conf)
 {
-    conf.add(Param::debug_log, "no");
+    conf.add(Param::debug_log, "no", gu::Config::Flag::type_bool);
 #ifdef GU_DBUG_ON
     conf.add(Param::dbug, "");
     conf.add(Param::signal, "");

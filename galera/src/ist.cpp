@@ -83,9 +83,13 @@ galera::ist::Receiver::RECV_BIND("ist.recv_bind");
 void
 galera::ist::register_params(gu::Config& conf)
 {
-    conf.add(Receiver::RECV_ADDR);
-    conf.add(Receiver::RECV_BIND);
-    conf.add(CONF_KEEP_KEYS);
+    conf.add(Receiver::RECV_ADDR, gu::Config::Flag::read_only);
+    conf.add(Receiver::RECV_BIND, gu::Config::Flag::read_only);
+    // Made hidden because undocumented
+    conf.add(CONF_KEEP_KEYS,
+             gu::Config::Flag::hidden |
+             gu::Config::Flag::read_only |
+             gu::Config::Flag::type_bool);
 }
 
 galera::ist::Receiver::Receiver(gu::Config&           conf,

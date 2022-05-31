@@ -32,10 +32,10 @@ gu_config_has (gu_config_t* cnf, const char* key);
 bool
 gu_config_is_set (gu_config_t* cnf, const char* key);
 
-/* before setting a parameter, it must be added to a known parameter list*/
+/* before setting a parameter, it must be added to a known parameter list */
 int
 gu_config_add (gu_config_t* cnf, const char* key,
-               const char* val /*can be NULL*/);
+               const char* val /*can be NULL*/, int flags);
 
 /* Getters/setters return 0 on success, 1 when key not set/not found,
  * negative error code in case of other errors (conversion failed and such) */

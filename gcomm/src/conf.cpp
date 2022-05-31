@@ -10,6 +10,9 @@
 
 static std::string const Delim = ".";
 
+std::string const BaseHost(COMMON_BASE_HOST_KEY);
+std::string const BasePort(COMMON_BASE_PORT_KEY);
+
 // Protonet
 std::string const gcomm::Conf::ProtonetBackend("protonet.backend");
 std::string const gcomm::Conf::ProtonetVersion("protonet.version");
@@ -119,11 +122,11 @@ std::string const gcomm::Conf::PcRecovery = PcPrefix + "recovery";
 void
 gcomm::Conf::register_params(gu::Config& cnf)
 {
-#define GCOMM_CONF_ADD(_x_) cnf.add(_x_);
-#define GCOMM_CONF_ADD_DEFAULT(_x_) cnf.add(_x_, Defaults::_x_);
+#define GCOMM_CONF_ADD(_x_) cnf.add(_x_, Flags::_x_);
+#define GCOMM_CONF_ADD_DEFAULT(_x_) cnf.add(_x_, Defaults::_x_, Flags::_x_);
 
-    GCOMM_CONF_ADD (COMMON_BASE_HOST_KEY);
-    GCOMM_CONF_ADD (COMMON_BASE_PORT_KEY);
+    GCOMM_CONF_ADD (BaseHost);
+    GCOMM_CONF_ADD (BasePort);
 
     GCOMM_CONF_ADD_DEFAULT(ProtonetBackend);
     GCOMM_CONF_ADD_DEFAULT(ProtonetVersion);

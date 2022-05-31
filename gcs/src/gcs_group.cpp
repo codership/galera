@@ -22,7 +22,9 @@ uint8_t     const GCS_VOTE_POLICY_DEFAULT(0);
 
 void gcs_group_register(gu::Config* cnf)
 {
-    cnf->add(GCS_VOTE_POLICY_KEY);
+    cnf->add(GCS_VOTE_POLICY_KEY,
+             gu::Config::Flag::read_only |
+             gu::Config::Flag::type_integer);
 }
 
 const char* gcs_group_state_str[GCS_GROUP_STATE_MAX] =

@@ -60,6 +60,11 @@ galera::ReplicatorSMM::InitConfig::InitConfig(gu::Config&       conf,
             conf.add(i->first, i->second);
     }
 
+    conf.set_flags(Param::max_write_set_size, gu::Config::Flag::type_integer);
+    conf.set_flags(Param::base_dir, gu::Config::Flag::read_only);
+    conf.set_flags(Param::base_port, gu::Config::Flag::read_only |
+                   gu::Config::Flag::type_integer);
+
     // what is would be a better protection?
     int const pv(gu::from_string<int>(conf.get(Param::proto_max)));
     if (pv > MAX_PROTO_VER)
@@ -69,8 +74,7 @@ galera::ReplicatorSMM::InitConfig::InitConfig(gu::Config&       conf,
         conf.add(Param::proto_max, gu::to_string(MAX_PROTO_VER));
     }
 
-    conf.add(COMMON_BASE_HOST_KEY);
-    conf.add(COMMON_BASE_PORT_KEY);
+    conf.add(COMMON_BASE_HOST_KEY, gu::Config::Flag::read_only);
 
     if (node_address && strlen(node_address) > 0)
     {

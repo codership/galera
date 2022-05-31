@@ -29,16 +29,23 @@ gcache::GCache::PARAMS_DIR                 (GCACHE_PARAMS_DIR);
 void
 gcache::GCache::Params::register_params(gu::Config& cfg)
 {
-    cfg.add(GCACHE_PARAMS_DIR,             GCACHE_DEFAULT_DIR);
-    cfg.add(GCACHE_PARAMS_RB_NAME,         GCACHE_DEFAULT_RB_NAME);
-    cfg.add(GCACHE_PARAMS_MEM_SIZE,        GCACHE_DEFAULT_MEM_SIZE);
-    cfg.add(GCACHE_PARAMS_RB_SIZE,         GCACHE_DEFAULT_RB_SIZE);
-    cfg.add(GCACHE_PARAMS_PAGE_SIZE,       GCACHE_DEFAULT_PAGE_SIZE);
-    cfg.add(GCACHE_PARAMS_KEEP_PAGES_SIZE, GCACHE_DEFAULT_KEEP_PAGES_SIZE);
+    cfg.add(GCACHE_PARAMS_DIR, GCACHE_DEFAULT_DIR,
+            gu::Config::Flag::read_only);
+    cfg.add(GCACHE_PARAMS_RB_NAME, GCACHE_DEFAULT_RB_NAME,
+            gu::Config::Flag::read_only);
+    cfg.add(GCACHE_PARAMS_MEM_SIZE, GCACHE_DEFAULT_MEM_SIZE,
+            gu::Config::Flag::type_integer);
+    cfg.add(GCACHE_PARAMS_RB_SIZE, GCACHE_DEFAULT_RB_SIZE,
+            gu::Config::Flag::read_only | gu::Config::Flag::type_integer);
+    cfg.add(GCACHE_PARAMS_PAGE_SIZE, GCACHE_DEFAULT_PAGE_SIZE,
+            gu::Config::Flag::type_integer);
+    cfg.add(GCACHE_PARAMS_KEEP_PAGES_SIZE, GCACHE_DEFAULT_KEEP_PAGES_SIZE,
+            gu::Config::Flag::type_integer);
 #ifndef NDEBUG
     cfg.add(GCACHE_PARAMS_DEBUG,           GCACHE_DEFAULT_DEBUG);
 #endif
-    cfg.add(GCACHE_PARAMS_RECOVER,         GCACHE_DEFAULT_RECOVER);
+    cfg.add(GCACHE_PARAMS_RECOVER, GCACHE_DEFAULT_RECOVER,
+            gu::Config::Flag::read_only | gu::Config::Flag::type_bool);
 }
 
 static const std::string

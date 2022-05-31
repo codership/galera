@@ -65,12 +65,26 @@ public:
         if (!has(key)) { params_[key] = Parameter(); }
     }
 
+    void
+    add (const std::string& key, int flags)
+    {
+        gu_trace(key_check(key));
+        if (!has(key)) { params_[key] = Parameter(flags); }
+    }
+
     /* adds parameter to the known parameter list and sets its value */
     void
     add (const std::string& key, const std::string& value)
     {
         gu_trace(key_check(key));
         if (!has(key)) { params_[key] = Parameter(value); }
+    }
+
+    void
+    add (const std::string& key, const std::string& value, int flags)
+    {
+        gu_trace(key_check(key));
+        if (!has(key)) { params_[key] = Parameter(value, flags); }
     }
 
     /* sets a known parameter to some value, otherwise throws NotFound */
@@ -96,6 +110,22 @@ public:
     set (const std::string& key, const char* value)
     {
         set(key, std::string(value));
+    }
+
+    /* Sets flags of the parameter with given key.
+     * Throws NotFound, if the key is not present. */
+    void
+    set_flags (const std::string& key, int flags)
+    {
+        param_map_t::iterator const i(params_.find(key));
+        if (i != params_.end())
+        {
+            i->second.set_flags(flags);
+        }
+        else
+        {
+            throw NotFound();
+        }
     }
 
     /* Parse a string of semicolumn separated key=value pairs into a vector.
@@ -177,17 +207,62 @@ public:
     }
 
     /* iterator stuff */
+    struct Flag
+    {
+        static const int hidden = (1 << 0);
+        static const int deprecated = (1 << 1);
+        static const int read_only = (1 << 2);
+        static const int type_bool = (1 << 3);
+        static const int type_integer = (1 << 4);
+        static const int type_double = (1 << 5);
+
+        static const int type_mask =
+            Flag::type_bool | Flag::type_integer | Flag::type_double;
+
+        static std::string to_string(int f)
+        {
+            std::ostringstream s;
+            if (f & Flag::hidden)
+                s << "hidden | ";
+            if (f & Flag::deprecated)
+                s << "deprecated | ";
+            if (f & Flag::read_only)
+                s << "read_only | ";
+            if (f & Flag::type_bool)
+                s << "bool | ";
+            if (f & Flag::type_integer)
+                s << "integer | ";
+            if (f & Flag::type_double)
+                s << "double | ";
+            std::string ret(s.str());
+            if (ret.length() > 3)
+                ret.erase(ret.length() - 3);
+            return ret;
+        }
+    };
 
     class Parameter
     {
     public:
 
         explicit
-        Parameter(const std::string& value) : value_(value), set_(true)  {}
-        Parameter()                         : value_(),      set_(false) {}
+        Parameter() :
+            value_(), set_(false), flags_(0) {}
+        Parameter(const std::string& value) :
+            value_(value), set_(true), flags_(0) {}
+        Parameter(int flags) :
+            value_(), set_(false), flags_(flags) {}
+        Parameter(const std::string& value, int flags) :
+            value_(value), set_(true), flags_(flags) {}
 
         const std::string& value()  const { return value_; }
         bool               is_set() const { return set_  ; }
+        int                flags()  const { return flags_; }
+
+        bool is_hidden() const
+        {
+            return flags_ & Flag::hidden;
+        }
 
         void set(const std::string& value)
         {
@@ -195,10 +270,16 @@ public:
             set_   = true;
         }
 
+        void set_flags(int flags)
+        {
+            flags_ = flags;
+        }
+
     private:
 
         std::string value_;
         bool        set_;
+        int         flags_;
     };
 
     typedef std::map <std::string, Parameter> param_map_t;

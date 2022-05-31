@@ -42,12 +42,13 @@ static std::string const CERT_PARAM_LENGTH_CHECK_DEFAULT("127");
 void
 galera::Certification::register_params(gu::Config& cnf)
 {
-    cnf.add(CERT_PARAM_LOG_CONFLICTS, CERT_PARAM_LOG_CONFLICTS_DEFAULT);
-    cnf.add(CERT_PARAM_OPTIMISTIC_PA, CERT_PARAM_OPTIMISTIC_PA_DEFAULT);
+    const int flags(gu::Config::Flag::type_bool);
+    cnf.add(CERT_PARAM_LOG_CONFLICTS, CERT_PARAM_LOG_CONFLICTS_DEFAULT, flags);
+    cnf.add(CERT_PARAM_OPTIMISTIC_PA, CERT_PARAM_OPTIMISTIC_PA_DEFAULT, flags);
     /* The defaults below are deliberately not reflected in conf: people
      * should not know about these dangerous setting unless they read RTFM. */
-    cnf.add(CERT_PARAM_MAX_LENGTH);
-    cnf.add(CERT_PARAM_LENGTH_CHECK);
+    cnf.add(CERT_PARAM_MAX_LENGTH, gu::Config::Flag::hidden);
+    cnf.add(CERT_PARAM_LENGTH_CHECK, gu::Config::Flag::hidden);
 }
 
 /* a function to get around unset defaults in ctor initialization list */

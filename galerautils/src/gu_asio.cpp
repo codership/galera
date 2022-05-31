@@ -517,15 +517,28 @@ static void init_use_ssl(gu::Config& conf)
 void gu::ssl_register_params(gu::Config& conf)
 {
     // register SSL config parameters
-    conf.add(gu::conf::use_ssl);
-    conf.add(gu::conf::ssl_cipher);
-    conf.add(gu::conf::ssl_compression);
-    conf.add(gu::conf::ssl_key);
-    conf.add(gu::conf::ssl_cert);
-    conf.add(gu::conf::ssl_ca);
-    conf.add(gu::conf::ssl_password_file);
-    conf.add(gu::conf::ssl_reload);
-    conf.add(gu::conf::socket_dynamic);
+    conf.add(gu::conf::use_ssl,
+             gu::Config::Flag::read_only |
+             gu::Config::Flag::type_bool);
+    conf.add(gu::conf::ssl_cipher,
+             gu::Config::Flag::read_only |
+             gu::Config::Flag::type_bool);
+    conf.add(gu::conf::ssl_compression,
+             gu::Config::Flag::read_only |
+             gu::Config::Flag::type_bool);
+    conf.add(gu::conf::ssl_key,
+             gu::Config::Flag::read_only);
+    conf.add(gu::conf::ssl_cert,
+             gu::Config::Flag::read_only);
+    conf.add(gu::conf::ssl_ca,
+             gu::Config::Flag::read_only);
+    conf.add(gu::conf::ssl_password_file,
+             gu::Config::Flag::read_only);
+    conf.add(gu::conf::ssl_reload,
+             gu::Config::Flag::type_bool);
+    conf.add(gu::conf::socket_dynamic,
+             gu::Config::Flag::read_only |
+             gu::Config::Flag::type_bool);
 }
 
 void gu::ssl_param_set(const std::string& key, const std::string& val, 
