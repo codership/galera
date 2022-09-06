@@ -750,13 +750,19 @@ wsrep_status_t galera::ReplicatorSMM::pre_commit(TrxHandle*        trx,
     {
         meta->gtid.uuid  = state_uuid_;
         meta->gtid.seqno = trx->global_seqno();
-        meta->depends_on = trx->depends_seqno();
+        // Depends on will be assigned after certification, not known
+        // here yet.
     }
     // State should not be checked here: If trx has been replicated,
     // it has to be certified and potentially applied. #528
     // if (state_() < S_JOINED) return WSREP_TRX_FAIL;
 
     wsrep_status_t retval(cert_and_catch(trx));
+
+    if (meta)
+    {
+        meta->depends_on = trx->depends_seqno();
+    }
 
     if (gu_unlikely(retval != WSREP_OK))
     {
