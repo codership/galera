@@ -14,7 +14,7 @@
 #include <string>
 #include <mutex>
 
-namespace galera
+namespace gu
 {
     class EventService
     {
@@ -43,7 +43,7 @@ namespace galera
         EventService(wsrep_event_context_t* ctx, wsrep_event_cb_t cb)
             : ctx_(ctx), cb_(cb)
         {}
-        virtual ~EventService() {}
+        ~EventService() {}
 
         EventService(const EventService&);
         EventService& operator =(EventService);

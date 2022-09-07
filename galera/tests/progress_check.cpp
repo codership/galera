@@ -41,7 +41,7 @@ START_TEST(progress_callback)
     wsrep_event_context_t event_context;
     wsrep_event_service_v1_t evs = { event_cb, &event_context };
 
-    galera::EventService::init_v1(&evs);
+    gu::EventService::init_v1(&evs);
 
     {
         galera::ProgressCallback<int> pcb(WSREP_MEMBER_JOINED,
@@ -59,7 +59,7 @@ START_TEST(progress_callback)
         /* Dtor calls event callback for the third time */
     }
 
-    galera::EventService::deinit_v1();
+    gu::EventService::deinit_v1();
 }
 END_TEST
 

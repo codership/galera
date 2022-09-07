@@ -6,7 +6,7 @@
 #define GALERA_PROGRESS_CALLBACK_HPP
 
 #include "gu_progress.hpp" // gu::Progress::Callback
-#include "event_service.hpp"
+#include "gu_event_service.hpp"
 #include "wsrep_api.h"
 
 #include <string>
@@ -34,7 +34,7 @@ namespace galera
                << ", \"done\": "  << done
                << ", \"undefined\": -1 }";
 
-            EventService::callback(event_name, os.str());
+            gu::EventService::callback(event_name, os.str());
         }
 
     private:

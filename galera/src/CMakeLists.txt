@@ -26,7 +26,6 @@ add_library(galera STATIC
   replicator_smm.cpp
   replicator_str.cpp
   replicator_smm_stats.cpp
-  event_service.cpp
   )
 
 target_include_directories(galera

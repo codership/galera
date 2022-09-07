@@ -2,7 +2,7 @@
 // Copyright (C) 2021 Codership Oy <info@codership.com>
 //
 
-#include "event_service.hpp"
+#include "gu_event_service.hpp"
 
 #include <cassert>
 
@@ -10,7 +10,7 @@
 // Event service hooks.
 //
 
-namespace galera
+namespace gu
 {
     std::mutex EventService::mutex;
     size_t     EventService::usage(0);
