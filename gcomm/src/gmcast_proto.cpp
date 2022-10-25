@@ -11,8 +11,8 @@
 static void emit_evicted_event()
 {
     std::ostringstream os;
-    os << "{\"status:\" \"evicted\","
-       << "\"message\":"
+    os << "{\"status\": \"evicted\", "
+       << "\"message\": "
        << "\"This node was evicted permanently from cluster, "
        << "restart is required\"}";
     gu::EventService::callback("event", os.str());
