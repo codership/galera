@@ -2,7 +2,7 @@
 // basic_stream_socket.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2019 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -32,7 +32,7 @@ namespace asio {
 #define ASIO_BASIC_STREAM_SOCKET_FWD_DECL
 
 // Forward declaration with defaulted arguments.
-template <typename Protocol, typename Executor = any_io_executor>
+template <typename Protocol, typename Executor = executor>
 class basic_stream_socket;
 
 #endif // !defined(ASIO_BASIC_STREAM_SOCKET_FWD_DECL)
@@ -45,12 +45,6 @@ class basic_stream_socket;
  * @par Thread Safety
  * @e Distinct @e objects: Safe.@n
  * @e Shared @e objects: Unsafe.
- *
- * Synchronous @c send, @c receive, and @c connect operations are thread safe
- * with respect to each other, if the underlying operating system calls are
- * also thread safe. This means that it is permitted to perform concurrent
- * calls to these synchronous operations on a single socket object. Other
- * synchronous operations, such as @c open or @c close, are not thread safe.
  *
  * @par Concepts:
  * AsyncReadStream, AsyncWriteStream, Stream, SyncReadStream, SyncWriteStream.
@@ -111,9 +105,9 @@ public:
    */
   template <typename ExecutionContext>
   explicit basic_stream_socket(ExecutionContext& context,
-      typename constraint<
+      typename enable_if<
         is_convertible<ExecutionContext&, execution_context&>::value
-      >::type = 0)
+      >::type* = 0)
     : basic_socket<Protocol, Executor>(context)
   {
   }
@@ -150,10 +144,9 @@ public:
    */
   template <typename ExecutionContext>
   basic_stream_socket(ExecutionContext& context, const protocol_type& protocol,
-      typename constraint<
-        is_convertible<ExecutionContext&, execution_context&>::value,
-        defaulted_constraint
-      >::type = defaulted_constraint())
+      typename enable_if<
+        is_convertible<ExecutionContext&, execution_context&>::value
+      >::type* = 0)
     : basic_socket<Protocol, Executor>(context, protocol)
   {
   }
@@ -196,9 +189,9 @@ public:
    */
   template <typename ExecutionContext>
   basic_stream_socket(ExecutionContext& context, const endpoint_type& endpoint,
-      typename constraint<
+      typename enable_if<
         is_convertible<ExecutionContext&, execution_context&>::value
-      >::type = 0)
+      >::type* = 0)
     : basic_socket<Protocol, Executor>(context, endpoint)
   {
   }
@@ -241,9 +234,9 @@ public:
   template <typename ExecutionContext>
   basic_stream_socket(ExecutionContext& context,
       const protocol_type& protocol, const native_handle_type& native_socket,
-      typename constraint<
+      typename enable_if<
         is_convertible<ExecutionContext&, execution_context&>::value
-      >::type = 0)
+      >::type* = 0)
     : basic_socket<Protocol, Executor>(context, protocol, native_socket)
   {
   }
@@ -260,7 +253,7 @@ public:
    * constructed using the @c basic_stream_socket(const executor_type&)
    * constructor.
    */
-  basic_stream_socket(basic_stream_socket&& other) ASIO_NOEXCEPT
+  basic_stream_socket(basic_stream_socket&& other)
     : basic_socket<Protocol, Executor>(std::move(other))
   {
   }
@@ -296,10 +289,10 @@ public:
    */
   template <typename Protocol1, typename Executor1>
   basic_stream_socket(basic_stream_socket<Protocol1, Executor1>&& other,
-      typename constraint<
+      typename enable_if<
         is_convertible<Protocol1, Protocol>::value
           && is_convertible<Executor1, Executor>::value
-      >::type = 0)
+      >::type* = 0)
     : basic_socket<Protocol, Executor>(std::move(other))
   {
   }
@@ -316,7 +309,7 @@ public:
    * constructor.
    */
   template <typename Protocol1, typename Executor1>
-  typename constraint<
+  typename enable_if<
     is_convertible<Protocol1, Protocol>::value
       && is_convertible<Executor1, Executor>::value,
     basic_stream_socket&
@@ -438,30 +431,24 @@ public:
   /// Start an asynchronous send.
   /**
    * This function is used to asynchronously send data on the stream socket.
-   * It is an initiating function for an @ref asynchronous_operation, and always
-   * returns immediately.
+   * The function call always returns immediately.
    *
    * @param buffers One or more data buffers to be sent on the socket. Although
    * the buffers object may be copied as necessary, ownership of the underlying
    * memory blocks is retained by the caller, which must guarantee that they
-   * remain valid until the completion handler is called.
+   * remain valid until the handler is called.
    *
-   * @param token The @ref completion_token that will be used to produce a
-   * completion handler, which will be called when the send completes.
-   * Potential completion tokens include @ref use_future, @ref use_awaitable,
-   * @ref yield_context, or a function object with the correct completion
-   * signature. The function signature of the completion handler must be:
+   * @param handler The handler to be called when the send operation completes.
+   * Copies will be made of the handler as required. The function signature of
+   * the handler must be:
    * @code void handler(
    *   const asio::error_code& error, // Result of operation.
-   *   std::size_t bytes_transferred // Number of bytes sent.
+   *   std::size_t bytes_transferred           // Number of bytes sent.
    * ); @endcode
    * Regardless of whether the asynchronous operation completes immediately or
-   * not, the completion handler will not be invoked from within this function.
-   * On immediate completion, invocation of the handler will be performed in a
+   * not, the handler will not be invoked from within this function. On
+   * immediate completion, invocation of the handler will be performed in a
    * manner equivalent to using asio::post().
-   *
-   * @par Completion Signature
-   * @code void(asio::error_code, std::size_t) @endcode
    *
    * @note The send operation may not transmit all of the data to the peer.
    * Consider using the @ref async_write function if you need to ensure that all
@@ -475,62 +462,42 @@ public:
    * See the @ref buffer documentation for information on sending multiple
    * buffers in one go, and how to use it with arrays, boost::array or
    * std::vector.
-   *
-   * @par Per-Operation Cancellation
-   * On POSIX or Windows operating systems, this asynchronous operation supports
-   * cancellation for the following asio::cancellation_type values:
-   *
-   * @li @c cancellation_type::terminal
-   *
-   * @li @c cancellation_type::partial
-   *
-   * @li @c cancellation_type::total
    */
-  template <typename ConstBufferSequence,
-      ASIO_COMPLETION_TOKEN_FOR(void (asio::error_code,
-        std::size_t)) WriteToken
-          ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
-  ASIO_INITFN_AUTO_RESULT_TYPE(WriteToken,
+  template <typename ConstBufferSequence, typename WriteHandler>
+  ASIO_INITFN_RESULT_TYPE(WriteHandler,
       void (asio::error_code, std::size_t))
   async_send(const ConstBufferSequence& buffers,
-      ASIO_MOVE_ARG(WriteToken) token
-        ASIO_DEFAULT_COMPLETION_TOKEN(executor_type))
+      ASIO_MOVE_ARG(WriteHandler) handler)
   {
-    return async_initiate<WriteToken,
+    return async_initiate<WriteHandler,
       void (asio::error_code, std::size_t)>(
-        initiate_async_send(this), token,
+        initiate_async_send(), handler, this,
         buffers, socket_base::message_flags(0));
   }
 
   /// Start an asynchronous send.
   /**
    * This function is used to asynchronously send data on the stream socket.
-   * It is an initiating function for an @ref asynchronous_operation, and always
-   * returns immediately.
+   * The function call always returns immediately.
    *
    * @param buffers One or more data buffers to be sent on the socket. Although
    * the buffers object may be copied as necessary, ownership of the underlying
    * memory blocks is retained by the caller, which must guarantee that they
-   * remain valid until the completion handler is called.
+   * remain valid until the handler is called.
    *
    * @param flags Flags specifying how the send call is to be made.
    *
-   * @param token The @ref completion_token that will be used to produce a
-   * completion handler, which will be called when the send completes.
-   * Potential completion tokens include @ref use_future, @ref use_awaitable,
-   * @ref yield_context, or a function object with the correct completion
-   * signature. The function signature of the completion handler must be:
+   * @param handler The handler to be called when the send operation completes.
+   * Copies will be made of the handler as required. The function signature of
+   * the handler must be:
    * @code void handler(
    *   const asio::error_code& error, // Result of operation.
-   *   std::size_t bytes_transferred // Number of bytes sent.
+   *   std::size_t bytes_transferred           // Number of bytes sent.
    * ); @endcode
    * Regardless of whether the asynchronous operation completes immediately or
-   * not, the completion handler will not be invoked from within this function.
-   * On immediate completion, invocation of the handler will be performed in a
+   * not, the handler will not be invoked from within this function. On
+   * immediate completion, invocation of the handler will be performed in a
    * manner equivalent to using asio::post().
-   *
-   * @par Completion Signature
-   * @code void(asio::error_code, std::size_t) @endcode
    *
    * @note The send operation may not transmit all of the data to the peer.
    * Consider using the @ref async_write function if you need to ensure that all
@@ -544,31 +511,17 @@ public:
    * See the @ref buffer documentation for information on sending multiple
    * buffers in one go, and how to use it with arrays, boost::array or
    * std::vector.
-   *
-   * @par Per-Operation Cancellation
-   * On POSIX or Windows operating systems, this asynchronous operation supports
-   * cancellation for the following asio::cancellation_type values:
-   *
-   * @li @c cancellation_type::terminal
-   *
-   * @li @c cancellation_type::partial
-   *
-   * @li @c cancellation_type::total
    */
-  template <typename ConstBufferSequence,
-      ASIO_COMPLETION_TOKEN_FOR(void (asio::error_code,
-        std::size_t)) WriteToken
-          ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
-  ASIO_INITFN_AUTO_RESULT_TYPE(WriteToken,
+  template <typename ConstBufferSequence, typename WriteHandler>
+  ASIO_INITFN_RESULT_TYPE(WriteHandler,
       void (asio::error_code, std::size_t))
   async_send(const ConstBufferSequence& buffers,
       socket_base::message_flags flags,
-      ASIO_MOVE_ARG(WriteToken) token
-        ASIO_DEFAULT_COMPLETION_TOKEN(executor_type))
+      ASIO_MOVE_ARG(WriteHandler) handler)
   {
-    return async_initiate<WriteToken,
+    return async_initiate<WriteHandler,
       void (asio::error_code, std::size_t)>(
-        initiate_async_send(this), token, buffers, flags);
+        initiate_async_send(), handler, this, buffers, flags);
   }
 
   /// Receive some data on the socket.
@@ -679,30 +632,24 @@ public:
   /// Start an asynchronous receive.
   /**
    * This function is used to asynchronously receive data from the stream
-   * socket. It is an initiating function for an @ref asynchronous_operation,
-   * and always returns immediately.
+   * socket. The function call always returns immediately.
    *
    * @param buffers One or more buffers into which the data will be received.
    * Although the buffers object may be copied as necessary, ownership of the
    * underlying memory blocks is retained by the caller, which must guarantee
-   * that they remain valid until the completion handler is called.
+   * that they remain valid until the handler is called.
    *
-   * @param token The @ref completion_token that will be used to produce a
-   * completion handler, which will be called when the receive completes.
-   * Potential completion tokens include @ref use_future, @ref use_awaitable,
-   * @ref yield_context, or a function object with the correct completion
-   * signature. The function signature of the completion handler must be:
+   * @param handler The handler to be called when the receive operation
+   * completes. Copies will be made of the handler as required. The function
+   * signature of the handler must be:
    * @code void handler(
    *   const asio::error_code& error, // Result of operation.
-   *   std::size_t bytes_transferred // Number of bytes received.
+   *   std::size_t bytes_transferred           // Number of bytes received.
    * ); @endcode
    * Regardless of whether the asynchronous operation completes immediately or
-   * not, the completion handler will not be invoked from within this function.
-   * On immediate completion, invocation of the handler will be performed in a
+   * not, the handler will not be invoked from within this function. On
+   * immediate completion, invocation of the handler will be performed in a
    * manner equivalent to using asio::post().
-   *
-   * @par Completion Signature
-   * @code void(asio::error_code, std::size_t) @endcode
    *
    * @note The receive operation may not receive all of the requested number of
    * bytes. Consider using the @ref async_read function if you need to ensure
@@ -718,62 +665,42 @@ public:
    * See the @ref buffer documentation for information on receiving into
    * multiple buffers in one go, and how to use it with arrays, boost::array or
    * std::vector.
-   *
-   * @par Per-Operation Cancellation
-   * On POSIX or Windows operating systems, this asynchronous operation supports
-   * cancellation for the following asio::cancellation_type values:
-   *
-   * @li @c cancellation_type::terminal
-   *
-   * @li @c cancellation_type::partial
-   *
-   * @li @c cancellation_type::total
    */
-  template <typename MutableBufferSequence,
-      ASIO_COMPLETION_TOKEN_FOR(void (asio::error_code,
-        std::size_t)) ReadToken
-          ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
-  ASIO_INITFN_AUTO_RESULT_TYPE(ReadToken,
+  template <typename MutableBufferSequence, typename ReadHandler>
+  ASIO_INITFN_RESULT_TYPE(ReadHandler,
       void (asio::error_code, std::size_t))
   async_receive(const MutableBufferSequence& buffers,
-      ASIO_MOVE_ARG(ReadToken) token
-        ASIO_DEFAULT_COMPLETION_TOKEN(executor_type))
+      ASIO_MOVE_ARG(ReadHandler) handler)
   {
-    return async_initiate<ReadToken,
+    return async_initiate<ReadHandler,
       void (asio::error_code, std::size_t)>(
-        initiate_async_receive(this), token,
+        initiate_async_receive(), handler, this,
         buffers, socket_base::message_flags(0));
   }
 
   /// Start an asynchronous receive.
   /**
    * This function is used to asynchronously receive data from the stream
-   * socket. It is an initiating function for an @ref asynchronous_operation,
-   * and always returns immediately.
+   * socket. The function call always returns immediately.
    *
    * @param buffers One or more buffers into which the data will be received.
    * Although the buffers object may be copied as necessary, ownership of the
    * underlying memory blocks is retained by the caller, which must guarantee
-   * that they remain valid until the completion handler is called.
+   * that they remain valid until the handler is called.
    *
    * @param flags Flags specifying how the receive call is to be made.
    *
-   * @param token The @ref completion_token that will be used to produce a
-   * completion handler, which will be called when the receive completes.
-   * Potential completion tokens include @ref use_future, @ref use_awaitable,
-   * @ref yield_context, or a function object with the correct completion
-   * signature. The function signature of the completion handler must be:
+   * @param handler The handler to be called when the receive operation
+   * completes. Copies will be made of the handler as required. The function
+   * signature of the handler must be:
    * @code void handler(
    *   const asio::error_code& error, // Result of operation.
-   *   std::size_t bytes_transferred // Number of bytes received.
+   *   std::size_t bytes_transferred           // Number of bytes received.
    * ); @endcode
    * Regardless of whether the asynchronous operation completes immediately or
-   * not, the completion handler will not be invoked from within this function.
-   * On immediate completion, invocation of the handler will be performed in a
+   * not, the handler will not be invoked from within this function. On
+   * immediate completion, invocation of the handler will be performed in a
    * manner equivalent to using asio::post().
-   *
-   * @par Completion Signature
-   * @code void(asio::error_code, std::size_t) @endcode
    *
    * @note The receive operation may not receive all of the requested number of
    * bytes. Consider using the @ref async_read function if you need to ensure
@@ -789,31 +716,17 @@ public:
    * See the @ref buffer documentation for information on receiving into
    * multiple buffers in one go, and how to use it with arrays, boost::array or
    * std::vector.
-   *
-   * @par Per-Operation Cancellation
-   * On POSIX or Windows operating systems, this asynchronous operation supports
-   * cancellation for the following asio::cancellation_type values:
-   *
-   * @li @c cancellation_type::terminal
-   *
-   * @li @c cancellation_type::partial
-   *
-   * @li @c cancellation_type::total
    */
-  template <typename MutableBufferSequence,
-      ASIO_COMPLETION_TOKEN_FOR(void (asio::error_code,
-        std::size_t)) ReadToken
-          ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
-  ASIO_INITFN_AUTO_RESULT_TYPE(ReadToken,
+  template <typename MutableBufferSequence, typename ReadHandler>
+  ASIO_INITFN_RESULT_TYPE(ReadHandler,
       void (asio::error_code, std::size_t))
   async_receive(const MutableBufferSequence& buffers,
       socket_base::message_flags flags,
-      ASIO_MOVE_ARG(ReadToken) token
-        ASIO_DEFAULT_COMPLETION_TOKEN(executor_type))
+      ASIO_MOVE_ARG(ReadHandler) handler)
   {
-    return async_initiate<ReadToken,
+    return async_initiate<ReadHandler,
       void (asio::error_code, std::size_t)>(
-        initiate_async_receive(this), token, buffers, flags);
+        initiate_async_receive(), handler, this, buffers, flags);
   }
 
   /// Write some data to the socket.
@@ -880,30 +793,24 @@ public:
   /// Start an asynchronous write.
   /**
    * This function is used to asynchronously write data to the stream socket.
-   * It is an initiating function for an @ref asynchronous_operation, and always
-   * returns immediately.
+   * The function call always returns immediately.
    *
    * @param buffers One or more data buffers to be written to the socket.
    * Although the buffers object may be copied as necessary, ownership of the
    * underlying memory blocks is retained by the caller, which must guarantee
-   * that they remain valid until the completion handler is called.
+   * that they remain valid until the handler is called.
    *
-   * @param token The @ref completion_token that will be used to produce a
-   * completion handler, which will be called when the write completes.
-   * Potential completion tokens include @ref use_future, @ref use_awaitable,
-   * @ref yield_context, or a function object with the correct completion
-   * signature. The function signature of the completion handler must be:
+   * @param handler The handler to be called when the write operation completes.
+   * Copies will be made of the handler as required. The function signature of
+   * the handler must be:
    * @code void handler(
    *   const asio::error_code& error, // Result of operation.
-   *   std::size_t bytes_transferred // Number of bytes written.
+   *   std::size_t bytes_transferred           // Number of bytes written.
    * ); @endcode
    * Regardless of whether the asynchronous operation completes immediately or
-   * not, the completion handler will not be invoked from within this function.
-   * On immediate completion, invocation of the handler will be performed in a
+   * not, the handler will not be invoked from within this function. On
+   * immediate completion, invocation of the handler will be performed in a
    * manner equivalent to using asio::post().
-   *
-   * @par Completion Signature
-   * @code void(asio::error_code, std::size_t) @endcode
    *
    * @note The write operation may not transmit all of the data to the peer.
    * Consider using the @ref async_write function if you need to ensure that all
@@ -917,30 +824,16 @@ public:
    * See the @ref buffer documentation for information on writing multiple
    * buffers in one go, and how to use it with arrays, boost::array or
    * std::vector.
-   *
-   * @par Per-Operation Cancellation
-   * On POSIX or Windows operating systems, this asynchronous operation supports
-   * cancellation for the following asio::cancellation_type values:
-   *
-   * @li @c cancellation_type::terminal
-   *
-   * @li @c cancellation_type::partial
-   *
-   * @li @c cancellation_type::total
    */
-  template <typename ConstBufferSequence,
-      ASIO_COMPLETION_TOKEN_FOR(void (asio::error_code,
-        std::size_t)) WriteToken
-          ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
-  ASIO_INITFN_AUTO_RESULT_TYPE(WriteToken,
+  template <typename ConstBufferSequence, typename WriteHandler>
+  ASIO_INITFN_RESULT_TYPE(WriteHandler,
       void (asio::error_code, std::size_t))
   async_write_some(const ConstBufferSequence& buffers,
-      ASIO_MOVE_ARG(WriteToken) token
-        ASIO_DEFAULT_COMPLETION_TOKEN(executor_type))
+      ASIO_MOVE_ARG(WriteHandler) handler)
   {
-    return async_initiate<WriteToken,
+    return async_initiate<WriteHandler,
       void (asio::error_code, std::size_t)>(
-        initiate_async_send(this), token,
+        initiate_async_send(), handler, this,
         buffers, socket_base::message_flags(0));
   }
 
@@ -1010,30 +903,24 @@ public:
   /// Start an asynchronous read.
   /**
    * This function is used to asynchronously read data from the stream socket.
-   * socket. It is an initiating function for an @ref asynchronous_operation,
-   * and always returns immediately.
+   * The function call always returns immediately.
    *
    * @param buffers One or more buffers into which the data will be read.
    * Although the buffers object may be copied as necessary, ownership of the
    * underlying memory blocks is retained by the caller, which must guarantee
-   * that they remain valid until the completion handler is called.
+   * that they remain valid until the handler is called.
    *
-   * @param token The @ref completion_token that will be used to produce a
-   * completion handler, which will be called when the read completes.
-   * Potential completion tokens include @ref use_future, @ref use_awaitable,
-   * @ref yield_context, or a function object with the correct completion
-   * signature. The function signature of the completion handler must be:
+   * @param handler The handler to be called when the read operation completes.
+   * Copies will be made of the handler as required. The function signature of
+   * the handler must be:
    * @code void handler(
    *   const asio::error_code& error, // Result of operation.
-   *   std::size_t bytes_transferred // Number of bytes read.
+   *   std::size_t bytes_transferred           // Number of bytes read.
    * ); @endcode
    * Regardless of whether the asynchronous operation completes immediately or
-   * not, the completion handler will not be invoked from within this function.
-   * On immediate completion, invocation of the handler will be performed in a
+   * not, the handler will not be invoked from within this function. On
+   * immediate completion, invocation of the handler will be performed in a
    * manner equivalent to using asio::post().
-   *
-   * @par Completion Signature
-   * @code void(asio::error_code, std::size_t) @endcode
    *
    * @note The read operation may not read all of the requested number of bytes.
    * Consider using the @ref async_read function if you need to ensure that the
@@ -1048,56 +935,25 @@ public:
    * See the @ref buffer documentation for information on reading into multiple
    * buffers in one go, and how to use it with arrays, boost::array or
    * std::vector.
-   *
-   * @par Per-Operation Cancellation
-   * On POSIX or Windows operating systems, this asynchronous operation supports
-   * cancellation for the following asio::cancellation_type values:
-   *
-   * @li @c cancellation_type::terminal
-   *
-   * @li @c cancellation_type::partial
-   *
-   * @li @c cancellation_type::total
    */
-  template <typename MutableBufferSequence,
-      ASIO_COMPLETION_TOKEN_FOR(void (asio::error_code,
-        std::size_t)) ReadToken
-          ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
-  ASIO_INITFN_AUTO_RESULT_TYPE(ReadToken,
+  template <typename MutableBufferSequence, typename ReadHandler>
+  ASIO_INITFN_RESULT_TYPE(ReadHandler,
       void (asio::error_code, std::size_t))
   async_read_some(const MutableBufferSequence& buffers,
-      ASIO_MOVE_ARG(ReadToken) token
-        ASIO_DEFAULT_COMPLETION_TOKEN(executor_type))
+      ASIO_MOVE_ARG(ReadHandler) handler)
   {
-    return async_initiate<ReadToken,
+    return async_initiate<ReadHandler,
       void (asio::error_code, std::size_t)>(
-        initiate_async_receive(this), token,
+        initiate_async_receive(), handler, this,
         buffers, socket_base::message_flags(0));
   }
 
 private:
-  // Disallow copying and assignment.
-  basic_stream_socket(const basic_stream_socket&) ASIO_DELETED;
-  basic_stream_socket& operator=(const basic_stream_socket&) ASIO_DELETED;
-
-  class initiate_async_send
+  struct initiate_async_send
   {
-  public:
-    typedef Executor executor_type;
-
-    explicit initiate_async_send(basic_stream_socket* self)
-      : self_(self)
-    {
-    }
-
-    executor_type get_executor() const ASIO_NOEXCEPT
-    {
-      return self_->get_executor();
-    }
-
     template <typename WriteHandler, typename ConstBufferSequence>
     void operator()(ASIO_MOVE_ARG(WriteHandler) handler,
-        const ConstBufferSequence& buffers,
+        basic_stream_socket* self, const ConstBufferSequence& buffers,
         socket_base::message_flags flags) const
     {
       // If you get an error on the following line it means that your handler
@@ -1105,33 +961,17 @@ private:
       ASIO_WRITE_HANDLER_CHECK(WriteHandler, handler) type_check;
 
       detail::non_const_lvalue<WriteHandler> handler2(handler);
-      self_->impl_.get_service().async_send(
-          self_->impl_.get_implementation(), buffers, flags,
-          handler2.value, self_->impl_.get_executor());
+      self->impl_.get_service().async_send(
+          self->impl_.get_implementation(), buffers, flags,
+          handler2.value, self->impl_.get_implementation_executor());
     }
-
-  private:
-    basic_stream_socket* self_;
   };
 
-  class initiate_async_receive
+  struct initiate_async_receive
   {
-  public:
-    typedef Executor executor_type;
-
-    explicit initiate_async_receive(basic_stream_socket* self)
-      : self_(self)
-    {
-    }
-
-    executor_type get_executor() const ASIO_NOEXCEPT
-    {
-      return self_->get_executor();
-    }
-
     template <typename ReadHandler, typename MutableBufferSequence>
     void operator()(ASIO_MOVE_ARG(ReadHandler) handler,
-        const MutableBufferSequence& buffers,
+        basic_stream_socket* self, const MutableBufferSequence& buffers,
         socket_base::message_flags flags) const
     {
       // If you get an error on the following line it means that your handler
@@ -1139,13 +979,10 @@ private:
       ASIO_READ_HANDLER_CHECK(ReadHandler, handler) type_check;
 
       detail::non_const_lvalue<ReadHandler> handler2(handler);
-      self_->impl_.get_service().async_receive(
-          self_->impl_.get_implementation(), buffers, flags,
-          handler2.value, self_->impl_.get_executor());
+      self->impl_.get_service().async_receive(
+          self->impl_.get_implementation(), buffers, flags,
+          handler2.value, self->impl_.get_implementation_executor());
     }
-
-  private:
-    basic_stream_socket* self_;
   };
 };
 

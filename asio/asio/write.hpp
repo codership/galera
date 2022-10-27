@@ -2,7 +2,7 @@
 // write.hpp
 // ~~~~~~~~~
 //
-// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2019 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -75,9 +75,9 @@ namespace asio {
  */
 template <typename SyncWriteStream, typename ConstBufferSequence>
 std::size_t write(SyncWriteStream& s, const ConstBufferSequence& buffers,
-    typename constraint<
+    typename enable_if<
       is_const_buffer_sequence<ConstBufferSequence>::value
-    >::type = 0);
+    >::type* = 0);
 
 /// Write all of the supplied data to a stream before returning.
 /**
@@ -118,9 +118,9 @@ std::size_t write(SyncWriteStream& s, const ConstBufferSequence& buffers,
 template <typename SyncWriteStream, typename ConstBufferSequence>
 std::size_t write(SyncWriteStream& s, const ConstBufferSequence& buffers,
     asio::error_code& ec,
-    typename constraint<
+    typename enable_if<
       is_const_buffer_sequence<ConstBufferSequence>::value
-    >::type = 0);
+    >::type* = 0);
 
 /// Write a certain amount of data to a stream before returning.
 /**
@@ -172,9 +172,9 @@ template <typename SyncWriteStream, typename ConstBufferSequence,
     typename CompletionCondition>
 std::size_t write(SyncWriteStream& s, const ConstBufferSequence& buffers,
     CompletionCondition completion_condition,
-    typename constraint<
+    typename enable_if<
       is_const_buffer_sequence<ConstBufferSequence>::value
-    >::type = 0);
+    >::type* = 0);
 
 /// Write a certain amount of data to a stream before returning.
 /**
@@ -219,9 +219,9 @@ template <typename SyncWriteStream, typename ConstBufferSequence,
     typename CompletionCondition>
 std::size_t write(SyncWriteStream& s, const ConstBufferSequence& buffers,
     CompletionCondition completion_condition, asio::error_code& ec,
-    typename constraint<
+    typename enable_if<
       is_const_buffer_sequence<ConstBufferSequence>::value
-    >::type = 0);
+    >::type* = 0);
 
 #if !defined(ASIO_NO_DYNAMIC_BUFFER_V1)
 
@@ -255,12 +255,10 @@ std::size_t write(SyncWriteStream& s, const ConstBufferSequence& buffers,
 template <typename SyncWriteStream, typename DynamicBuffer_v1>
 std::size_t write(SyncWriteStream& s,
     ASIO_MOVE_ARG(DynamicBuffer_v1) buffers,
-    typename constraint<
+    typename enable_if<
       is_dynamic_buffer_v1<typename decay<DynamicBuffer_v1>::type>::value
-    >::type = 0,
-    typename constraint<
-      !is_dynamic_buffer_v2<typename decay<DynamicBuffer_v1>::type>::value
-    >::type = 0);
+        && !is_dynamic_buffer_v2<typename decay<DynamicBuffer_v1>::type>::value
+    >::type* = 0);
 
 /// Write all of the supplied data to a stream before returning.
 /**
@@ -293,12 +291,10 @@ template <typename SyncWriteStream, typename DynamicBuffer_v1>
 std::size_t write(SyncWriteStream& s,
     ASIO_MOVE_ARG(DynamicBuffer_v1) buffers,
     asio::error_code& ec,
-    typename constraint<
+    typename enable_if<
       is_dynamic_buffer_v1<typename decay<DynamicBuffer_v1>::type>::value
-    >::type = 0,
-    typename constraint<
-      !is_dynamic_buffer_v2<typename decay<DynamicBuffer_v1>::type>::value
-    >::type = 0);
+        && !is_dynamic_buffer_v2<typename decay<DynamicBuffer_v1>::type>::value
+    >::type* = 0);
 
 /// Write a certain amount of data to a stream before returning.
 /**
@@ -341,12 +337,10 @@ template <typename SyncWriteStream, typename DynamicBuffer_v1,
 std::size_t write(SyncWriteStream& s,
     ASIO_MOVE_ARG(DynamicBuffer_v1) buffers,
     CompletionCondition completion_condition,
-    typename constraint<
+    typename enable_if<
       is_dynamic_buffer_v1<typename decay<DynamicBuffer_v1>::type>::value
-    >::type = 0,
-    typename constraint<
-      !is_dynamic_buffer_v2<typename decay<DynamicBuffer_v1>::type>::value
-    >::type = 0);
+        && !is_dynamic_buffer_v2<typename decay<DynamicBuffer_v1>::type>::value
+    >::type* = 0);
 
 /// Write a certain amount of data to a stream before returning.
 /**
@@ -390,12 +384,10 @@ template <typename SyncWriteStream, typename DynamicBuffer_v1,
 std::size_t write(SyncWriteStream& s,
     ASIO_MOVE_ARG(DynamicBuffer_v1) buffers,
     CompletionCondition completion_condition, asio::error_code& ec,
-    typename constraint<
+    typename enable_if<
       is_dynamic_buffer_v1<typename decay<DynamicBuffer_v1>::type>::value
-    >::type = 0,
-    typename constraint<
-      !is_dynamic_buffer_v2<typename decay<DynamicBuffer_v1>::type>::value
-    >::type = 0);
+        && !is_dynamic_buffer_v2<typename decay<DynamicBuffer_v1>::type>::value
+    >::type* = 0);
 
 #if !defined(ASIO_NO_EXTENSIONS)
 #if !defined(ASIO_NO_IOSTREAM)
@@ -573,9 +565,9 @@ std::size_t write(SyncWriteStream& s, basic_streambuf<Allocator>& b,
  */
 template <typename SyncWriteStream, typename DynamicBuffer_v2>
 std::size_t write(SyncWriteStream& s, DynamicBuffer_v2 buffers,
-    typename constraint<
+    typename enable_if<
       is_dynamic_buffer_v2<DynamicBuffer_v2>::value
-    >::type = 0);
+    >::type* = 0);
 
 /// Write all of the supplied data to a stream before returning.
 /**
@@ -607,9 +599,9 @@ std::size_t write(SyncWriteStream& s, DynamicBuffer_v2 buffers,
 template <typename SyncWriteStream, typename DynamicBuffer_v2>
 std::size_t write(SyncWriteStream& s, DynamicBuffer_v2 buffers,
     asio::error_code& ec,
-    typename constraint<
+    typename enable_if<
       is_dynamic_buffer_v2<DynamicBuffer_v2>::value
-    >::type = 0);
+    >::type* = 0);
 
 /// Write a certain amount of data to a stream before returning.
 /**
@@ -651,9 +643,9 @@ template <typename SyncWriteStream, typename DynamicBuffer_v2,
     typename CompletionCondition>
 std::size_t write(SyncWriteStream& s, DynamicBuffer_v2 buffers,
     CompletionCondition completion_condition,
-    typename constraint<
+    typename enable_if<
       is_dynamic_buffer_v2<DynamicBuffer_v2>::value
-    >::type = 0);
+    >::type* = 0);
 
 /// Write a certain amount of data to a stream before returning.
 /**
@@ -696,9 +688,9 @@ template <typename SyncWriteStream, typename DynamicBuffer_v2,
     typename CompletionCondition>
 std::size_t write(SyncWriteStream& s, DynamicBuffer_v2 buffers,
     CompletionCondition completion_condition, asio::error_code& ec,
-    typename constraint<
+    typename enable_if<
       is_dynamic_buffer_v2<DynamicBuffer_v2>::value
-    >::type = 0);
+    >::type* = 0);
 
 /*@}*/
 /**
@@ -713,9 +705,9 @@ std::size_t write(SyncWriteStream& s, DynamicBuffer_v2 buffers,
 /// stream.
 /**
  * This function is used to asynchronously write a certain number of bytes of
- * data to a stream. It is an initiating function for an @ref
- * asynchronous_operation, and always returns immediately. The asynchronous
- * operation will continue until one of the following conditions is true:
+ * data to a stream. The function call always returns immediately. The
+ * asynchronous operation will continue until one of the following conditions
+ * is true:
  *
  * @li All of the data in the supplied buffers has been written. That is, the
  * bytes transferred is equal to the sum of the buffer sizes.
@@ -734,28 +726,23 @@ std::size_t write(SyncWriteStream& s, DynamicBuffer_v2 buffers,
  * @param buffers One or more buffers containing the data to be written.
  * Although the buffers object may be copied as necessary, ownership of the
  * underlying memory blocks is retained by the caller, which must guarantee
- * that they remain valid until the completion handler is called.
+ * that they remain valid until the handler is called.
  *
- * @param token The @ref completion_token that will be used to produce a
- * completion handler, which will be called when the write completes.
- * Potential completion tokens include @ref use_future, @ref use_awaitable,
- * @ref yield_context, or a function object with the correct completion
- * signature. The function signature of the completion handler must be:
+ * @param handler The handler to be called when the write operation completes.
+ * Copies will be made of the handler as required. The function signature of
+ * the handler must be:
  * @code void handler(
- *   // Result of operation.
- *   const asio::error_code& error,
+ *   const asio::error_code& error, // Result of operation.
  *
- *   // Number of bytes written from the buffers. If an error
- *   // occurred, this will be less than the sum of the buffer sizes.
- *   std::size_t bytes_transferred
+ *   std::size_t bytes_transferred           // Number of bytes written from the
+ *                                           // buffers. If an error occurred,
+ *                                           // this will be less than the sum
+ *                                           // of the buffer sizes.
  * ); @endcode
  * Regardless of whether the asynchronous operation completes immediately or
- * not, the completion handler will not be invoked from within this function.
- * On immediate completion, invocation of the handler will be performed in a
+ * not, the handler will not be invoked from within this function. On
+ * immediate completion, invocation of the handler will be performed in a
  * manner equivalent to using asio::post().
- *
- * @par Completion Signature
- * @code void(asio::error_code, std::size_t) @endcode
  *
  * @par Example
  * To write a single data buffer use the @ref buffer function as follows:
@@ -765,40 +752,24 @@ std::size_t write(SyncWriteStream& s, DynamicBuffer_v2 buffers,
  * See the @ref buffer documentation for information on writing multiple
  * buffers in one go, and how to use it with arrays, boost::array or
  * std::vector.
- *
- * @par Per-Operation Cancellation
- * This asynchronous operation supports cancellation for the following
- * asio::cancellation_type values:
- *
- * @li @c cancellation_type::terminal
- *
- * @li @c cancellation_type::partial
- *
- * if they are also supported by the @c AsyncWriteStream type's
- * @c async_write_some operation.
  */
 template <typename AsyncWriteStream, typename ConstBufferSequence,
-    ASIO_COMPLETION_TOKEN_FOR(void (asio::error_code,
-      std::size_t)) WriteToken
-        ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(
-          typename AsyncWriteStream::executor_type)>
-ASIO_INITFN_AUTO_RESULT_TYPE(WriteToken,
+    typename WriteHandler>
+ASIO_INITFN_RESULT_TYPE(WriteHandler,
     void (asio::error_code, std::size_t))
 async_write(AsyncWriteStream& s, const ConstBufferSequence& buffers,
-    ASIO_MOVE_ARG(WriteToken) token
-      ASIO_DEFAULT_COMPLETION_TOKEN(
-        typename AsyncWriteStream::executor_type),
-    typename constraint<
+    ASIO_MOVE_ARG(WriteHandler) handler,
+    typename enable_if<
       is_const_buffer_sequence<ConstBufferSequence>::value
-    >::type = 0);
+    >::type* = 0);
 
 /// Start an asynchronous operation to write a certain amount of data to a
 /// stream.
 /**
  * This function is used to asynchronously write a certain number of bytes of
- * data to a stream. It is an initiating function for an @ref
- * asynchronous_operation, and always returns immediately. The asynchronous
- * operation will continue until one of the following conditions is true:
+ * data to a stream. The function call always returns immediately. The
+ * asynchronous operation will continue until one of the following conditions
+ * is true:
  *
  * @li All of the data in the supplied buffers has been written. That is, the
  * bytes transferred is equal to the sum of the buffer sizes.
@@ -817,7 +788,7 @@ async_write(AsyncWriteStream& s, const ConstBufferSequence& buffers,
  * @param buffers One or more buffers containing the data to be written.
  * Although the buffers object may be copied as necessary, ownership of the
  * underlying memory blocks is retained by the caller, which must guarantee
- * that they remain valid until the completion handler is called.
+ * that they remain valid until the handler is called.
  *
  * @param completion_condition The function object to be called to determine
  * whether the write operation is complete. The signature of the function object
@@ -833,26 +804,21 @@ async_write(AsyncWriteStream& s, const ConstBufferSequence& buffers,
  * non-zero return value indicates the maximum number of bytes to be written on
  * the next call to the stream's async_write_some function.
  *
- * @param token The @ref completion_token that will be used to produce a
- * completion handler, which will be called when the write completes.
- * Potential completion tokens include @ref use_future, @ref use_awaitable,
- * @ref yield_context, or a function object with the correct completion
- * signature. The function signature of the completion handler must be:
+ * @param handler The handler to be called when the write operation completes.
+ * Copies will be made of the handler as required. The function signature of the
+ * handler must be:
  * @code void handler(
- *   // Result of operation.
- *   const asio::error_code& error,
+ *   const asio::error_code& error, // Result of operation.
  *
- *   // Number of bytes written from the buffers. If an error
- *   // occurred, this will be less than the sum of the buffer sizes.
- *   std::size_t bytes_transferred
+ *   std::size_t bytes_transferred           // Number of bytes written from the
+ *                                           // buffers. If an error occurred,
+ *                                           // this will be less than the sum
+ *                                           // of the buffer sizes.
  * ); @endcode
  * Regardless of whether the asynchronous operation completes immediately or
- * not, the completion handler will not be invoked from within this function.
- * On immediate completion, invocation of the handler will be performed in a
+ * not, the handler will not be invoked from within this function. On
+ * immediate completion, invocation of the handler will be performed in a
  * manner equivalent to using asio::post().
- *
- * @par Completion Signature
- * @code void(asio::error_code, std::size_t) @endcode
  *
  * @par Example
  * To write a single data buffer use the @ref buffer function as follows:
@@ -863,30 +829,17 @@ async_write(AsyncWriteStream& s, const ConstBufferSequence& buffers,
  * See the @ref buffer documentation for information on writing multiple
  * buffers in one go, and how to use it with arrays, boost::array or
  * std::vector.
- *
- * @par Per-Operation Cancellation
- * This asynchronous operation supports cancellation for the following
- * asio::cancellation_type values:
- *
- * @li @c cancellation_type::terminal
- *
- * @li @c cancellation_type::partial
-   *
- * if they are also supported by the @c AsyncWriteStream type's
- * @c async_write_some operation.
  */
-template <typename AsyncWriteStream,
-    typename ConstBufferSequence, typename CompletionCondition,
-    ASIO_COMPLETION_TOKEN_FOR(void (asio::error_code,
-      std::size_t)) WriteToken>
-ASIO_INITFN_AUTO_RESULT_TYPE(WriteToken,
+template <typename AsyncWriteStream, typename ConstBufferSequence,
+    typename CompletionCondition, typename WriteHandler>
+ASIO_INITFN_RESULT_TYPE(WriteHandler,
     void (asio::error_code, std::size_t))
 async_write(AsyncWriteStream& s, const ConstBufferSequence& buffers,
     CompletionCondition completion_condition,
-    ASIO_MOVE_ARG(WriteToken) token,
-    typename constraint<
+    ASIO_MOVE_ARG(WriteHandler) handler,
+    typename enable_if<
       is_const_buffer_sequence<ConstBufferSequence>::value
-    >::type = 0);
+    >::type* = 0);
 
 #if !defined(ASIO_NO_DYNAMIC_BUFFER_V1)
 
@@ -894,9 +847,9 @@ async_write(AsyncWriteStream& s, const ConstBufferSequence& buffers,
 /// stream.
 /**
  * This function is used to asynchronously write a certain number of bytes of
- * data to a stream. It is an initiating function for an @ref
- * asynchronous_operation, and always returns immediately. The asynchronous
- * operation will continue until one of the following conditions is true:
+ * data to a stream. The function call always returns immediately. The
+ * asynchronous operation will continue until one of the following conditions
+ * is true:
  *
  * @li All of the data in the supplied dynamic buffer sequence has been written.
  *
@@ -914,67 +867,44 @@ async_write(AsyncWriteStream& s, const ConstBufferSequence& buffers,
  * @param buffers The dynamic buffer sequence from which data will be written.
  * Although the buffers object may be copied as necessary, ownership of the
  * underlying memory blocks is retained by the caller, which must guarantee
- * that they remain valid until the completion handler is called. Successfully
- * written data is automatically consumed from the buffers.
+ * that they remain valid until the handler is called. Successfully written
+ * data is automatically consumed from the buffers.
  *
- * @param token The @ref completion_token that will be used to produce a
- * completion handler, which will be called when the write completes.
- * Potential completion tokens include @ref use_future, @ref use_awaitable,
- * @ref yield_context, or a function object with the correct completion
- * signature. The function signature of the completion handler must be:
+ * @param handler The handler to be called when the write operation completes.
+ * Copies will be made of the handler as required. The function signature of the
+ * handler must be:
  * @code void handler(
- *   // Result of operation.
- *   const asio::error_code& error,
+ *   const asio::error_code& error, // Result of operation.
  *
- *   // Number of bytes written from the buffers. If an error
- *   // occurred, this will be less than the sum of the buffer sizes.
- *   std::size_t bytes_transferred
+ *   std::size_t bytes_transferred           // Number of bytes written from the
+ *                                           // buffers. If an error occurred,
+ *                                           // this will be less than the sum
+ *                                           // of the buffer sizes.
  * ); @endcode
  * Regardless of whether the asynchronous operation completes immediately or
- * not, the completion handler will not be invoked from within this function.
- * On immediate completion, invocation of the handler will be performed in a
+ * not, the handler will not be invoked from within this function. On
+ * immediate completion, invocation of the handler will be performed in a
  * manner equivalent to using asio::post().
- *
- * @par Completion Signature
- * @code void(asio::error_code, std::size_t) @endcode
- *
- * @par Per-Operation Cancellation
- * This asynchronous operation supports cancellation for the following
- * asio::cancellation_type values:
- *
- * @li @c cancellation_type::terminal
- *
- * @li @c cancellation_type::partial
- *
- * if they are also supported by the @c AsyncWriteStream type's
- * @c async_write_some operation.
  */
-template <typename AsyncWriteStream, typename DynamicBuffer_v1,
-    ASIO_COMPLETION_TOKEN_FOR(void (asio::error_code,
-      std::size_t)) WriteToken
-        ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(
-          typename AsyncWriteStream::executor_type)>
-ASIO_INITFN_AUTO_RESULT_TYPE(WriteToken,
+template <typename AsyncWriteStream,
+    typename DynamicBuffer_v1, typename WriteHandler>
+ASIO_INITFN_RESULT_TYPE(WriteHandler,
     void (asio::error_code, std::size_t))
 async_write(AsyncWriteStream& s,
     ASIO_MOVE_ARG(DynamicBuffer_v1) buffers,
-    ASIO_MOVE_ARG(WriteToken) token
-      ASIO_DEFAULT_COMPLETION_TOKEN(
-        typename AsyncWriteStream::executor_type),
-    typename constraint<
+    ASIO_MOVE_ARG(WriteHandler) handler,
+    typename enable_if<
       is_dynamic_buffer_v1<typename decay<DynamicBuffer_v1>::type>::value
-    >::type = 0,
-    typename constraint<
-      !is_dynamic_buffer_v2<typename decay<DynamicBuffer_v1>::type>::value
-    >::type = 0);
+        && !is_dynamic_buffer_v2<typename decay<DynamicBuffer_v1>::type>::value
+    >::type* = 0);
 
 /// Start an asynchronous operation to write a certain amount of data to a
 /// stream.
 /**
  * This function is used to asynchronously write a certain number of bytes of
- * data to a stream. It is an initiating function for an @ref
- * asynchronous_operation, and always returns immediately. The asynchronous
- * operation will continue until one of the following conditions is true:
+ * data to a stream. The function call always returns immediately. The
+ * asynchronous operation will continue until one of the following conditions
+ * is true:
  *
  * @li All of the data in the supplied dynamic buffer sequence has been written.
  *
@@ -992,8 +922,8 @@ async_write(AsyncWriteStream& s,
  * @param buffers The dynamic buffer sequence from which data will be written.
  * Although the buffers object may be copied as necessary, ownership of the
  * underlying memory blocks is retained by the caller, which must guarantee
- * that they remain valid until the completion handler is called. Successfully
- * written data is automatically consumed from the buffers.
+ * that they remain valid until the handler is called. Successfully written
+ * data is automatically consumed from the buffers.
  *
  * @param completion_condition The function object to be called to determine
  * whether the write operation is complete. The signature of the function object
@@ -1009,54 +939,34 @@ async_write(AsyncWriteStream& s,
  * non-zero return value indicates the maximum number of bytes to be written on
  * the next call to the stream's async_write_some function.
  *
- * @param token The @ref completion_token that will be used to produce a
- * completion handler, which will be called when the write completes.
- * Potential completion tokens include @ref use_future, @ref use_awaitable,
- * @ref yield_context, or a function object with the correct completion
- * signature. The function signature of the completion handler must be:
+ * @param handler The handler to be called when the write operation completes.
+ * Copies will be made of the handler as required. The function signature of the
+ * handler must be:
  * @code void handler(
- *   // Result of operation.
- *   const asio::error_code& error,
+ *   const asio::error_code& error, // Result of operation.
  *
- *   // Number of bytes written from the buffers. If an error
- *   // occurred, this will be less than the sum of the buffer sizes.
- *   std::size_t bytes_transferred
+ *   std::size_t bytes_transferred           // Number of bytes written from the
+ *                                           // buffers. If an error occurred,
+ *                                           // this will be less than the sum
+ *                                           // of the buffer sizes.
  * ); @endcode
  * Regardless of whether the asynchronous operation completes immediately or
- * not, the completion handler will not be invoked from within this function.
- * On immediate completion, invocation of the handler will be performed in a
+ * not, the handler will not be invoked from within this function. On
+ * immediate completion, invocation of the handler will be performed in a
  * manner equivalent to using asio::post().
- *
- * @par Completion Signature
- * @code void(asio::error_code, std::size_t) @endcode
- *
- * @par Per-Operation Cancellation
- * This asynchronous operation supports cancellation for the following
- * asio::cancellation_type values:
- *
- * @li @c cancellation_type::terminal
- *
- * @li @c cancellation_type::partial
- *
- * if they are also supported by the @c AsyncWriteStream type's
- * @c async_write_some operation.
  */
-template <typename AsyncWriteStream,
-    typename DynamicBuffer_v1, typename CompletionCondition,
-    ASIO_COMPLETION_TOKEN_FOR(void (asio::error_code,
-      std::size_t)) WriteToken>
-ASIO_INITFN_AUTO_RESULT_TYPE(WriteToken,
+template <typename AsyncWriteStream, typename DynamicBuffer_v1,
+    typename CompletionCondition, typename WriteHandler>
+ASIO_INITFN_RESULT_TYPE(WriteHandler,
     void (asio::error_code, std::size_t))
 async_write(AsyncWriteStream& s,
     ASIO_MOVE_ARG(DynamicBuffer_v1) buffers,
     CompletionCondition completion_condition,
-    ASIO_MOVE_ARG(WriteToken) token,
-    typename constraint<
+    ASIO_MOVE_ARG(WriteHandler) handler,
+    typename enable_if<
       is_dynamic_buffer_v1<typename decay<DynamicBuffer_v1>::type>::value
-    >::type = 0,
-    typename constraint<
-      !is_dynamic_buffer_v2<typename decay<DynamicBuffer_v1>::type>::value
-    >::type = 0);
+        && !is_dynamic_buffer_v2<typename decay<DynamicBuffer_v1>::type>::value
+    >::type* = 0);
 
 #if !defined(ASIO_NO_EXTENSIONS)
 #if !defined(ASIO_NO_IOSTREAM)
@@ -1065,9 +975,9 @@ async_write(AsyncWriteStream& s,
 /// stream.
 /**
  * This function is used to asynchronously write a certain number of bytes of
- * data to a stream. It is an initiating function for an @ref
- * asynchronous_operation, and always returns immediately. The asynchronous
- * operation will continue until one of the following conditions is true:
+ * data to a stream. The function call always returns immediately. The
+ * asynchronous operation will continue until one of the following conditions
+ * is true:
  *
  * @li All of the data in the supplied basic_streambuf has been written.
  *
@@ -1084,59 +994,37 @@ async_write(AsyncWriteStream& s,
  *
  * @param b A basic_streambuf object from which data will be written. Ownership
  * of the streambuf is retained by the caller, which must guarantee that it
- * remains valid until the completion handler is called.
+ * remains valid until the handler is called.
  *
- * @param token The @ref completion_token that will be used to produce a
- * completion handler, which will be called when the write completes.
- * Potential completion tokens include @ref use_future, @ref use_awaitable,
- * @ref yield_context, or a function object with the correct completion
- * signature. The function signature of the completion handler must be:
+ * @param handler The handler to be called when the write operation completes.
+ * Copies will be made of the handler as required. The function signature of the
+ * handler must be:
  * @code void handler(
- *   // Result of operation.
- *   const asio::error_code& error,
+ *   const asio::error_code& error, // Result of operation.
  *
- *   // Number of bytes written from the buffers. If an error
- *   // occurred, this will be less than the sum of the buffer sizes.
- *   std::size_t bytes_transferred
+ *   std::size_t bytes_transferred           // Number of bytes written from the
+ *                                           // buffers. If an error occurred,
+ *                                           // this will be less than the sum
+ *                                           // of the buffer sizes.
  * ); @endcode
  * Regardless of whether the asynchronous operation completes immediately or
- * not, the completion handler will not be invoked from within this function.
- * On immediate completion, invocation of the handler will be performed in a
+ * not, the handler will not be invoked from within this function. On
+ * immediate completion, invocation of the handler will be performed in a
  * manner equivalent to using asio::post().
- *
- * @par Completion Signature
- * @code void(asio::error_code, std::size_t) @endcode
- *
- * @par Per-Operation Cancellation
- * This asynchronous operation supports cancellation for the following
- * asio::cancellation_type values:
- *
- * @li @c cancellation_type::terminal
- *
- * @li @c cancellation_type::partial
- *
- * if they are also supported by the @c AsyncWriteStream type's
- * @c async_write_some operation.
  */
-template <typename AsyncWriteStream, typename Allocator,
-    ASIO_COMPLETION_TOKEN_FOR(void (asio::error_code,
-      std::size_t)) WriteToken
-        ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(
-          typename AsyncWriteStream::executor_type)>
-ASIO_INITFN_AUTO_RESULT_TYPE(WriteToken,
+template <typename AsyncWriteStream, typename Allocator, typename WriteHandler>
+ASIO_INITFN_RESULT_TYPE(WriteHandler,
     void (asio::error_code, std::size_t))
 async_write(AsyncWriteStream& s, basic_streambuf<Allocator>& b,
-    ASIO_MOVE_ARG(WriteToken) token
-      ASIO_DEFAULT_COMPLETION_TOKEN(
-        typename AsyncWriteStream::executor_type));
+    ASIO_MOVE_ARG(WriteHandler) handler);
 
 /// Start an asynchronous operation to write a certain amount of data to a
 /// stream.
 /**
  * This function is used to asynchronously write a certain number of bytes of
- * data to a stream. It is an initiating function for an @ref
- * asynchronous_operation, and always returns immediately. The asynchronous
- * operation will continue until one of the following conditions is true:
+ * data to a stream. The function call always returns immediately. The
+ * asynchronous operation will continue until one of the following conditions
+ * is true:
  *
  * @li All of the data in the supplied basic_streambuf has been written.
  *
@@ -1153,7 +1041,7 @@ async_write(AsyncWriteStream& s, basic_streambuf<Allocator>& b,
  *
  * @param b A basic_streambuf object from which data will be written. Ownership
  * of the streambuf is retained by the caller, which must guarantee that it
- * remains valid until the completion handler is called.
+ * remains valid until the handler is called.
  *
  * @param completion_condition The function object to be called to determine
  * whether the write operation is complete. The signature of the function object
@@ -1169,47 +1057,29 @@ async_write(AsyncWriteStream& s, basic_streambuf<Allocator>& b,
  * non-zero return value indicates the maximum number of bytes to be written on
  * the next call to the stream's async_write_some function.
  *
- * @param token The @ref completion_token that will be used to produce a
- * completion handler, which will be called when the write completes.
- * Potential completion tokens include @ref use_future, @ref use_awaitable,
- * @ref yield_context, or a function object with the correct completion
- * signature. The function signature of the completion handler must be:
+ * @param handler The handler to be called when the write operation completes.
+ * Copies will be made of the handler as required. The function signature of the
+ * handler must be:
  * @code void handler(
- *   // Result of operation.
- *   const asio::error_code& error,
+ *   const asio::error_code& error, // Result of operation.
  *
- *   // Number of bytes written from the buffers. If an error
- *   // occurred, this will be less than the sum of the buffer sizes.
- *   std::size_t bytes_transferred
+ *   std::size_t bytes_transferred           // Number of bytes written from the
+ *                                           // buffers. If an error occurred,
+ *                                           // this will be less than the sum
+ *                                           // of the buffer sizes.
  * ); @endcode
  * Regardless of whether the asynchronous operation completes immediately or
- * not, the completion handler will not be invoked from within this function.
- * On immediate completion, invocation of the handler will be performed in a
+ * not, the handler will not be invoked from within this function. On
+ * immediate completion, invocation of the handler will be performed in a
  * manner equivalent to using asio::post().
- *
- * @par Completion Signature
- * @code void(asio::error_code, std::size_t) @endcode
- *
- * @par Per-Operation Cancellation
- * This asynchronous operation supports cancellation for the following
- * asio::cancellation_type values:
- *
- * @li @c cancellation_type::terminal
- *
- * @li @c cancellation_type::partial
- *
- * if they are also supported by the @c AsyncWriteStream type's
- * @c async_write_some operation.
  */
-template <typename AsyncWriteStream,
-    typename Allocator, typename CompletionCondition,
-    ASIO_COMPLETION_TOKEN_FOR(void (asio::error_code,
-      std::size_t)) WriteToken>
-ASIO_INITFN_AUTO_RESULT_TYPE(WriteToken,
+template <typename AsyncWriteStream, typename Allocator,
+    typename CompletionCondition, typename WriteHandler>
+ASIO_INITFN_RESULT_TYPE(WriteHandler,
     void (asio::error_code, std::size_t))
 async_write(AsyncWriteStream& s, basic_streambuf<Allocator>& b,
     CompletionCondition completion_condition,
-    ASIO_MOVE_ARG(WriteToken) token);
+    ASIO_MOVE_ARG(WriteHandler) handler);
 
 #endif // !defined(ASIO_NO_IOSTREAM)
 #endif // !defined(ASIO_NO_EXTENSIONS)
@@ -1219,9 +1089,9 @@ async_write(AsyncWriteStream& s, basic_streambuf<Allocator>& b,
 /// stream.
 /**
  * This function is used to asynchronously write a certain number of bytes of
- * data to a stream. It is an initiating function for an @ref
- * asynchronous_operation, and always returns immediately. The asynchronous
- * operation will continue until one of the following conditions is true:
+ * data to a stream. The function call always returns immediately. The
+ * asynchronous operation will continue until one of the following conditions
+ * is true:
  *
  * @li All of the data in the supplied dynamic buffer sequence has been written.
  *
@@ -1239,63 +1109,42 @@ async_write(AsyncWriteStream& s, basic_streambuf<Allocator>& b,
  * @param buffers The dynamic buffer sequence from which data will be written.
  * Although the buffers object may be copied as necessary, ownership of the
  * underlying memory blocks is retained by the caller, which must guarantee
- * that they remain valid until the completion handler is called. Successfully
- * written data is automatically consumed from the buffers.
+ * that they remain valid until the handler is called. Successfully written
+ * data is automatically consumed from the buffers.
  *
- * @param token The @ref completion_token that will be used to produce a
- * completion handler, which will be called when the write completes.
- * Potential completion tokens include @ref use_future, @ref use_awaitable,
- * @ref yield_context, or a function object with the correct completion
- * signature. The function signature of the completion handler must be:
+ * @param handler The handler to be called when the write operation completes.
+ * Copies will be made of the handler as required. The function signature of the
+ * handler must be:
  * @code void handler(
- *   // Result of operation.
- *   const asio::error_code& error,
+ *   const asio::error_code& error, // Result of operation.
  *
- *   // Number of bytes written from the buffers. If an error
- *   // occurred, this will be less than the sum of the buffer sizes.
- *   std::size_t bytes_transferred
+ *   std::size_t bytes_transferred           // Number of bytes written from the
+ *                                           // buffers. If an error occurred,
+ *                                           // this will be less than the sum
+ *                                           // of the buffer sizes.
  * ); @endcode
  * Regardless of whether the asynchronous operation completes immediately or
- * not, the completion handler will not be invoked from within this function.
- * On immediate completion, invocation of the handler will be performed in a
+ * not, the handler will not be invoked from within this function. On
+ * immediate completion, invocation of the handler will be performed in a
  * manner equivalent to using asio::post().
- *
- * @par Completion Signature
- * @code void(asio::error_code, std::size_t) @endcode
- *
- * @par Per-Operation Cancellation
- * This asynchronous operation supports cancellation for the following
- * asio::cancellation_type values:
- *
- * @li @c cancellation_type::terminal
- *
- * @li @c cancellation_type::partial
- *
- * if they are also supported by the @c AsyncWriteStream type's
- * @c async_write_some operation.
  */
-template <typename AsyncWriteStream, typename DynamicBuffer_v2,
-    ASIO_COMPLETION_TOKEN_FOR(void (asio::error_code,
-      std::size_t)) WriteToken
-        ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(
-          typename AsyncWriteStream::executor_type)>
-ASIO_INITFN_AUTO_RESULT_TYPE(WriteToken,
+template <typename AsyncWriteStream,
+    typename DynamicBuffer_v2, typename WriteHandler>
+ASIO_INITFN_RESULT_TYPE(WriteHandler,
     void (asio::error_code, std::size_t))
 async_write(AsyncWriteStream& s, DynamicBuffer_v2 buffers,
-    ASIO_MOVE_ARG(WriteToken) token
-      ASIO_DEFAULT_COMPLETION_TOKEN(
-        typename AsyncWriteStream::executor_type),
-    typename constraint<
+    ASIO_MOVE_ARG(WriteHandler) handler,
+    typename enable_if<
       is_dynamic_buffer_v2<DynamicBuffer_v2>::value
-    >::type = 0);
+    >::type* = 0);
 
 /// Start an asynchronous operation to write a certain amount of data to a
 /// stream.
 /**
  * This function is used to asynchronously write a certain number of bytes of
- * data to a stream. It is an initiating function for an @ref
- * asynchronous_operation, and always returns immediately. The asynchronous
- * operation will continue until one of the following conditions is true:
+ * data to a stream. The function call always returns immediately. The
+ * asynchronous operation will continue until one of the following conditions
+ * is true:
  *
  * @li All of the data in the supplied dynamic buffer sequence has been written.
  *
@@ -1313,8 +1162,8 @@ async_write(AsyncWriteStream& s, DynamicBuffer_v2 buffers,
  * @param buffers The dynamic buffer sequence from which data will be written.
  * Although the buffers object may be copied as necessary, ownership of the
  * underlying memory blocks is retained by the caller, which must guarantee
- * that they remain valid until the completion handler is called. Successfully
- * written data is automatically consumed from the buffers.
+ * that they remain valid until the handler is called. Successfully written
+ * data is automatically consumed from the buffers.
  *
  * @param completion_condition The function object to be called to determine
  * whether the write operation is complete. The signature of the function object
@@ -1330,50 +1179,32 @@ async_write(AsyncWriteStream& s, DynamicBuffer_v2 buffers,
  * non-zero return value indicates the maximum number of bytes to be written on
  * the next call to the stream's async_write_some function.
  *
- * @param token The @ref completion_token that will be used to produce a
- * completion handler, which will be called when the write completes.
- * Potential completion tokens include @ref use_future, @ref use_awaitable,
- * @ref yield_context, or a function object with the correct completion
- * signature. The function signature of the completion handler must be:
+ * @param handler The handler to be called when the write operation completes.
+ * Copies will be made of the handler as required. The function signature of the
+ * handler must be:
  * @code void handler(
- *   // Result of operation.
- *   const asio::error_code& error,
+ *   const asio::error_code& error, // Result of operation.
  *
- *   // Number of bytes written from the buffers. If an error
- *   // occurred, this will be less than the sum of the buffer sizes.
- *   std::size_t bytes_transferred
+ *   std::size_t bytes_transferred           // Number of bytes written from the
+ *                                           // buffers. If an error occurred,
+ *                                           // this will be less than the sum
+ *                                           // of the buffer sizes.
  * ); @endcode
  * Regardless of whether the asynchronous operation completes immediately or
- * not, the completion handler will not be invoked from within this function.
- * On immediate completion, invocation of the handler will be performed in a
+ * not, the handler will not be invoked from within this function. On
+ * immediate completion, invocation of the handler will be performed in a
  * manner equivalent to using asio::post().
- *
- * @par Completion Signature
- * @code void(asio::error_code, std::size_t) @endcode
- *
- * @par Per-Operation Cancellation
- * This asynchronous operation supports cancellation for the following
- * asio::cancellation_type values:
- *
- * @li @c cancellation_type::terminal
- *
- * @li @c cancellation_type::partial
- *
- * if they are also supported by the @c AsyncWriteStream type's
- * @c async_write_some operation.
  */
-template <typename AsyncWriteStream,
-    typename DynamicBuffer_v2, typename CompletionCondition,
-    ASIO_COMPLETION_TOKEN_FOR(void (asio::error_code,
-      std::size_t)) WriteToken>
-ASIO_INITFN_AUTO_RESULT_TYPE(WriteToken,
+template <typename AsyncWriteStream, typename DynamicBuffer_v2,
+    typename CompletionCondition, typename WriteHandler>
+ASIO_INITFN_RESULT_TYPE(WriteHandler,
     void (asio::error_code, std::size_t))
 async_write(AsyncWriteStream& s, DynamicBuffer_v2 buffers,
     CompletionCondition completion_condition,
-    ASIO_MOVE_ARG(WriteToken) token,
-    typename constraint<
+    ASIO_MOVE_ARG(WriteHandler) handler,
+    typename enable_if<
       is_dynamic_buffer_v2<DynamicBuffer_v2>::value
-    >::type = 0);
+    >::type* = 0);
 
 /*@}*/
 

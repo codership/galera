@@ -2,7 +2,7 @@
 // windows/basic_object_handle.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2019 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 // Copyright (c) 2011 Boris Schaeling (boris@highscore.de)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
@@ -21,13 +21,13 @@
 #if defined(ASIO_HAS_WINDOWS_OBJECT_HANDLE) \
   || defined(GENERATING_DOCUMENTATION)
 
-#include "asio/any_io_executor.hpp"
 #include "asio/async_result.hpp"
 #include "asio/detail/io_object_impl.hpp"
 #include "asio/detail/throw_error.hpp"
 #include "asio/detail/win_object_handle_service.hpp"
 #include "asio/error.hpp"
 #include "asio/execution_context.hpp"
+#include "asio/executor.hpp"
 
 #if defined(ASIO_HAS_MOVE)
 # include <utility>
@@ -47,20 +47,12 @@ namespace windows {
  * @e Distinct @e objects: Safe.@n
  * @e Shared @e objects: Unsafe.
  */
-template <typename Executor = any_io_executor>
+template <typename Executor = executor>
 class basic_object_handle
 {
 public:
   /// The type of the executor associated with the object.
   typedef Executor executor_type;
-
-  /// Rebinds the handle type to another executor.
-  template <typename Executor1>
-  struct rebind_executor
-  {
-    /// The handle type when rebound to the specified executor.
-    typedef basic_object_handle<Executor1> other;
-  };
 
   /// The native representation of a handle.
 #if defined(GENERATING_DOCUMENTATION)
@@ -82,7 +74,7 @@ public:
    * object handle.
    */
   explicit basic_object_handle(const executor_type& ex)
-    : impl_(0, ex)
+    : impl_(ex)
   {
   }
 
@@ -96,11 +88,11 @@ public:
    */
   template <typename ExecutionContext>
   explicit basic_object_handle(ExecutionContext& context,
-      typename constraint<
+      typename enable_if<
         is_convertible<ExecutionContext&, execution_context&>::value,
-        defaulted_constraint
-      >::type = defaulted_constraint())
-    : impl_(0, 0, context)
+        basic_object_handle
+      >::type* = 0)
+    : impl_(context)
   {
   }
 
@@ -119,7 +111,7 @@ public:
    */
   basic_object_handle(const executor_type& ex,
       const native_handle_type& native_handle)
-    : impl_(0, ex)
+    : impl_(ex)
   {
     asio::error_code ec;
     impl_.get_service().assign(impl_.get_implementation(), native_handle, ec);
@@ -142,10 +134,10 @@ public:
   template <typename ExecutionContext>
   basic_object_handle(ExecutionContext& context,
       const native_handle_type& native_handle,
-      typename constraint<
+      typename enable_if<
         is_convertible<ExecutionContext&, execution_context&>::value
-      >::type = 0)
-    : impl_(0, 0, context)
+      >::type* = 0)
+    : impl_(context)
   {
     asio::error_code ec;
     impl_.get_service().assign(impl_.get_implementation(), native_handle, ec);
@@ -357,74 +349,37 @@ public:
   /// Start an asynchronous wait on the object handle.
   /**
    * This function is be used to initiate an asynchronous wait against the
-   * object handle. It is an initiating function for an @ref
-   * asynchronous_operation, and always returns immediately.
+   * object handle. It always returns immediately.
    *
-   * @param token The @ref completion_token that will be used to produce a
-   * completion handler, which will be called when the wait completes.
-   * Potential completion tokens include @ref use_future, @ref use_awaitable,
-   * @ref yield_context, or a function object with the correct completion
-   * signature. The function signature of the completion handler must be:
+   * @param handler The handler to be called when the object handle is set to
+   * the signalled state. Copies will be made of the handler as required. The
+   * function signature of the handler must be:
    * @code void handler(
    *   const asio::error_code& error // Result of operation.
    * ); @endcode
    * Regardless of whether the asynchronous operation completes immediately or
-   * not, the completion handler will not be invoked from within this function.
-   * On immediate completion, invocation of the handler will be performed in a
+   * not, the handler will not be invoked from within this function. On
+   * immediate completion, invocation of the handler will be performed in a
    * manner equivalent to using asio::post().
-   *
-   * @par Completion Signature
-   * @code void(asio::error_code) @endcode
    */
-  template <
-      ASIO_COMPLETION_TOKEN_FOR(void (asio::error_code))
-        WaitToken ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
-  ASIO_INITFN_AUTO_RESULT_TYPE(WaitToken,
+  template <typename WaitHandler>
+  ASIO_INITFN_RESULT_TYPE(WaitHandler,
       void (asio::error_code))
-  async_wait(
-      ASIO_MOVE_ARG(WaitToken) token
-        ASIO_DEFAULT_COMPLETION_TOKEN(executor_type))
+  async_wait(ASIO_MOVE_ARG(WaitHandler) handler)
   {
-    return async_initiate<WaitToken, void (asio::error_code)>(
-        initiate_async_wait(this), token);
+    asio::async_completion<WaitHandler,
+      void (asio::error_code)> init(handler);
+
+    impl_.get_service().async_wait(impl_.get_implementation(),
+        init.completion_handler, impl_.get_implementation_executor());
+
+    return init.result.get();
   }
 
 private:
   // Disallow copying and assignment.
   basic_object_handle(const basic_object_handle&) ASIO_DELETED;
   basic_object_handle& operator=(const basic_object_handle&) ASIO_DELETED;
-
-  class initiate_async_wait
-  {
-  public:
-    typedef Executor executor_type;
-
-    explicit initiate_async_wait(basic_object_handle* self)
-      : self_(self)
-    {
-    }
-
-    executor_type get_executor() const ASIO_NOEXCEPT
-    {
-      return self_->get_executor();
-    }
-
-    template <typename WaitHandler>
-    void operator()(ASIO_MOVE_ARG(WaitHandler) handler) const
-    {
-      // If you get an error on the following line it means that your handler
-      // does not meet the documented type requirements for a WaitHandler.
-      ASIO_WAIT_HANDLER_CHECK(WaitHandler, handler) type_check;
-
-      detail::non_const_lvalue<WaitHandler> handler2(handler);
-      self_->impl_.get_service().async_wait(
-          self_->impl_.get_implementation(),
-          handler2.value, self_->impl_.get_executor());
-    }
-
-  private:
-    basic_object_handle* self_;
-  };
 
   asio::detail::io_object_impl<
     asio::detail::win_object_handle_service, Executor> impl_;

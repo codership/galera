@@ -2,7 +2,7 @@
 // windows/basic_overlapped_handle.hpp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2019 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -22,13 +22,13 @@
   || defined(GENERATING_DOCUMENTATION)
 
 #include <cstddef>
-#include "asio/any_io_executor.hpp"
 #include "asio/async_result.hpp"
 #include "asio/detail/io_object_impl.hpp"
 #include "asio/detail/throw_error.hpp"
 #include "asio/detail/win_iocp_handle_service.hpp"
 #include "asio/error.hpp"
 #include "asio/execution_context.hpp"
+#include "asio/executor.hpp"
 
 #if defined(ASIO_HAS_MOVE)
 # include <utility>
@@ -50,20 +50,12 @@ namespace windows {
  * @e Distinct @e objects: Safe.@n
  * @e Shared @e objects: Unsafe.
  */
-template <typename Executor = any_io_executor>
+template <typename Executor = executor>
 class basic_overlapped_handle
 {
 public:
   /// The type of the executor associated with the object.
   typedef Executor executor_type;
-
-  /// Rebinds the handle type to another executor.
-  template <typename Executor1>
-  struct rebind_executor
-  {
-    /// The handle type when rebound to the specified executor.
-    typedef basic_overlapped_handle<Executor1> other;
-  };
 
   /// The native representation of a handle.
 #if defined(GENERATING_DOCUMENTATION)
@@ -85,7 +77,7 @@ public:
    * overlapped handle.
    */
   explicit basic_overlapped_handle(const executor_type& ex)
-    : impl_(0, ex)
+    : impl_(ex)
   {
   }
 
@@ -99,11 +91,11 @@ public:
    */
   template <typename ExecutionContext>
   explicit basic_overlapped_handle(ExecutionContext& context,
-      typename constraint<
+      typename enable_if<
         is_convertible<ExecutionContext&, execution_context&>::value,
-        defaulted_constraint
-      >::type = defaulted_constraint())
-    : impl_(0, 0, context)
+        basic_overlapped_handle
+      >::type* = 0)
+    : impl_(context)
   {
   }
 
@@ -122,7 +114,7 @@ public:
    */
   basic_overlapped_handle(const executor_type& ex,
       const native_handle_type& native_handle)
-    : impl_(0, ex)
+    : impl_(ex)
   {
     asio::error_code ec;
     impl_.get_service().assign(impl_.get_implementation(), native_handle, ec);
@@ -145,10 +137,10 @@ public:
   template <typename ExecutionContext>
   basic_overlapped_handle(ExecutionContext& context,
       const native_handle_type& native_handle,
-      typename constraint<
+      typename enable_if<
         is_convertible<ExecutionContext&, execution_context&>::value
-      >::type = 0)
-    : impl_(0, 0, context)
+      >::type* = 0)
+    : impl_(context)
   {
     asio::error_code ec;
     impl_.get_service().assign(impl_.get_implementation(), native_handle, ec);

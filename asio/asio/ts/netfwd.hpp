@@ -2,7 +2,7 @@
 // ts/netfwd.hpp
 // ~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2019 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -25,12 +25,6 @@
 # include "asio/detail/date_time_fwd.hpp"
 #endif // defined(ASIO_HAS_BOOST_DATE_TIME)
 
-#if !defined(ASIO_USE_TS_EXECUTOR_AS_DEFAULT)
-#include "asio/execution/blocking.hpp"
-#include "asio/execution/outstanding_work.hpp"
-#include "asio/execution/relationship.hpp"
-#endif // !defined(ASIO_USE_TS_EXECUTOR_AS_DEFAULT)
-
 #if !defined(GENERATING_DOCUMENTATION)
 
 #include "asio/detail/push_options.hpp"
@@ -42,57 +36,12 @@ class execution_context;
 template <typename T, typename Executor>
 class executor_binder;
 
-#if !defined(ASIO_EXECUTOR_WORK_GUARD_DECL)
-#define ASIO_EXECUTOR_WORK_GUARD_DECL
-
-template <typename Executor, typename = void, typename = void>
+template <typename Executor>
 class executor_work_guard;
 
-#endif // !defined(ASIO_EXECUTOR_WORK_GUARD_DECL)
-
-template <typename Blocking, typename Relationship, typename Allocator>
-class basic_system_executor;
-
-#if defined(ASIO_USE_TS_EXECUTOR_AS_DEFAULT)
+class system_executor;
 
 class executor;
-
-typedef executor any_io_executor;
-
-#else // defined(ASIO_USE_TS_EXECUTOR_AS_DEFAULT)
-
-namespace execution {
-
-#if !defined(ASIO_EXECUTION_ANY_EXECUTOR_FWD_DECL)
-#define ASIO_EXECUTION_ANY_EXECUTOR_FWD_DECL
-
-#if defined(ASIO_HAS_VARIADIC_TEMPLATES)
-
-template <typename... SupportableProperties>
-class any_executor;
-
-#else // defined(ASIO_HAS_VARIADIC_TEMPLATES)
-
-template <typename = void, typename = void, typename = void,
-    typename = void, typename = void, typename = void,
-    typename = void, typename = void, typename = void>
-class any_executor;
-
-#endif // defined(ASIO_HAS_VARIADIC_TEMPLATES)
-
-#endif // !defined(ASIO_EXECUTION_ANY_EXECUTOR_FWD_DECL)
-
-template <typename U>
-struct context_as_t;
-
-template <typename Property>
-struct prefer_only;
-
-} // namespace execution
-
-class any_io_executor;
-
-#endif // defined(ASIO_USE_TS_EXECUTOR_AS_DEFAULT)
 
 template <typename Executor>
 class strand;
@@ -114,7 +63,7 @@ struct time_traits;
 
 template <typename Clock,
     typename WaitTraits = wait_traits<Clock>,
-    typename Executor = any_io_executor>
+    typename Executor = executor>
 class basic_waitable_timer;
 
 #endif // !defined(ASIO_BASIC_WAITABLE_TIMER_FWD_DECL)
@@ -133,7 +82,7 @@ typedef basic_waitable_timer<chrono::high_resolution_clock>
 #if !defined(ASIO_BASIC_SOCKET_FWD_DECL)
 #define ASIO_BASIC_SOCKET_FWD_DECL
 
-template <typename Protocol, typename Executor = any_io_executor>
+template <typename Protocol, typename Executor = executor>
 class basic_socket;
 
 #endif // !defined(ASIO_BASIC_SOCKET_FWD_DECL)
@@ -141,7 +90,7 @@ class basic_socket;
 #if !defined(ASIO_BASIC_DATAGRAM_SOCKET_FWD_DECL)
 #define ASIO_BASIC_DATAGRAM_SOCKET_FWD_DECL
 
-template <typename Protocol, typename Executor = any_io_executor>
+template <typename Protocol, typename Executor = executor>
 class basic_datagram_socket;
 
 #endif // !defined(ASIO_BASIC_DATAGRAM_SOCKET_FWD_DECL)
@@ -150,7 +99,7 @@ class basic_datagram_socket;
 #define ASIO_BASIC_STREAM_SOCKET_FWD_DECL
 
 // Forward declaration with defaulted arguments.
-template <typename Protocol, typename Executor = any_io_executor>
+template <typename Protocol, typename Executor = executor>
 class basic_stream_socket;
 
 #endif // !defined(ASIO_BASIC_STREAM_SOCKET_FWD_DECL)
@@ -158,7 +107,7 @@ class basic_stream_socket;
 #if !defined(ASIO_BASIC_SOCKET_ACCEPTOR_FWD_DECL)
 #define ASIO_BASIC_SOCKET_ACCEPTOR_FWD_DECL
 
-template <typename Protocol, typename Executor = any_io_executor>
+template <typename Protocol, typename Executor = executor>
 class basic_socket_acceptor;
 
 #endif // !defined(ASIO_BASIC_SOCKET_ACCEPTOR_FWD_DECL)
@@ -235,7 +184,7 @@ class basic_resolver_results;
 #if !defined(ASIO_IP_BASIC_RESOLVER_FWD_DECL)
 #define ASIO_IP_BASIC_RESOLVER_FWD_DECL
 
-template <typename InternetProtocol, typename Executor = any_io_executor>
+template <typename InternetProtocol, typename Executor = executor>
 class basic_resolver;
 
 #endif // !defined(ASIO_IP_BASIC_RESOLVER_FWD_DECL)

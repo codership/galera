@@ -2,7 +2,7 @@
 // impl/handler_alloc_hook.ipp
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2019 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -16,7 +16,6 @@
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
 #include "asio/detail/config.hpp"
-#include "asio/detail/memory.hpp"
 #include "asio/detail/thread_context.hpp"
 #include "asio/detail/thread_info_base.hpp"
 #include "asio/handler_alloc_hook.hpp"
@@ -25,33 +24,24 @@
 
 namespace asio {
 
-asio_handler_allocate_is_deprecated
-asio_handler_allocate(std::size_t size, ...)
+void* asio_handler_allocate(std::size_t size, ...)
 {
-#if defined(ASIO_NO_DEPRECATED)
-  (void)size;
-  return asio_handler_allocate_is_no_longer_used();
-#elif !defined(ASIO_DISABLE_SMALL_BLOCK_RECYCLING)
+#if !defined(ASIO_DISABLE_SMALL_BLOCK_RECYCLING)
   return detail::thread_info_base::allocate(
-      detail::thread_context::top_of_thread_call_stack(), size);
+      detail::thread_context::thread_call_stack::top(), size);
 #else // !defined(ASIO_DISABLE_SMALL_BLOCK_RECYCLING)
-  return aligned_new(ASIO_DEFAULT_ALIGN, size);
+  return ::operator new(size);
 #endif // !defined(ASIO_DISABLE_SMALL_BLOCK_RECYCLING)
 }
 
-asio_handler_deallocate_is_deprecated
-asio_handler_deallocate(void* pointer, std::size_t size, ...)
+void asio_handler_deallocate(void* pointer, std::size_t size, ...)
 {
-#if defined(ASIO_NO_DEPRECATED)
-  (void)pointer;
-  (void)size;
-  return asio_handler_deallocate_is_no_longer_used();
-#elif !defined(ASIO_DISABLE_SMALL_BLOCK_RECYCLING)
+#if !defined(ASIO_DISABLE_SMALL_BLOCK_RECYCLING)
   detail::thread_info_base::deallocate(
-      detail::thread_context::top_of_thread_call_stack(), pointer, size);
+      detail::thread_context::thread_call_stack::top(), pointer, size);
 #else // !defined(ASIO_DISABLE_SMALL_BLOCK_RECYCLING)
   (void)size;
-  aligned_delete(pointer)
+  ::operator delete(pointer);
 #endif // !defined(ASIO_DISABLE_SMALL_BLOCK_RECYCLING)
 }
 

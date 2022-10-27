@@ -150,7 +150,7 @@ void gu::AsioUdpSocket::connect(const gu::URI& uri)
 
         socket_.set_option(asio::ip::udp::socket::reuse_address(true));
         socket_.set_option(asio::ip::udp::socket::linger(true, 1));
-#if ASIO_VERSION < 101600
+#if ASIO_VERSION < 101400
         asio::ip::udp::socket::non_blocking_io non_blocking(true);
         socket_.io_control(non_blocking);
 #else

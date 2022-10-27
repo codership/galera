@@ -380,7 +380,7 @@ std::string gu::extra_error_info(const gu::AsioErrorCode& ec)
 
 static SSL_CTX* native_ssl_ctx(asio::ssl::context& context)
 {
-#if ASIO_VERSION < 101601
+#if ASIO_VERSION < 101401
     return context.impl();
 #else
     return context.native_handle();
@@ -550,7 +550,7 @@ void gu::ssl_param_set(const std::string& key, const std::string& val,
         {
             try
             {
-#if ASIO_VERSION < 101601
+#if ASIO_VERSION < 101401
                 asio::io_service io_service;
                 asio::ssl::context ctx(io_service, asio::ssl::context::sslv23);
 #else
@@ -602,7 +602,7 @@ void gu::ssl_init_options(gu::Config& conf)
         // values
         try
         {
-#if ASIO_VERSION < 101601
+#if ASIO_VERSION < 101401
             asio::io_service io_service;
             asio::ssl::context ctx(io_service, asio::ssl::context::sslv23);
 #else

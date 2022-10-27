@@ -2,7 +2,7 @@
 // basic_serial_port.hpp
 // ~~~~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2019 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 // Copyright (c) 2008 Rep Invariant Systems, Inc. (info@repinvariant.com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
@@ -22,7 +22,6 @@
   || defined(GENERATING_DOCUMENTATION)
 
 #include <string>
-#include "asio/any_io_executor.hpp"
 #include "asio/async_result.hpp"
 #include "asio/detail/handler_type_requirements.hpp"
 #include "asio/detail/io_object_impl.hpp"
@@ -31,11 +30,12 @@
 #include "asio/detail/type_traits.hpp"
 #include "asio/error.hpp"
 #include "asio/execution_context.hpp"
+#include "asio/executor.hpp"
 #include "asio/serial_port_base.hpp"
 #if defined(ASIO_HAS_IOCP)
 # include "asio/detail/win_iocp_serial_port_service.hpp"
 #else
-# include "asio/detail/posix_serial_port_service.hpp"
+# include "asio/detail/reactive_serial_port_service.hpp"
 #endif
 
 #if defined(ASIO_HAS_MOVE)
@@ -55,21 +55,13 @@ namespace asio {
  * @e Distinct @e objects: Safe.@n
  * @e Shared @e objects: Unsafe.
  */
-template <typename Executor = any_io_executor>
+template <typename Executor = executor>
 class basic_serial_port
   : public serial_port_base
 {
 public:
   /// The type of the executor associated with the object.
   typedef Executor executor_type;
-
-  /// Rebinds the serial port type to another executor.
-  template <typename Executor1>
-  struct rebind_executor
-  {
-    /// The serial port type when rebound to the specified executor.
-    typedef basic_serial_port<Executor1> other;
-  };
 
   /// The native representation of a serial port.
 #if defined(GENERATING_DOCUMENTATION)
@@ -78,7 +70,7 @@ public:
   typedef detail::win_iocp_serial_port_service::native_handle_type
     native_handle_type;
 #else
-  typedef detail::posix_serial_port_service::native_handle_type
+  typedef detail::reactive_serial_port_service::native_handle_type
     native_handle_type;
 #endif
 
@@ -94,7 +86,7 @@ public:
    * serial port.
    */
   explicit basic_serial_port(const executor_type& ex)
-    : impl_(0, ex)
+    : impl_(ex)
   {
   }
 
@@ -108,11 +100,11 @@ public:
    */
   template <typename ExecutionContext>
   explicit basic_serial_port(ExecutionContext& context,
-      typename constraint<
+      typename enable_if<
         is_convertible<ExecutionContext&, execution_context&>::value,
-        defaulted_constraint
-      >::type = defaulted_constraint())
-    : impl_(0, 0, context)
+        basic_serial_port
+      >::type* = 0)
+    : impl_(context)
   {
   }
 
@@ -129,7 +121,7 @@ public:
    * port.
    */
   basic_serial_port(const executor_type& ex, const char* device)
-    : impl_(0, ex)
+    : impl_(ex)
   {
     asio::error_code ec;
     impl_.get_service().open(impl_.get_implementation(), device, ec);
@@ -150,10 +142,10 @@ public:
    */
   template <typename ExecutionContext>
   basic_serial_port(ExecutionContext& context, const char* device,
-      typename constraint<
+      typename enable_if<
         is_convertible<ExecutionContext&, execution_context&>::value
-      >::type = 0)
-    : impl_(0, 0, context)
+      >::type* = 0)
+    : impl_(context)
   {
     asio::error_code ec;
     impl_.get_service().open(impl_.get_implementation(), device, ec);
@@ -173,7 +165,7 @@ public:
    * port.
    */
   basic_serial_port(const executor_type& ex, const std::string& device)
-    : impl_(0, ex)
+    : impl_(ex)
   {
     asio::error_code ec;
     impl_.get_service().open(impl_.get_implementation(), device, ec);
@@ -194,10 +186,10 @@ public:
    */
   template <typename ExecutionContext>
   basic_serial_port(ExecutionContext& context, const std::string& device,
-      typename constraint<
+      typename enable_if<
         is_convertible<ExecutionContext&, execution_context&>::value
-      >::type = 0)
-    : impl_(0, 0, context)
+      >::type* = 0)
+    : impl_(context)
   {
     asio::error_code ec;
     impl_.get_service().open(impl_.get_implementation(), device, ec);
@@ -219,7 +211,7 @@ public:
    */
   basic_serial_port(const executor_type& ex,
       const native_handle_type& native_serial_port)
-    : impl_(0, ex)
+    : impl_(ex)
   {
     asio::error_code ec;
     impl_.get_service().assign(impl_.get_implementation(),
@@ -243,10 +235,10 @@ public:
   template <typename ExecutionContext>
   basic_serial_port(ExecutionContext& context,
       const native_handle_type& native_serial_port,
-      typename constraint<
+      typename enable_if<
         is_convertible<ExecutionContext&, execution_context&>::value
-      >::type = 0)
-    : impl_(0, 0, context)
+      >::type* = 0)
+    : impl_(context)
   {
     asio::error_code ec;
     impl_.get_service().assign(impl_.get_implementation(),
@@ -656,30 +648,24 @@ public:
   /// Start an asynchronous write.
   /**
    * This function is used to asynchronously write data to the serial port.
-   * It is an initiating function for an @ref asynchronous_operation, and always
-   * returns immediately.
+   * The function call always returns immediately.
    *
    * @param buffers One or more data buffers to be written to the serial port.
    * Although the buffers object may be copied as necessary, ownership of the
    * underlying memory blocks is retained by the caller, which must guarantee
-   * that they remain valid until the completion handler is called.
+   * that they remain valid until the handler is called.
    *
-   * @param token The @ref completion_token that will be used to produce a
-   * completion handler, which will be called when the write completes.
-   * Potential completion tokens include @ref use_future, @ref use_awaitable,
-   * @ref yield_context, or a function object with the correct completion
-   * signature. The function signature of the completion handler must be:
+   * @param handler The handler to be called when the write operation completes.
+   * Copies will be made of the handler as required. The function signature of
+   * the handler must be:
    * @code void handler(
    *   const asio::error_code& error, // Result of operation.
-   *   std::size_t bytes_transferred // Number of bytes written.
+   *   std::size_t bytes_transferred           // Number of bytes written.
    * ); @endcode
    * Regardless of whether the asynchronous operation completes immediately or
-   * not, the completion handler will not be invoked from within this function.
-   * On immediate completion, invocation of the handler will be performed in a
+   * not, the handler will not be invoked from within this function. On
+   * immediate completion, invocation of the handler will be performed in a
    * manner equivalent to using asio::post().
-   *
-   * @par Completion Signature
-   * @code void(asio::error_code, std::size_t) @endcode
    *
    * @note The write operation may not transmit all of the data to the peer.
    * Consider using the @ref async_write function if you need to ensure that all
@@ -694,30 +680,16 @@ public:
    * See the @ref buffer documentation for information on writing multiple
    * buffers in one go, and how to use it with arrays, boost::array or
    * std::vector.
-   *
-   * @par Per-Operation Cancellation
-   * On POSIX or Windows operating systems, this asynchronous operation supports
-   * cancellation for the following asio::cancellation_type values:
-   *
-   * @li @c cancellation_type::terminal
-   *
-   * @li @c cancellation_type::partial
-   *
-   * @li @c cancellation_type::total
    */
-  template <typename ConstBufferSequence,
-      ASIO_COMPLETION_TOKEN_FOR(void (asio::error_code,
-        std::size_t)) WriteToken
-          ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
-  ASIO_INITFN_AUTO_RESULT_TYPE(WriteToken,
+  template <typename ConstBufferSequence, typename WriteHandler>
+  ASIO_INITFN_RESULT_TYPE(WriteHandler,
       void (asio::error_code, std::size_t))
   async_write_some(const ConstBufferSequence& buffers,
-      ASIO_MOVE_ARG(WriteToken) token
-        ASIO_DEFAULT_COMPLETION_TOKEN(executor_type))
+      ASIO_MOVE_ARG(WriteHandler) handler)
   {
-    return async_initiate<WriteToken,
+    return async_initiate<WriteHandler,
       void (asio::error_code, std::size_t)>(
-        initiate_async_write_some(this), token, buffers);
+        initiate_async_write_some(), handler, this, buffers);
   }
 
   /// Read some data from the serial port.
@@ -786,30 +758,24 @@ public:
   /// Start an asynchronous read.
   /**
    * This function is used to asynchronously read data from the serial port.
-   * It is an initiating function for an @ref asynchronous_operation, and always
-   * returns immediately.
+   * The function call always returns immediately.
    *
    * @param buffers One or more buffers into which the data will be read.
    * Although the buffers object may be copied as necessary, ownership of the
    * underlying memory blocks is retained by the caller, which must guarantee
-   * that they remain valid until the completion handler is called.
+   * that they remain valid until the handler is called.
    *
-   * @param token The @ref completion_token that will be used to produce a
-   * completion handler, which will be called when the read completes.
-   * Potential completion tokens include @ref use_future, @ref use_awaitable,
-   * @ref yield_context, or a function object with the correct completion
-   * signature. The function signature of the completion handler must be:
+   * @param handler The handler to be called when the read operation completes.
+   * Copies will be made of the handler as required. The function signature of
+   * the handler must be:
    * @code void handler(
    *   const asio::error_code& error, // Result of operation.
-   *   std::size_t bytes_transferred // Number of bytes read.
+   *   std::size_t bytes_transferred           // Number of bytes read.
    * ); @endcode
    * Regardless of whether the asynchronous operation completes immediately or
-   * not, the completion handler will not be invoked from within this function.
-   * On immediate completion, invocation of the handler will be performed in a
+   * not, the handler will not be invoked from within this function. On
+   * immediate completion, invocation of the handler will be performed in a
    * manner equivalent to using asio::post().
-   *
-   * @par Completion Signature
-   * @code void(asio::error_code, std::size_t) @endcode
    *
    * @note The read operation may not read all of the requested number of bytes.
    * Consider using the @ref async_read function if you need to ensure that the
@@ -825,30 +791,16 @@ public:
    * See the @ref buffer documentation for information on reading into multiple
    * buffers in one go, and how to use it with arrays, boost::array or
    * std::vector.
-   *
-   * @par Per-Operation Cancellation
-   * On POSIX or Windows operating systems, this asynchronous operation supports
-   * cancellation for the following asio::cancellation_type values:
-   *
-   * @li @c cancellation_type::terminal
-   *
-   * @li @c cancellation_type::partial
-   *
-   * @li @c cancellation_type::total
    */
-  template <typename MutableBufferSequence,
-      ASIO_COMPLETION_TOKEN_FOR(void (asio::error_code,
-        std::size_t)) ReadToken
-          ASIO_DEFAULT_COMPLETION_TOKEN_TYPE(executor_type)>
-  ASIO_INITFN_AUTO_RESULT_TYPE(ReadToken,
+  template <typename MutableBufferSequence, typename ReadHandler>
+  ASIO_INITFN_RESULT_TYPE(ReadHandler,
       void (asio::error_code, std::size_t))
   async_read_some(const MutableBufferSequence& buffers,
-      ASIO_MOVE_ARG(ReadToken) token
-        ASIO_DEFAULT_COMPLETION_TOKEN(executor_type))
+      ASIO_MOVE_ARG(ReadHandler) handler)
   {
-    return async_initiate<ReadToken,
+    return async_initiate<ReadHandler,
       void (asio::error_code, std::size_t)>(
-        initiate_async_read_some(this), token, buffers);
+        initiate_async_read_some(), handler, this, buffers);
   }
 
 private:
@@ -856,76 +808,44 @@ private:
   basic_serial_port(const basic_serial_port&) ASIO_DELETED;
   basic_serial_port& operator=(const basic_serial_port&) ASIO_DELETED;
 
-  class initiate_async_write_some
+  struct initiate_async_write_some
   {
-  public:
-    typedef Executor executor_type;
-
-    explicit initiate_async_write_some(basic_serial_port* self)
-      : self_(self)
-    {
-    }
-
-    executor_type get_executor() const ASIO_NOEXCEPT
-    {
-      return self_->get_executor();
-    }
-
     template <typename WriteHandler, typename ConstBufferSequence>
     void operator()(ASIO_MOVE_ARG(WriteHandler) handler,
-        const ConstBufferSequence& buffers) const
+        basic_serial_port* self, const ConstBufferSequence& buffers) const
     {
       // If you get an error on the following line it means that your handler
       // does not meet the documented type requirements for a WriteHandler.
       ASIO_WRITE_HANDLER_CHECK(WriteHandler, handler) type_check;
 
       detail::non_const_lvalue<WriteHandler> handler2(handler);
-      self_->impl_.get_service().async_write_some(
-          self_->impl_.get_implementation(), buffers,
-          handler2.value, self_->impl_.get_executor());
+      self->impl_.get_service().async_write_some(
+          self->impl_.get_implementation(), buffers, handler2.value,
+          self->impl_.get_implementation_executor());
     }
-
-  private:
-    basic_serial_port* self_;
   };
 
-  class initiate_async_read_some
+  struct initiate_async_read_some
   {
-  public:
-    typedef Executor executor_type;
-
-    explicit initiate_async_read_some(basic_serial_port* self)
-      : self_(self)
-    {
-    }
-
-    executor_type get_executor() const ASIO_NOEXCEPT
-    {
-      return self_->get_executor();
-    }
-
     template <typename ReadHandler, typename MutableBufferSequence>
     void operator()(ASIO_MOVE_ARG(ReadHandler) handler,
-        const MutableBufferSequence& buffers) const
+        basic_serial_port* self, const MutableBufferSequence& buffers) const
     {
       // If you get an error on the following line it means that your handler
       // does not meet the documented type requirements for a ReadHandler.
       ASIO_READ_HANDLER_CHECK(ReadHandler, handler) type_check;
 
       detail::non_const_lvalue<ReadHandler> handler2(handler);
-      self_->impl_.get_service().async_read_some(
-          self_->impl_.get_implementation(), buffers,
-          handler2.value, self_->impl_.get_executor());
+      self->impl_.get_service().async_read_some(
+          self->impl_.get_implementation(), buffers, handler2.value,
+          self->impl_.get_implementation_executor());
     }
-
-  private:
-    basic_serial_port* self_;
   };
 
 #if defined(ASIO_HAS_IOCP)
   detail::io_object_impl<detail::win_iocp_serial_port_service, Executor> impl_;
 #else
-  detail::io_object_impl<detail::posix_serial_port_service, Executor> impl_;
+  detail::io_object_impl<detail::reactive_serial_port_service, Executor> impl_;
 #endif
 };
 

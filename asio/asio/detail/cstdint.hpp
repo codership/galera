@@ -2,7 +2,7 @@
 // detail/cstdint.hpp
 // ~~~~~~~~~~~~~~~~~~
 //
-// Copyright (c) 2003-2022 Christopher M. Kohlhoff (chris at kohlhoff dot com)
+// Copyright (c) 2003-2019 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -38,7 +38,6 @@ using std::int64_t;
 using std::int_least64_t;
 using std::uint64_t;
 using std::uint_least64_t;
-using std::uintptr_t;
 using std::uintmax_t;
 #else // defined(ASIO_HAS_CSTDINT)
 using boost::int16_t;
@@ -53,7 +52,6 @@ using boost::int64_t;
 using boost::int_least64_t;
 using boost::uint64_t;
 using boost::uint_least64_t;
-using boost::uintptr_t;
 using boost::uintmax_t;
 #endif // defined(ASIO_HAS_CSTDINT)
 
