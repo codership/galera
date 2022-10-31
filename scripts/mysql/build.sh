@@ -478,6 +478,7 @@ then
             if [ "$MYSQL_MM_VER" -ge "80" ]
             then
                 BUILD_OPT+=" -DWITH_CURL=system"
+                BUILD_OPT+=" -DWITH_ZLIB=bundled"
             fi
         else # MariaDB-specific build options
             BUILD_OPT+=" -DWITH_READLINE=system"
