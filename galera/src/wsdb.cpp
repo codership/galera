@@ -6,6 +6,7 @@
 #include "trx_handle.hpp"
 #include "write_set.hpp"
 
+#include "gu_thread.hpp"
 #include "gu_lock.hpp"
 #include "gu_throw.hpp"
 
@@ -34,10 +35,11 @@ void galera::Wsdb::print(std::ostream& os) const
 galera::Wsdb::Wsdb()
     :
     trx_pool_  (TrxHandle::LOCAL_STORAGE_SIZE(), 512, "LocalTrxHandle"),
-    trx_map_   (),
-    trx_mutex_ (),
-    conn_map_  (),
-    conn_mutex_()
+    trx_map_     (),
+    conn_trx_map_(),
+    trx_mutex_   (),
+    conn_map_    (),
+    conn_mutex_  ()
 {}
 
 
@@ -55,6 +57,9 @@ galera::Wsdb::~Wsdb()
     assert(conn_map_.size() == 0);
 #else
     for_each(trx_map_.begin(), trx_map_.end(), Unref2nd<TrxMap::value_type>());
+    for_each(conn_trx_map_.begin(),
+             conn_trx_map_.end(),
+             Unref2nd<ConnTrxMap::value_type>());
 #endif // !NDEBUG
 }
 
@@ -64,9 +69,31 @@ galera::Wsdb::find_trx(wsrep_trx_id_t const trx_id)
 {
     gu::Lock lock(trx_mutex_);
 
-    TrxMap::iterator const i(trx_map_.find(trx_id));
+    galera::TrxHandle* trx;
+    /* trx-id = 0 is safe-guard condition.
+    trx-id is generally assigned from thd->query-id and
+    query-id default is 0. If background thread try to assign
+    wsrep_next_trx_id before setting query-id we will hit
+    this assertion: */
+    assert(trx_id != 0);
 
-    return (trx_map_.end() == i ? 0 : i->second);
+    if (trx_id != wsrep_trx_id_t(-1))
+    {
+        /* trx_id is valid and unique. Search for this trx_id in the
+        trx_id -> trx map: */
+        TrxMap::iterator const i(trx_map_.find(trx_id));
+        trx = (trx_map_.end() == i ? NULL : i->second);
+    }
+    else
+    {
+        /* trx_id is default, so search for repsective connection id
+        in connection-transaction map: */
+        gu_thread_t const id = gu_thread_self();
+        ConnTrxMap::iterator const i(conn_trx_map_.find(id));
+        trx = (conn_trx_map_.end() == i ? NULL : i->second);
+    }
+
+    return (trx);
 }
 
 
@@ -79,12 +106,28 @@ galera::Wsdb::create_trx(const TrxHandle::Params& params,
 
     gu::Lock lock(trx_mutex_);
 
-    std::pair<TrxMap::iterator, bool> i
-        (trx_map_.insert(std::make_pair(trx_id, trx)));
+    galera::TrxHandle* trx_ref;
+    if (trx_id != wsrep_trx_id_t(-1))
+    {
+        /* trx_id is valid, add it to trx-map as valid trx_id, which
+        is unique accross connections: */
+        std::pair<TrxMap::iterator, bool> i
+            (trx_map_.insert(std::make_pair(trx_id, trx)));
+        if (gu_unlikely(i.second == false)) gu_throw_fatal;
+        trx_ref = i.first->second;
+    }
+    else
+    {
+        /* trx_id is default so add trx object to connection map
+        that is maintained based on gu_thread_id (actually it is
+        alias for connection_id): */
+         std::pair<ConnTrxMap::iterator, bool> i
+             (conn_trx_map_.insert(std::make_pair(gu_thread_self(), trx)));
+        if (gu_unlikely(i.second == false)) gu_throw_fatal;
+        trx_ref = i.first->second;
+    }
 
-    if (gu_unlikely(i.second == false)) gu_throw_fatal;
-
-    return i.first->second;
+    return (trx_ref);
 }
 
 
@@ -154,11 +197,24 @@ galera::Wsdb::get_conn_query(const TrxHandle::Params& params,
 void galera::Wsdb::discard_trx(wsrep_trx_id_t trx_id)
 {
     gu::Lock lock(trx_mutex_);
-    TrxMap::iterator i;
-    if ((i = trx_map_.find(trx_id)) != trx_map_.end())
+    if (trx_id != wsrep_trx_id_t(-1))
     {
-        i->second->unref();
-        trx_map_.erase(i);
+        TrxMap::iterator i;
+        if ((i = trx_map_.find(trx_id)) != trx_map_.end())
+        {
+            i->second->unref();
+            trx_map_.erase(i);
+        }
+    }
+    else
+    {
+        ConnTrxMap::iterator i;
+        gu_thread_t id = gu_thread_self();
+        if ((i = conn_trx_map_.find(id)) != conn_trx_map_.end())
+        {
+            i->second->unref();
+            conn_trx_map_.erase(i);
+        }
     }
 }
 
