@@ -61,21 +61,11 @@ bool gcomm::Protonet::set_param(const std::string& key, const std::string& val,
 
 gcomm::Protonet* gcomm::Protonet::create(gu::Config& conf)
 {
-    const std::string backend(conf.get(Conf::ProtonetBackend));
     const int version(conf.get<int>(Conf::ProtonetVersion));
 
     if (version > max_version_)
     {
         gu_throw_error(EINVAL) << "invalid protonet version: " << version;
     }
-
-    log_info << "protonet " << backend << " version " << version;
-
-    if (backend == "asio")
-        return new AsioProtonet(conf, version);
-
-    gu_throw_fatal << Conf::ProtonetBackend << " '" << backend
-                   << "' not supported"; throw;
-
-    return 0; // keep compiler happy
+    return new AsioProtonet(conf, version);
 }

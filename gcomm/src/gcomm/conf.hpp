@@ -44,7 +44,6 @@ namespace gcomm
      */
     struct Conf
     {
-        static std::string const ProtonetBackend;
         static std::string const ProtonetVersion;
 
         /*!

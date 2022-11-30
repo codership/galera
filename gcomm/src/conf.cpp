@@ -11,7 +11,6 @@
 static std::string const Delim = ".";
 
 // Protonet
-std::string const gcomm::Conf::ProtonetBackend("protonet.backend");
 std::string const gcomm::Conf::ProtonetVersion("protonet.version");
 
 // TCP
@@ -125,7 +124,6 @@ gcomm::Conf::register_params(gu::Config& cnf)
     GCOMM_CONF_ADD (COMMON_BASE_HOST_KEY);
     GCOMM_CONF_ADD (COMMON_BASE_PORT_KEY);
 
-    GCOMM_CONF_ADD_DEFAULT(ProtonetBackend);
     GCOMM_CONF_ADD_DEFAULT(ProtonetVersion);
 
     GCOMM_CONF_ADD        (TcpNonBlocking);

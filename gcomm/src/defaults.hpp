@@ -11,7 +11,6 @@ namespace gcomm
 {
     struct Defaults
     {
-        static std::string const ProtonetBackend          ;
         static std::string const ProtonetVersion          ;
         static std::string const SocketChecksum           ;
         static std::string const SocketRecvBufSize        ;
