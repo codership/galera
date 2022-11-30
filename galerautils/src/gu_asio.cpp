@@ -74,6 +74,12 @@ void gu::ssl_init_options(gu::Config& conf)
             log_info << "disabling SSL compression";
             sk_SSL_COMP_zero(SSL_COMP_get_compression_methods());
         }
+        else
+        {
+            log_warn << "SSL compression is not effective. The option "
+                     << conf::ssl_compression << " is deprecated and "
+                     << "will be removed in future releases.";
+        }
         conf.set(conf::ssl_compression, compression);
 
 
