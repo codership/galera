@@ -19,6 +19,7 @@
 #include <numeric>
 #include <iterator>
 #include <set>
+#include <iostream> // std::cerr
 
 using namespace std::rel_ops;
 

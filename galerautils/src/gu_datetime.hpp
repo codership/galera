@@ -11,10 +11,9 @@
 
 
 #include "gu_exception.hpp"
-#include "gu_regex.hpp"
 #include "gu_time.h"
 
-#include <iostream>
+#include <sstream>
 #include <string>
 #include <limits>
 
@@ -41,16 +40,24 @@ namespace gu
         {
         public:
             /*!
-             * @brief Constructor
+             * @brief Construct gu::datetime::Period from string
              *
-             * Duration format is PnYnMnDTnHnMnS where Y is year, M is month,
-             * D is day, T is the time designator separating date and time
-             * parts, H denotes hours, M (after T) is minutes and S seconds.
+             * This constructor accepts a string that contains a duration
+             * represented in ISO8601 format. Alternatively, it accepts a
+             * string that represents a double duration in number of seconds.
+             *
+             * The ISO8601 duration format is PnYnMnDTnHnMnS where Y is year,
+             * M is month, D is day, T is the time designator separating date
+             * and time parts, H denotes hours, M (after T) is minutes and S
+             * seconds.
              *
              * All other n:s are expected to be integers except the one
              * before S which can be decimal to represent fractions of second.
              *
-             * @param str Time period represented in ISO8601 duration format.
+             * @param str Time period represented in ISO8601 duration format,
+             *            or number of seconds represented as double.
+             *
+             * @throws NotFound
              */
             Period(const std::string& str = "") :
                 nsecs()
@@ -96,9 +103,6 @@ namespace gu
 
             friend class Date;
             friend std::istream& operator>>(std::istream&, Period&);
-
-            static const char* const period_regex; /*! regexp string */
-            static RegEx       const regex;        /*! period string parser */
 
             /*!
              * @brief Parse period string.
@@ -235,6 +239,11 @@ namespace gu
             std::ostringstream os;
             os << p;
             return os.str();
+        }
+
+        inline double to_double(const Period& p)
+        {
+            return static_cast<double>(p.get_nsecs()) / Sec;
         }
 
         inline std::istream& operator>>(std::istream& is, Period& p)

@@ -11,6 +11,7 @@
 #include "check_trace.hpp"
 #include "gcomm/conf.hpp"
 #include "gu_asio.hpp" // gu::ssl_register_params()
+#include <iostream> // std::cerr
 
 using namespace std;
 using namespace gu;
