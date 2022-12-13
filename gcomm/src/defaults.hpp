@@ -81,8 +81,10 @@ namespace gcomm
                                              gu::Config::Flag::type_integer;
         static const int GMCastMCastTTL    = gu::Config::Flag::read_only |
                                              gu::Config::Flag::type_integer;
-        static const int GMCastTimeWait    = gu::Config::Flag::read_only;
-        static const int GMCastPeerTimeout = gu::Config::Flag::read_only;
+        static const int GMCastTimeWait    = gu::Config::Flag::read_only |
+                                             gu::Config::Flag::type_duration;
+        static const int GMCastPeerTimeout = gu::Config::Flag::read_only |
+                                             gu::Config::Flag::type_duration;;
         // Hidden because undocumented
         static const int GMCastMaxInitialReconnectAttempts =
             gu::Config::Flag::hidden | gu::Config::Flag::type_integer;
@@ -94,23 +96,24 @@ namespace gcomm
                                              gu::Config::Flag::type_integer;
 
         static const int EvsVersion           = gu::Config::Flag::read_only;
-        static const int EvsViewForgetTimeout = gu::Config::Flag::read_only;
-        static const int EvsSuspectTimeout    = 0;
-        static const int EvsInactiveTimeout   = 0;
-        static const int EvsInactiveCheckPeriod = 0;
-        static const int EvsInstallTimeout    = 0;
-        static const int EvsKeepalivePeriod   = 0;
-        static const int EvsJoinRetransPeriod = 0;
-        static const int EvsStatsReportPeriod = 0;
+        static const int EvsViewForgetTimeout = gu::Config::Flag::read_only |
+                                                gu::Config::Flag::type_duration;
+        static const int EvsSuspectTimeout    = gu::Config::Flag::type_duration;
+        static const int EvsInactiveTimeout   = gu::Config::Flag::type_duration;
+        static const int EvsInactiveCheckPeriod = gu::Config::Flag::type_duration;
+        static const int EvsInstallTimeout    = gu::Config::Flag::type_duration;
+        static const int EvsKeepalivePeriod   = gu::Config::Flag::type_duration;
+        static const int EvsJoinRetransPeriod = gu::Config::Flag::type_duration;
+        static const int EvsStatsReportPeriod = gu::Config::Flag::type_duration;
         static const int EvsDebugLogMask      = 0;
         static const int EvsInfoLogMask       = 0;
         static const int EvsSendWindow        = gu::Config::Flag::type_integer;
         static const int EvsUserSendWindow    = gu::Config::Flag::type_integer;
         static const int EvsUseAggregate      = gu::Config::Flag::type_bool;
-        static const int EvsCausalKeepalivePeriod = 0;
+        static const int EvsCausalKeepalivePeriod = gu::Config::Flag::type_duration;
         static const int EvsMaxInstallTimeouts = gu::Config::Flag::type_integer;
-        static const int EvsDelayMargin       = 0;
-        static const int EvsDelayedKeepPeriod = 0;
+        static const int EvsDelayMargin       = gu::Config::Flag::type_duration;
+        static const int EvsDelayedKeepPeriod = gu::Config::Flag::type_duration;
         static const int EvsEvict             = 0;
         static const int EvsAutoEvict         = gu::Config::Flag::read_only |
                                                 gu::Config::Flag::type_bool;
@@ -119,13 +122,16 @@ namespace gcomm
         static const int PcIgnoreSb           = gu::Config::Flag::type_bool;
         static const int PcIgnoreQuorum       = gu::Config::Flag::type_bool;
         static const int PcChecksum           = gu::Config::Flag::type_bool;
-        static const int PcAnnounceTimeout    = gu::Config::Flag::read_only;
-        static const int PcLinger             = gu::Config::Flag::read_only;
+        static const int PcAnnounceTimeout    = gu::Config::Flag::read_only |
+                                                gu::Config::Flag::type_duration;
+        static const int PcLinger             = gu::Config::Flag::read_only |
+                                                gu::Config::Flag::type_duration;
         static const int PcNpvo               = gu::Config::Flag::type_bool;
         static const int PcBootstrap          = gu::Config::Flag::type_bool;
         static const int PcWaitPrim           = gu::Config::Flag::read_only |
                                                 gu::Config::Flag::type_bool;
-        static const int PcWaitPrimTimeout    = gu::Config::Flag::read_only;
+        static const int PcWaitPrimTimeout    = gu::Config::Flag::read_only |
+                                                gu::Config::Flag::type_duration;
         static const int PcWeight             = gu::Config::Flag::type_integer;
         static const int PcRecovery           = gu::Config::Flag::read_only |
                                                 gu::Config::Flag::type_bool;

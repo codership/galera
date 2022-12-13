@@ -215,9 +215,10 @@ public:
         static const int type_bool = (1 << 3);
         static const int type_integer = (1 << 4);
         static const int type_double = (1 << 5);
+        static const int type_duration = (1 << 6);
 
-        static const int type_mask =
-            Flag::type_bool | Flag::type_integer | Flag::type_double;
+        static const int type_mask = Flag::type_bool | Flag::type_integer
+                                     | Flag::type_double | Flag::type_duration;
 
         static std::string to_string(int f)
         {
@@ -234,6 +235,8 @@ public:
                 s << "integer | ";
             if (f & Flag::type_double)
                 s << "double | ";
+            if (f & Flag::type_duration)
+                s << "duration | ";
             std::string ret(s.str());
             if (ret.length() > 3)
                 ret.erase(ret.length() - 3);

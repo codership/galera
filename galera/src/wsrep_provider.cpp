@@ -1677,6 +1677,8 @@ static int map_parameter_flags(int flags)
       ret |= WSREP_PARAM_TYPE_INTEGER;
     if (flags & gu::Config::Flag::type_double)
       ret |= WSREP_PARAM_TYPE_DOUBLE;
+    if (flags & gu::Config::Flag::type_duration)
+      ret |= WSREP_PARAM_TYPE_DOUBLE;
     return ret;
 }
 
@@ -1702,6 +1704,21 @@ static int wsrep_parameter_init(wsrep_parameter& wsrep_param,
     case gu::Config::Flag::type_double:
         ret = gu_str2dbl(param.value().c_str(), &wsrep_param.value.as_double);
         break;
+    case gu::Config::Flag::type_duration:
+    {
+        try
+        {
+            // durations are mapped to doubles
+            wsrep_param.value.as_double
+                = to_double(gu::datetime::Period(param.value()));
+        }
+        catch (...)
+        {
+            assert(0);
+            return 1;
+        }
+        break;
+    }
     default:
         assert((param.flags() & gu::Config::Flag::type_mask) == 0);
         wsrep_param.value.as_string = param.value().c_str();

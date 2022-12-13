@@ -60,6 +60,7 @@ galera::ReplicatorSMM::InitConfig::InitConfig(gu::Config&       conf,
             conf.add(i->first, i->second);
     }
 
+    conf.set_flags(Param::causal_read_timeout, gu::Config::Flag::type_duration);
     conf.set_flags(Param::max_write_set_size, gu::Config::Flag::type_integer);
     conf.set_flags(Param::base_dir, gu::Config::Flag::read_only);
     conf.set_flags(Param::base_port, gu::Config::Flag::read_only |
