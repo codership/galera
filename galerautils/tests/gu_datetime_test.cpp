@@ -107,6 +107,18 @@ START_TEST(test_period_from_double)
 }
 END_TEST
 
+START_TEST(test_period_overflow)
+{
+    long long max_secs = std::numeric_limits<long long>::max() / gu::datetime::Sec;
+
+    std::string max_duration("PT" + std::to_string(max_secs) + "S");
+    ck_assert(Period(max_duration).get_nsecs()); // no overflow
+
+    std::string overflow_duration("PT" + std::to_string(max_secs + 1.0) + "S");
+    assert_invalid_period(overflow_duration);
+}
+END_TEST
+
 START_TEST(test_date)
 {
     Date d1(Date::monotonic());
@@ -153,6 +165,10 @@ Suite* gu_datetime_suite()
 
     tc = tcase_create("test_period_from_double");
     tcase_add_test(tc, test_period_from_double);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_period_overflow");
+    tcase_add_test(tc, test_period_overflow);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_date");

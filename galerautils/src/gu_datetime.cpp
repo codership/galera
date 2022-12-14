@@ -63,8 +63,14 @@ namespace
               const std::string& part_string(parts[g.index].str());
               if (not part_string.empty())
               {
-                  double d(gu::from_string<double>(part_string));
-                  nsecs += static_cast<long long>(d * g.multiplier);
+                  const double max(std::numeric_limits<long long>::max());
+                  const double d(gu::from_string<double>(part_string) * g.multiplier);
+                  if ((d > max) || (nsecs > (max - d)))
+                  {
+                      // addition would overflow
+                      throw gu::NotFound();
+                  }
+                  nsecs += static_cast<long long>(d);
               }
           }
       }
