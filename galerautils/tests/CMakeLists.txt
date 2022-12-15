@@ -58,6 +58,7 @@ add_executable(gu_tests++
   gu_mem_pool_test.cpp
   gu_alloc_test.cpp
   gu_rset_test.cpp
+  gu_utils_test++.cpp
   gu_string_utils_test.cpp
   gu_uri_test.cpp
   gu_config_test.cpp

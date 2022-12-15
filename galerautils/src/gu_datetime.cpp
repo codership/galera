@@ -63,8 +63,8 @@ namespace
               const std::string& part_string(parts[g.index].str());
               if (not part_string.empty())
               {
+                  const double d(std::stod(part_string) * g.multiplier);
                   const double max(std::numeric_limits<long long>::max());
-                  const double d(gu::from_string<double>(part_string) * g.multiplier);
                   if ((d > max) || (nsecs > (max - d)))
                   {
                       // addition would overflow
@@ -125,7 +125,7 @@ void gu::datetime::Period::parse(const std::string& str)
     {
         nsecs = ::iso8601_duration_to_nsecs(str);
     }
-    catch (NotFound& e)
+    catch (...)
     {
         double d(gu::from_string<double>(str));
         nsecs = static_cast<long long>(d * Sec);
