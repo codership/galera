@@ -5,10 +5,9 @@
 #include "gu_datetime.hpp"
 #include "gu_logger.hpp"
 #include "gu_utils.hpp"
-
 #include "gu_datetime_test.hpp"
 
-
+#include <cmath> // std::fabs
 
 using namespace gu;
 using namespace gu::datetime;
@@ -96,14 +95,22 @@ START_TEST(test_period_invalid)
 }
 END_TEST
 
+static void assert_double_eq_tol(double left, double right, double tol)
+{
+    ck_assert(std::fabs(left - right) < tol);
+}
+
 START_TEST(test_period_from_double)
 {
     ck_assert(Period("0").get_nsecs() == 0);
     ck_assert(Period(".1").get_nsecs() ==  100*MSec);
     ck_assert(Period("0.0").get_nsecs() == 0);
     ck_assert(Period("0.5").get_nsecs() == 500*MSec);
-    ck_assert(to_double(Period("0.5")) == 0.5);
-    ck_assert(to_double(Period(".111111111")) == 0.111111111);
+    // Use microsecond precision for comparison to make
+    // it work on x86
+    assert_double_eq_tol(to_double(Period("0.5")), 0.5,  0.000001);
+    assert_double_eq_tol(to_double(Period(".111111111")), 0.111111111,
+                         0.000001);;
 }
 END_TEST
 
