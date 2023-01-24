@@ -92,6 +92,7 @@ START_TEST(test_period_invalid)
     assert_invalid_period("PT.D");
     assert_invalid_period("PT1D");
     assert_invalid_period("P1D1Y");
+    assert_invalid_period("P9223372036854775807Y"); // Overflow
 }
 END_TEST
 
