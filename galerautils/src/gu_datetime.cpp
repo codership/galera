@@ -8,8 +8,7 @@
 #include "gu_logger.hpp"
 #include "gu_utils.hpp"
 #include "gu_throw.hpp"
-
-#include <regex>
+#include "gu_regex.hpp"
 
 namespace
 {
@@ -17,10 +16,10 @@ namespace
     const char* const period_regex =
       "^(P)(([0-9]+)Y)?(([0-9]+)M)?(([0-9]+)D)?"
 /*      1  23          45          67                             */
-      "((T)?(([0-9]+)H)?(([0-9]+)M)?(([0-9]+)(\\.([0-9]+))?S)?)?";
+      "((T)?(([0-9]+)H)?(([0-9]+)M)?(([0-9]+)(\\.([0-9]+))?S)?)?$";
 /*     89    11          13          15      16                   */
 
-  std::regex const regex(period_regex);
+  gu::RegEx regex(period_regex);
 
   enum
   {
@@ -55,28 +54,28 @@ namespace
   long long iso8601_duration_to_nsecs(const std::string& str)
   {
       long long nsecs = 0;
-      std::smatch parts;
-      if (std::regex_match(str, parts, regex))
+      std::vector<gu::RegEx::Match> parts;
+      try
       {
-          for (auto g : regex_groups)
-          {
-              const std::string& part_string(parts[g.index].str());
-              if (not part_string.empty())
-              {
-                  const double d(std::stod(part_string) * g.multiplier);
-                  const double max(std::numeric_limits<long long>::max());
-                  if ((d > max) || (nsecs > (max - d)))
-                  {
-                      // addition would overflow
-                      throw gu::NotFound();
-                  }
-                  nsecs += static_cast<long long>(d);
-              }
-          }
+          parts = regex.match(str, GU_NUM_PARTS);
       }
-      else
-      {
+      catch (...) {
           throw gu::NotFound();
+      }
+
+      for (auto g : regex_groups)
+      {
+          if (parts[g.index].is_set())
+          {
+              const double d(std::stod(parts[g.index].str()) * g.multiplier);
+              const double max(std::numeric_limits<long long>::max());
+              if ((d > max) || (nsecs > (max - d)))
+              {
+                  // addition would overflow
+                  throw gu::NotFound();
+              }
+              nsecs += static_cast<long long>(d);
+          }
       }
       return nsecs;
   }
