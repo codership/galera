@@ -452,7 +452,7 @@ then
             MYSQL_MM_VER="$MYSQL_MAJOR_VER$MYSQL_MINOR_VER"
 
             [ "$MYSQL_MM_VER" -ge "56" ] \
-            && MEMCACHED_OPT="-DWITH_LIBEVENT=bundled -DWITH_INNODB_MEMCACHED=ON" \
+            && MEMCACHED_OPT="-DWITH_LIBEVENT=bundled -DWITH_INNODB_MEMCACHED=OFF" \
             || MEMCACHED_OPT=""
 
             if [ "$MYSQL_MM_VER" -ge "57" ]
@@ -460,7 +460,7 @@ then
                 BOOST_OPT="-DWITH_BOOST=$MYSQL_BUILD_DIR/boost_$MYSQL_MM_VER"
                 [ "yes" = "$BOOTSTRAP" ] && \
                     BOOST_OPT="$BOOST_OPT -DDOWNLOAD_BOOST=1"
-                SSL_OPT="-DWITH_SSL=yes"
+                SSL_OPT="-DWITH_SSL=/opt/openssl"
             else
                 BOOST_OPT=""
                 SSL_OPT="-DWITH_SSL=yes"
@@ -493,9 +493,11 @@ then
                   $SSL_OPT \
                   -DWITH_ZLIB=system \
                   -DMYSQL_MAINTAINER_MODE=0 \
+                  -DWITH_ROCKSDB=NO \
                   $MEMCACHED_OPT \
                   $BOOST_OPT \
                   $MYSQL_SRC \
+                  -DCXX_STANDARD=98 \
             && make -j $JOBS -S && popd || exit 1
         fi
     else  # just recompile and relink with old configuration
