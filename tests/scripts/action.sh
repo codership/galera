@@ -1,11 +1,23 @@
 # Helper to get status variable value
 
+mysql_command()
+{
+    local node=$1
+    if [ "${NODE_LOCATION[$node]}" = "local" ]
+    then
+        echo "${NODE_TEST_DIR[$node]}/mysql/bin/mysql"
+    else
+        echo "mysql"
+    fi
+}
+
 cluster_status()
 {
     local node=$1
     case "$DBMS" in
         "MYSQL")
-            local res=$(mysql -u$DBMS_ROOT_USER -p$DBMS_ROOT_PSWD \
+            local command=$(mysql_command $node)
+            local res=$($command -u$DBMS_ROOT_USER -p$DBMS_ROOT_PSWD \
                 -h${NODE_INCOMING_HOST[$node]} -P${NODE_INCOMING_PORT[$node]} \
                 --skip-column-names -ss \
                 -e "SET wsrep_on=0;
@@ -22,7 +34,9 @@ mysql_query()
 {
     local node=$1
     local query=$2
-    mysql -u$DBMS_ROOT_USER -p$DBMS_ROOT_PSWD \
+    local command=$(mysql_command $node)
+
+    $command -u$DBMS_ROOT_USER -p$DBMS_ROOT_PSWD \
           -h${NODE_INCOMING_HOST[$node]} -P${NODE_INCOMING_PORT[$node]} \
           --skip-column-names -ss -e "$query"
 }

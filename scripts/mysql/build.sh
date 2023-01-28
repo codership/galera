@@ -451,7 +451,6 @@ then
 
         BUILD_OPT+=" -DWITH_EXTRA_CHARSETS=all"
         BUILD_OPT+=" -DMYSQL_MAINTAINER_MODE=0"
-        BUILD_OPT+=" -DWITH_ZLIB=system"
 
         MYSQL_MM_VER="$MYSQL_MAJOR_VER$MYSQL_MINOR_VER"
 
@@ -481,6 +480,7 @@ then
                 BUILD_OPT+=" -DWITH_ZLIB=bundled"
             fi
         else # MariaDB-specific build options
+            BUILD_OPT+=" -DWITH_SSL=bundled"
             BUILD_OPT+=" -DWITH_READLINE=system"
             BUILD_OPT+=" -DWITH_DEBUG:BOOL=ON"
             BUILD_OPT+=" -DWITH_INNODB_DISALLOW_WRITES:BOOL=ON"

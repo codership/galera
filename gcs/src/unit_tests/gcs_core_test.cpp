@@ -550,14 +550,18 @@ END_TEST
 
 // do a single send step, compare with the expected result
 static inline bool
-CORE_SEND_STEP (gcs_core_t* core, long timeout, long ret)
+CORE_SEND_STEP (gcs_core_t* core, long timeout, long ret, int line)
 {
    long err = gcs_core_send_step (core, timeout);
    ck_assert_msg(err >= 0, "gcs_core_send_step(): %ld (%s)",
                  err, strerror (-err));
    if (ret >= 0) {
-       ck_assert_msg(err == ret, "gcs_core_send_step(): expected %ld, got %ld",
-                     ret, err);
+       if (err != ret) {
+           fprintf(stderr, "gcs_core_send_step(%ld, %ld) at line %d:"
+                   " expected %ld, got %ld", timeout, ret, line, ret, err);
+           assert(0); // to catch a core if possible
+           ck_abort();
+       }
    }
 
    return false;
@@ -625,11 +629,11 @@ CORE_TEST_OWN (int gcs_proto_ver)
 
     ck_assert(!CORE_RECV_START (&act_r));
     ck_assert(!CORE_SEND_START (&act_s));
-    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1, __LINE__)); // 1st frag
     usleep (10000); // resolve race between sending and setting transitional
     gcs_dummy_set_transitional (Backend);
-    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
-    ck_assert(!CORE_SEND_STEP (Core, tout, 0)); // no frags left
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1, __LINE__)); // 2nd frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 0, __LINE__)); // no frags left
     ck_assert(NULL == act_r.out); // should not have received anything
     ck_assert(!gcs_dummy_set_component (Backend, prim)); // return to PRIM state
     ck_assert(!CORE_SEND_END (&act_s, act_size));
@@ -643,8 +647,8 @@ CORE_TEST_OWN (int gcs_proto_ver)
      */
     ck_assert(!DUMMY_INJECT_COMPONENT (Backend, non_prim));
     ck_assert(!CORE_SEND_START (&act_s));
-    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 1st frag
-    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1, __LINE__)); // 1st frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1, __LINE__)); // 2nd frag
     ck_assert(!CORE_SEND_END (&act_s, act_size));
     ck_assert(!gcs_dummy_set_component(Backend, non_prim));
     ck_assert(!CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
@@ -662,8 +666,8 @@ CORE_TEST_OWN (int gcs_proto_ver)
      * fragment send fails.
      */
     ck_assert(!CORE_SEND_START (&act_s));
-    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 1st frag
-    ck_assert(!CORE_SEND_STEP (Core, tout, 0)); // bail out after 1st frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1, __LINE__)); // 1st frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 0, __LINE__)); // bail out after 1st frag
     ck_assert(!CORE_SEND_END (&act_s, -ENOTCONN));
 
     /*
@@ -676,7 +680,7 @@ CORE_TEST_OWN (int gcs_proto_ver)
     ck_assert(!gcs_dummy_set_component(Backend, non_prim));
     ck_assert(!DUMMY_INJECT_COMPONENT (Backend, non_prim));
     ck_assert(!CORE_SEND_START (&act_s));
-    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1, __LINE__)); // 1st frag
     ck_assert(!CORE_SEND_END (&act_s, -ENOTCONN));
     ck_assert(!CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
     ck_assert(!core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
@@ -690,9 +694,9 @@ CORE_TEST_OWN (int gcs_proto_ver)
      */
     ck_assert(!DUMMY_INSTALL_COMPONENT (Backend, prim));
     ck_assert(!CORE_SEND_START (&act_s));
-    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1, __LINE__)); // 1st frag
     ck_assert(!DUMMY_INJECT_COMPONENT (Backend, non_prim));
-    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1, __LINE__)); // 2nd frag
     ck_assert(!CORE_SEND_END (&act_s, act_size));
     ck_assert(!CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
     ck_assert(!core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
@@ -710,11 +714,11 @@ CORE_TEST_OWN (int gcs_proto_ver)
      */
     ck_assert(!DUMMY_INSTALL_COMPONENT (Backend, prim));
     ck_assert(!CORE_SEND_START (&act_s));
-    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1, __LINE__)); // 1st frag
     usleep (100000); // make sure 1st fragment gets in before new component
     ck_assert(!DUMMY_INSTALL_COMPONENT (Backend, non_prim));
     ck_assert(!DUMMY_INSTALL_COMPONENT (Backend, prim));
-    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1, __LINE__)); // 2nd frag
     ck_assert(!CORE_SEND_END (&act_s, act_size));
     ck_assert(!CORE_RECV_ACT (&act_r, act_buf, act_size, GCS_ACT_WRITESET));
     ck_assert_msg(-ERESTART == act_r.seqno,
@@ -739,26 +743,26 @@ CORE_TEST_OWN (int gcs_proto_ver)
     // subcase 1
     ck_assert(!DUMMY_INSTALL_COMPONENT (Backend, prim));
     ck_assert(!CORE_SEND_START (&act_s));
-    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1, __LINE__)); // 1st frag
     ck_assert(!DUMMY_INJECT_COMPONENT (Backend, non_prim));
-    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1, __LINE__)); // 2nd frag
     usleep (500000); // fail_if_seq
     ck_assert(!gcs_dummy_set_component(Backend, non_prim));
     ck_assert(!CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
     ck_assert(!core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
     Cache->free(act_r.out);
-    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 3rd frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1, __LINE__)); // 3rd frag
     ck_assert(!CORE_SEND_END (&act_s, -ENOTCONN));
 
     // subcase 2
     ck_assert(!DUMMY_INSTALL_COMPONENT (Backend, prim));
     ck_assert(!CORE_SEND_START (&act_s));
-    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 1st frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1, __LINE__)); // 1st frag
     ck_assert(!DUMMY_INJECT_COMPONENT (Backend, non_prim));
-    ck_assert(!CORE_SEND_STEP (Core, tout, 1)); // 2nd frag
+    ck_assert(!CORE_SEND_STEP (Core, tout, 1, __LINE__)); // 2nd frag
     usleep (1000000);
     ck_assert(!gcs_dummy_set_component(Backend, non_prim));
-    ck_assert(!CORE_SEND_STEP (Core, 4*tout, 1)); // 3rd frag
+    ck_assert(!CORE_SEND_STEP (Core, 4*tout, 1, __LINE__)); // 3rd frag
     ck_assert(!CORE_RECV_ACT (&act_r, NULL, UNKNOWN_SIZE, GCS_ACT_CCHANGE));
     ck_assert(!core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
     Cache->free(act_r.out);
