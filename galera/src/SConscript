@@ -33,7 +33,6 @@ libgaleraxx_srcs = [
     'ist.cpp',
     'gcs_dummy.cpp',
     'saved_state.cpp',
-    'event_service.cpp',
     'galera_view.cpp'
 ]
 
