@@ -97,6 +97,7 @@ static const char* Defaults[] =
     "pc.wait_prim",                "true",
     "pc.wait_prim_timeout",        "PT30S",
     "pc.weight",                   "1",
+    "protonet.backend",            "asio",
     "protonet.version",            "0",
     "repl.causal_read_timeout",    "PT30S",
     "repl.commit_order",           "3",

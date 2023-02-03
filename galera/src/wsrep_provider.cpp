@@ -1766,10 +1766,14 @@ extern "C"
 int wsrep_init_config_service_v1(wsrep_config_service_v1_t *config_service)
 {
     config_service->get_parameters = get_parameters;
+    // Deprecation checks will be done by application which uses
+    // the service.
+    gu::Config::disable_deprecation_check();
     return WSREP_OK;
 }
 
 extern "C"
 void wsrep_deinit_config_service_v1()
 {
+    gu::Config::enable_deprecation_check();
 }

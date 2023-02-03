@@ -14,6 +14,7 @@ std::string const BaseHost(COMMON_BASE_HOST_KEY);
 std::string const BasePort(COMMON_BASE_PORT_KEY);
 
 // Protonet
+std::string const gcomm::Conf::ProtonetBackend("protonet.backend");
 std::string const gcomm::Conf::ProtonetVersion("protonet.version");
 
 // TCP
@@ -127,6 +128,7 @@ gcomm::Conf::register_params(gu::Config& cnf)
     GCOMM_CONF_ADD (BaseHost);
     GCOMM_CONF_ADD (BasePort);
 
+    GCOMM_CONF_ADD_DEFAULT(ProtonetBackend);
     GCOMM_CONF_ADD_DEFAULT(ProtonetVersion);
 
     GCOMM_CONF_ADD        (TcpNonBlocking);

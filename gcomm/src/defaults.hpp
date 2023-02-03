@@ -12,6 +12,7 @@ namespace gcomm
 {
     struct Defaults
     {
+        static std::string const ProtonetBackend          ;
         static std::string const ProtonetVersion          ;
         static std::string const SocketChecksum           ;
         static std::string const SocketRecvBufSize        ;
@@ -60,8 +61,10 @@ namespace gcomm
         static const int BasePort = gu::Config::Flag::read_only |
                                     gu::Config::Flag::type_integer;
 
-        static const int ProtonetBackend = gu::Config::Flag::read_only;
-        static const int ProtonetVersion = gu::Config::Flag::read_only;
+        static const int ProtonetBackend
+            = gu::Config::Flag::read_only | gu::Config::Flag::deprecated;
+        static const int ProtonetVersion
+            = gu::Config::Flag::read_only | gu::Config::Flag::deprecated;
 
         // Hidden because not documented / does not seem to be used?
         static const int TcpNonBlocking = gu::Config::Flag::hidden;

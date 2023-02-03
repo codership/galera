@@ -102,6 +102,9 @@ gu::Config::parse (const std::string& param_list)
 
 gu::Config::Config() : params_() {}
 
+std::function<void(const std::string&, const gu::Config::Parameter&)>
+    gu::Config::deprecation_check_func_ = check_deprecated;
+
 void
 gu::Config::set_longlong (const std::string& key, long long val)
 {
@@ -153,6 +156,26 @@ gu::Config::check_conversion (const char* str,
     {
         gu_throw_error(EINVAL) << "Invalid value '" << str << "' for " << type
                                << " type.";
+    }
+}
+
+void gu::Config::enable_deprecation_check()
+{
+    deprecation_check_func_ = check_deprecated;
+}
+
+void gu::Config::disable_deprecation_check()
+{
+    deprecation_check_func_ = nullptr;
+}
+
+void gu::Config::check_deprecated(const std::string& key,
+                                  const Parameter& param)
+{
+    if (param.is_deprecated())
+    {
+        log_warn << "Parameter '" << key
+                 << "' is deprecated and will be removed in future versions";
     }
 }
 
