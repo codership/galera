@@ -826,6 +826,11 @@ start_progress(gcs_conn_t* conn)
 {
     gu_fifo_lock(conn->recv_q);
     {
+        if (conn->progress_)
+        {
+            // Did not reach synced after previously becoming joined.
+            delete conn->progress_;
+        }
         conn->progress_ = new gu::Progress<gcs_seqno_t>(
             conn->progress_cb_,
             "Processing event queue:", " events",
@@ -1703,6 +1708,11 @@ long gcs_close (gcs_conn_t *conn)
     }
     /* recv_thread() is supposed to set state to CLOSED when exiting */
     assert (GCS_CONN_CLOSED == conn->state);
+    if (conn->progress_)
+    {
+        delete conn->progress_;
+        conn->progress_ = nullptr;
+    }
     return ret;
 }
 
