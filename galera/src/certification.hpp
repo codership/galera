@@ -62,9 +62,10 @@ namespace galera
 
         void assign_initial_position(const gu::GTID& gtid, int version);
         TestResult append_trx(const TrxHandleSlavePtr&);
+        /* Append dummy trx from cert index preload. */
+        void append_dummy_preload(const TrxHandleSlavePtr&);
         TestResult test(const TrxHandleSlavePtr&, bool store_keys);
         wsrep_seqno_t position() const { return position_; }
-        wsrep_seqno_t increment_position(); /* for dummy IST events */
 
         /* this is for configuration change use */
         void adjust_position(const View&, const gu::GTID& gtid, int version);
@@ -180,6 +181,11 @@ namespace galera
 
             void operator()(TrxMap::value_type& vt) const
             {
+                if (not vt.second)
+                {
+                    // Dummy preload events insert only seqno
+                    return;
+                }
                 {
                     TrxHandleSlave* trx(vt.second.get());
                     // Trying to lock trx mutex here may cause deadlock

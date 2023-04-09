@@ -1287,9 +1287,8 @@ void ReplicatorSMM::handle_ist_nbo(const TrxHandleSlavePtr& ts,
         // donor refuses to donate SST from the position with active NBO.
         assert(preload);
         log_debug << "Skipping NBO event: " << ts;
-        wsrep_seqno_t const pos(cert_.increment_position());
-        assert(ts->global_seqno() == pos);
-        (void)pos;
+        cert_.append_dummy_preload(ts);
+        assert(ts->global_seqno() == cert_.position());
     }
     if (gu_likely(must_apply == true))
     {
@@ -1330,11 +1329,10 @@ void ReplicatorSMM::handle_ist_trx_preload(const TrxHandleSlavePtr& ts,
     }
     else if (cert_.position() != WSREP_SEQNO_UNDEFINED)
     {
-        // Increment position to keep track only if the initial
-        // seqno has already been assigned.
-        wsrep_seqno_t const pos __attribute__((unused))(
-            cert_.increment_position());
-        assert(ts->global_seqno() == pos);
+        // Append dummy trx to keep certification trx map continuous which
+        // is a requirement for cert purge to work properly.
+        cert_.append_dummy_preload(ts);
+        assert(ts->global_seqno() == cert_.position());
     }
 }
 
