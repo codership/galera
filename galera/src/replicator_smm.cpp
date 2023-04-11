@@ -2164,7 +2164,10 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t const seq,
 
     if (seq >= cc_seqno_) /* Refs #782. workaround for
                            * assert(seqno >= seqno_released_) in gcache. */
+    {
+        assert(seq <= last_committed());
         cert_.purge_trxs_upto(seq, true);
+    }
 
     local_monitor_.leave(lo);
     log_debug << "Got commit cut from GCS: " << seq;

@@ -71,10 +71,10 @@ length_check(const gu::Config& conf)
         return gu::Config::from_config<int>(CERT_PARAM_LENGTH_CHECK_DEFAULT);
 }
 
+#ifndef NDEBUG
 static void report_inconsistency(const galera::Certification::CertIndexNG::value_type& ke, const galera::KeySetIn& key_set)
 {
     key_set.rewind();
-    std::cerr << "Key entry: " << *ke;
     std::cerr << "Key set\n";
     for (long i = 0; i < key_set.count(); ++i)
     {
@@ -82,6 +82,26 @@ static void report_inconsistency(const galera::Certification::CertIndexNG::value
         std::cerr << kp << "\n";
     }
 }
+
+static void check_integrity(const galera::Certification::CertIndexNG& cert_index,
+                            const galera::TrxHandleSlave* ts,
+                            const galera::KeySetIn& key_set)
+{
+    std::for_each(
+        cert_index.begin(), cert_index.end(),
+        [&cert_index, &key_set,
+         ts](const galera::Certification::CertIndexNG::value_type& ke) {
+            ke->for_each_ref(
+                [ke, &key_set, ts](const TrxHandleSlave* ref) {
+                    if (ts == ref)
+                    {
+                        report_inconsistency(ke, key_set);
+                    }
+                    assert(ts != ref);
+                });
+        });
+}
+#endif /* NDEBUG */
 
 // Purge key set from given index
 static void purge_key_set(galera::Certification::CertIndexNG& cert_index,
@@ -91,6 +111,7 @@ static void purge_key_set(galera::Certification::CertIndexNG& cert_index,
 {
 #ifndef NDEBUG
     ts->verify_checksum();
+    log_info << "purge_key_set " << ts->global_seqno();
 #endif /* NDEBUG */
     for (long i(0); i < count; ++i)
     {
@@ -119,19 +140,7 @@ static void purge_key_set(galera::Certification::CertIndexNG& cert_index,
         }
     }
 #ifndef NDEBUG
-    std::for_each(
-        cert_index.begin(), cert_index.end(),
-        [&cert_index, &key_set,
-         ts](const galera::Certification::CertIndexNG::value_type& ke) {
-            ke->for_each_ref(
-                [ke, &key_set, ts](const TrxHandleSlave* ref) {
-                    if (ts == ref)
-                    {
-                        report_inconsistency(ke, key_set);
-                    }
-                    assert(ts != ref);
-                });
-        });
+    check_integrity(cert_index, ts, key_set);
 #endif /* NDEBUG */
 }
 
@@ -368,22 +377,19 @@ galera::Certification::do_test_v3to5(TrxHandleSlave* trx, bool store_keys)
         key_count_ += key_count;
     }
     cert_debug << "END CERTIFICATION (success): " << *trx;
+    log_info << "cert success " << trx->global_seqno() << " " << store_keys;
     return TEST_OK;
 
 cert_fail:
 
+    log_info << "cert failure " << trx->global_seqno() << " " << store_keys;
     cert_debug << "END CERTIFICATION (failed): " << *trx;
 
     assert (processed < key_count);
     assert(cert_index_ng_.size() == prev_cert_index_size);
 
 #ifndef NDEBUG
-    std::for_each(
-        cert_index_ng_.begin(), cert_index_ng_.end(),
-        [trx](const galera::Certification::CertIndexNG::value_type& ke) {
-            ke->for_each_ref(
-                [trx](const TrxHandleSlave* ref) { assert(trx != ref); });
-        });
+    check_integrity(cert_index_ng_, trx, key_set);
 #endif /* NDEBUG */
 
     return TEST_FAILED;
@@ -410,6 +416,7 @@ trx_cert_version_match(int const trx_version, int const cert_version)
 galera::Certification::TestResult
 galera::Certification::do_test(const TrxHandleSlavePtr& trx, bool store_keys)
 {
+    assert(mutex_.owned());
     assert(trx->source_id() != WSREP_UUID_UNDEFINED);
 
     if (!trx_cert_version_match(trx->version(), version_))
@@ -437,8 +444,6 @@ galera::Certification::do_test(const TrxHandleSlavePtr& trx, bool store_keys)
     }
 
     TestResult res(TEST_FAILED);
-
-    gu::Lock lock(mutex_); // why do we need that? - e.g. set_trx_committed()
 
     /* initialize parent seqno */
     if (gu_unlikely(trx_map_.empty()))
@@ -1100,20 +1105,31 @@ galera::Certification::adjust_position(const View&         view,
 galera::Certification::TestResult
 galera::Certification::test(const TrxHandleSlavePtr& trx, bool store_keys)
 {
+    gu::Lock lock(mutex_);
+    return test_no_lock(trx, store_keys);
+}
+
+galera::Certification::TestResult
+galera::Certification::test_no_lock(const TrxHandleSlavePtr& trx,
+                                    bool store_keys)
+{
+    assert(mutex_.owned());
     assert(trx->global_seqno() >= 0 /* && trx->local_seqno() >= 0 */);
 
-    const TestResult ret
-        (trx->preordered() ?
-         do_test_preordered(trx.get()) : do_test(trx, store_keys));
+    const TestResult ret(trx->preordered() ? do_test_preordered(trx.get())
+                                           : do_test(trx, store_keys));
 
-    if (gu_unlikely(ret != TEST_OK)) { trx->mark_dummy(); }
+    if (gu_unlikely(ret != TEST_OK))
+    {
+        trx->mark_dummy();
+    }
 
     return ret;
 }
 
-
 wsrep_seqno_t galera::Certification::get_safe_to_discard_seqno_() const
 {
+    assert(mutex_.owned());
     wsrep_seqno_t retval;
     if (deps_set_.empty() == true)
     {
@@ -1136,7 +1152,10 @@ galera::Certification::purge_trxs_upto_(wsrep_seqno_t const seqno,
 
     TrxMap::iterator purge_bound(trx_map_.upper_bound(seqno));
 
-    cert_debug << "purging index up to " << seqno;
+    cert_debug << "purging index up to " << seqno << ", safe to discard seqno " << get_safe_to_discard_seqno_();
+
+    assert(purge_bound == trx_map_.end() ||
+           purge_bound->first <= get_safe_to_discard_seqno_() + 1);
 
     for_each(trx_map_.begin(), purge_bound, PurgeAndDiscard(*this));
     trx_map_.erase(trx_map_.begin(), purge_bound);
@@ -1158,13 +1177,13 @@ galera::Certification::TestResult
 galera::Certification::append_trx(const TrxHandleSlavePtr& trx)
 {
 // explicit ROLLBACK is dummy()    assert(!trx->is_dummy());
-    assert(trx->global_seqno() >= 0 /* && trx->local_seqno() >= 0 */);
+    assert(trx->global_seqno() > 0 /* && trx->local_seqno() >= 0 */);
     assert(trx->global_seqno() > position_);
 
 #ifndef NDEBUG
     bool const explicit_rollback(trx->explicit_rollback());
 #endif /* NDEBUG */
-
+    TestResult retval = TEST_FAILED;
     {
         gu::Lock lock(mutex_);
 
@@ -1203,19 +1222,14 @@ galera::Certification::append_trx(const TrxHandleSlavePtr& trx)
             }
             else
             {
-                cert_debug << "purging index up to " << trim_seqno;
+                cert_debug << "append_trx: purging index up to " << trim_seqno;
             }
 
             purge_trxs_upto_(trim_seqno, true);
         }
-    }
 
-    const TestResult retval(test(trx, true));
+        retval = test_no_lock(trx, true);
 
-    {
-        assert(trx->global_seqno() > 0);
-
-        gu::Lock lock(mutex_);
         if (trx_map_.insert(
                 std::make_pair(trx->global_seqno(), trx)).second == false)
             gu_throw_fatal << "duplicate trx entry " << *trx;
@@ -1228,6 +1242,7 @@ galera::Certification::append_trx(const TrxHandleSlavePtr& trx)
             deps_set_.insert(trx->last_seen_seqno());
             assert(deps_set_.size() <= trx_map_.size());
         }
+        log_info << "trx_map: " << trx->global_seqno();
     }
 
     if (!trx->certified()) trx->mark_certified();

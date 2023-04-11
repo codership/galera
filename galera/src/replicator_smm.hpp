@@ -411,6 +411,7 @@ namespace galera
         {
             if (gu_unlikely(purge_seqno != -1))
             {
+                assert(purge_seqno <= last_committed());
                 service_thd_.report_last_committed(purge_seqno);
             }
         }
