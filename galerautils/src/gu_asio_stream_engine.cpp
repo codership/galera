@@ -100,7 +100,7 @@ private:
 
 #include <openssl/ssl.h>
 
-#if OPENSSL_VERSION_NUMBER >= 0x1010100fL && !defined(LIBRESSL_VERSION_NUMBER)
+#if OPENSSL_VERSION_NUMBER >= 0x1010100fL
 #define HAVE_READ_EX
 #define HAVE_WRITE_EX
 #endif
