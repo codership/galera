@@ -43,7 +43,7 @@ void galera::TrxHandle::print_state(std::ostream& os, TrxHandle::State s)
     // don't use default to make compiler warn if something is missed
     }
 
-    os << "<unknown TRX state " << s << ">";
+    os << "<unknown TRX state " << static_cast<int>(s) << ">";
     assert(0);
 }
 
@@ -81,11 +81,16 @@ void galera::TrxHandle::print(std::ostream& os) const
        << " trx_id: "  << int64_t(trx_id())  // for readability
        << " tstamp: "  << timestamp()
        << "; state: ";
+}
+
+void galera::TrxHandleMaster::print(std::ostream& os) const
+{
+    TrxHandle::print(os);
     print_state_history(os);
 }
 
 std::ostream&
-galera::operator<<(std::ostream& os, const TrxHandle& th)
+galera::operator<<(std::ostream& os, const TrxHandleMaster& th)
 {
     th.print(os); return os;
 }

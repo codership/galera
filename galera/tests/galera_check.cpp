@@ -22,6 +22,7 @@ extern Suite* service_thd_suite();
 extern Suite* ist_suite();
 extern Suite* saved_state_suite();
 extern Suite* defaults_suite();
+extern Suite* progress_suite();
 
 static suite_creator_t suites[] =
 {
@@ -34,6 +35,7 @@ static suite_creator_t suites[] =
     ist_suite,
     saved_state_suite,
     defaults_suite,
+    progress_suite,
     0
 };
 

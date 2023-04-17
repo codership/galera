@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2021 Codership Oy <info@codership.com>
  */
 
 #include "../src/galera_service_thd.hpp"
@@ -38,7 +38,10 @@ namespace
             conf_   (),
             init_   (conf_, NULL, NULL),
             gcache_setup_(conf_),
-            gcache_ (conf_, "."),
+            gcache_pcb_
+            (galera::ProgressCallback<int64_t>(WSREP_MEMBER_UNDEFINED,
+                                               WSREP_MEMBER_UNDEFINED)),
+            gcache_ (&gcache_pcb_, conf_, "."),
             gcs_    (conf_, gcache_)
         {}
 
@@ -50,6 +53,7 @@ namespace
         gu::Config       conf_;
         galera::ReplicatorSMM::InitConfig init_;
         GCache_setup     gcache_setup_;
+        galera::ProgressCallback<int64_t> gcache_pcb_;
         gcache::GCache   gcache_;
         galera::DummyGcs gcs_;
     };

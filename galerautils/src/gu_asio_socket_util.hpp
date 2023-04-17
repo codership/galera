@@ -24,7 +24,7 @@
 template <class S>
 int native_socket_handle(S& socket)
 {
-#if ASIO_VERSION < 101601
+#if ASIO_VERSION < 101401
     return socket.native();
 #else
     return socket.native_handle();

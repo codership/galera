@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2014 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2021 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_GCS_HPP
@@ -79,6 +79,7 @@ namespace galera
 
         Gcs(gu::Config&     config,
             gcache::GCache& cache,
+            gu::Progress<gcs_seqno_t>::Callback* cb,
             int repl_proto_ver        = 0,
             int appl_proto_ver        = 0,
             const char* node_name     = 0,
@@ -86,6 +87,7 @@ namespace galera
             :
             conn_(gcs_create(reinterpret_cast<gu_config_t*>(&config),
                              reinterpret_cast<gcache_t*>(&cache),
+                             cb,
                              node_name, node_incoming,
                              repl_proto_ver, appl_proto_ver))
         {

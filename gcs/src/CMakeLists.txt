@@ -28,7 +28,7 @@ set(GCS_SOURCES
 # Gcs library.
 #
 
-add_library(gcs ${GCS_SOURCES})
+add_library(gcs STATIC ${GCS_SOURCES})
 
 target_compile_definitions(gcs
   PRIVATE
@@ -46,6 +46,7 @@ target_compile_options(gcs
   -Wno-conversion
   -Wno-unused-parameter
   -Wno-overloaded-virtual
+  -Wno-vla
   )
 
 target_link_libraries(gcs gcomm gcache)
@@ -54,7 +55,7 @@ target_link_libraries(gcs gcomm gcache)
 # Gcs library for Garb daemon.
 #
 
-add_library(gcs4garb ${GCS_SOURCES})
+add_library(gcs4garb STATIC ${GCS_SOURCES})
 
 target_compile_definitions(gcs4garb
   PRIVATE
@@ -69,6 +70,7 @@ target_compile_options(gcs4garb
   -Wno-conversion
   -Wno-unused-parameter
   -Wno-overloaded-virtual
+  -Wno-vla
   )
 
 target_link_libraries(gcs4garb gcomm gcache)

@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2020 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2021 Codership Oy <info@codership.com>
 //
 
 #include "galera_common.hpp"
@@ -120,13 +120,21 @@ galera::ReplicatorSMM::ReplicatorSMM(const struct wsrep_init_args* args)
     sst_cond_           (),
     sst_retry_sec_      (1),
     sst_received_       (false),
-    gcache_             (config_, config_.get(BASE_DIR)),
-    gcs_                (config_, gcache_, proto_max_, args->proto_ver,
+    gcache_progress_cb_ (ProgressCallback<int64_t>(WSREP_MEMBER_UNDEFINED,
+                                                   WSREP_MEMBER_UNDEFINED)),
+    gcache_             (&gcache_progress_cb_, config_, config_.get(BASE_DIR)),
+    joined_progress_cb_ (ProgressCallback<gcs_seqno_t>(WSREP_MEMBER_JOINED,
+                                                       WSREP_MEMBER_SYNCED)),
+    gcs_                (config_, gcache_, &joined_progress_cb_,
+                         proto_max_, args->proto_ver,
                          args->node_name, args->node_incoming),
     service_thd_        (gcs_, gcache_),
     slave_pool_         (sizeof(TrxHandleSlave), 1024, "TrxHandleSlave"),
-    as_                 (new GcsActionSource(slave_pool_, gcs_, *this, gcache_)),
-    ist_receiver_       (config_, gcache_, slave_pool_,*this,args->node_address),
+    as_                 (new GcsActionSource(slave_pool_, gcs_, *this,gcache_)),
+    ist_progress_cb_    (ProgressCallback<wsrep_seqno_t>(WSREP_MEMBER_JOINER,
+                                                         WSREP_MEMBER_JOINED)),
+    ist_receiver_       (config_, gcache_, slave_pool_, *this,
+                         args->node_address, &ist_progress_cb_),
     ist_senders_        (gcache_),
     wsdb_               (),
     cert_               (config_, &service_thd_),
@@ -662,6 +670,8 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster& trx,
 
     ssize_t rcode(-1);
 
+    GU_DBUG_SYNC_WAIT("before_replicate_sync");
+
     do
     {
         assert(act.seqno_g == GCS_SEQNO_ILL);
@@ -993,7 +1003,7 @@ wsrep_status_t galera::ReplicatorSMM::certify(TrxHandleMaster&  trx,
             /* committing fragment fails certification or non-committing BF'ed */
             // If the ts was queued, the depends seqno cannot be trusted
             // as it may be modified concurrently.
-            assert(ts->queued() || ts->depends_seqno() < 0 ||
+            assert(ts->queued() || ts->is_dummy() ||
                    (ts->flags() & TrxHandle::F_COMMIT) == 0);
             assert(ts->state() == TrxHandle::S_CERTIFYING ||
                    ts->state() == TrxHandle::S_REPLICATING);
@@ -1066,18 +1076,10 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster& trx,
     case TrxHandle::S_CERTIFYING:
     {
         assert(ts.state() == TrxHandle::S_CERTIFYING);
-        // safety measure to make sure that all preceding trxs finish before
-        // replaying
-        wsrep_seqno_t const ds(ts.depends_seqno());
-        ts.set_depends_seqno(ts.global_seqno() - 1);
 
         ApplyOrder ao(ts);
         assert(apply_monitor_.entered(ao) == false);
         gu_trace(apply_monitor_.enter(ao));
-
-        // restore dependency info
-        ts.set_depends_seqno(WSREP_SEQNO_UNDEFINED);
-        ts.set_depends_seqno(ds);
         TX_SET_STATE(ts, TrxHandle::S_APPLYING);
     }
     // fall through
@@ -1088,6 +1090,10 @@ wsrep_status_t galera::ReplicatorSMM::replay_trx(TrxHandleMaster& trx,
         // fall through
     case TrxHandle::S_COMMITTING:
         ++local_replays_;
+
+        // safety measure to make sure that all preceding trxs are
+        // ordered for commit before replaying
+        commit_monitor_.wait(ts.global_seqno() - 1);
 
         TX_SET_STATE(trx, TrxHandle::S_REPLAYING);
         try
@@ -3274,7 +3280,7 @@ wsrep_status_t galera::ReplicatorSMM::handle_local_monitor_interrupted(
     }
     else
     {
-        assert(WSREP_SEQNO_UNDEFINED == ts->depends_seqno());
+        assert(ts->is_dummy());
         pending_cert_queue_.push(ts);
     }
 
@@ -3330,9 +3336,10 @@ wsrep_status_t galera::ReplicatorSMM::finish_cert(
         {
             retval = WSREP_OK;
         }
-        assert(ts->depends_seqno() >= 0);
+        assert(!ts->is_dummy());
         break;
     case Certification::TEST_FAILED:
+        assert(ts->is_dummy());
         if (ts->nbo_end()) assert(ts->ends_nbo() == WSREP_SEQNO_UNDEFINED);
         local_cert_failures_ += ts->local();
         if (trx != 0) TX_SET_STATE(*trx, TrxHandle::S_ABORTING);
@@ -3350,7 +3357,7 @@ wsrep_status_t galera::ReplicatorSMM::finish_cert(
 
     // we must do seqno assignment 'in order' for std::map reasons,
     // so keeping it inside the monitor. NBO end should never be skipped.
-    bool const skip(ts->depends_seqno() < 0 && !ts->nbo_end());
+    bool const skip(ts->is_dummy() && !ts->nbo_end());
     gcache_.seqno_assign (ts->action().first, ts->global_seqno(),
                           GCS_ACT_WRITESET, skip);
 

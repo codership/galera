@@ -55,6 +55,7 @@ target_compile_options(gcs_tests
   PRIVATE
   -Wno-conversion
   -Wno-unused-parameter
+  -Wno-vla
   )
 
 target_link_libraries(gcs_tests

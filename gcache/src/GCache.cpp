@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2021 Codership Oy <info@codership.com>
  */
 
 #include "GCache.hpp"
@@ -35,7 +35,8 @@ namespace gcache
 #endif
     }
 
-    GCache::GCache (gu::Config& cfg, const std::string& data_dir)
+    GCache::GCache (ProgressCallback* pcb,
+                    gu::Config& cfg, const std::string& data_dir)
         :
         config    (cfg),
         params    (config, data_dir),
@@ -43,7 +44,7 @@ namespace gcache
         seqno2ptr (SEQNO_NONE),
         gid       (),
         mem       (params.mem_size(), seqno2ptr, params.debug()),
-        rb        (params.rb_name(), params.rb_size(), seqno2ptr, gid,
+        rb        (pcb, params.rb_name(), params.rb_size(), seqno2ptr, gid,
                    params.debug(), params.recover()),
         ps        (params.dir_name(),
                    params.keep_pages_size(),
@@ -80,8 +81,9 @@ namespace gcache
 
 gcache_t* gcache_create (gu_config_t* conf, const char* data_dir)
 {
+    /* this funciton is used only in tests */
     gcache::GCache* gc = new gcache::GCache (
-        *reinterpret_cast<gu::Config*>(conf), data_dir);
+        NULL, *reinterpret_cast<gu::Config*>(conf), data_dir);
     return reinterpret_cast<gcache_t*>(gc);
 }
 

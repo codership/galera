@@ -17,7 +17,7 @@ struct gcs_params
     long    fc_base_limit;
     long    max_packet_size;
     long    fc_debug;
-    bool    fc_master_slave;
+    bool    fc_single_primary;
     bool    sync_donor;
 };
 

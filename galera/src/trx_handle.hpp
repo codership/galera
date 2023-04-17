@@ -45,9 +45,7 @@ namespace galera
 
         void add(typename T::State from, typename T::State to)
         {
-            trans_map_.insert_unique(
-                std::make_pair(typename T::Transition(from, to),
-                               typename T::Fsm::TransAttr()));
+            trans_map_.insert_unique(typename T::Transition(from, to));
         }
     private:
         typename T::Fsm::TransMap& trans_map_;
@@ -205,7 +203,6 @@ namespace galera
 
         bool master() const { return master_; }
 
-        void print(std::ostream& os) const;
 
         virtual ~TrxHandle() {}
 
@@ -216,6 +213,8 @@ namespace galera
         }
 
     protected:
+
+        void print(std::ostream& os) const;
 
         void  set_state(State const state, int const line)
         {
@@ -359,7 +358,8 @@ namespace galera
     { return ws_flags_to_trx_flags_tmpl<FLAGS_MATCH_API_FLAGS>(flags); }
 
     std::ostream& operator<<(std::ostream& os, TrxHandle::State s);
-    std::ostream& operator<<(std::ostream& os, const TrxHandle& trx);
+    class TrxHandleMaster;
+    std::ostream& operator<<(std::ostream& os, const TrxHandleMaster& trx);
 
     class TrxHandleSlave;
     std::ostream& operator<<(std::ostream& os, const TrxHandleSlave& th);
@@ -639,7 +639,6 @@ namespace galera
 
         void mark_dummy()
         {
-            set_depends_seqno(WSREP_SEQNO_UNDEFINED);
             set_flags(flags() | F_ROLLBACK);
         }
 
@@ -1006,6 +1005,8 @@ namespace galera
         void set_deferred_abort(bool deferred_abort)
         { deferred_abort_ = deferred_abort; }
         bool deferred_abort() const { return deferred_abort_; }
+
+        void print(std::ostream& os) const;
     private:
 
         inline int pa_range_default() const

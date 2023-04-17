@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2020 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2021 Codership Oy <info@codership.com>
 //
 
 
@@ -399,7 +399,7 @@ extern "C" void* receiver_thd(void* arg)
     conf.set(galera::ist::Receiver::RECV_ADDR, rargs->listen_addr_);
     ISTHandler isth;
     galera::ist::Receiver receiver(conf, rargs->gcache_, slave_pool,
-                                   isth, 0);
+                                   isth, 0, NULL);
 
     // Prepare starts IST receiver thread
     rargs->listen_addr_ = receiver.prepare(rargs->first_, rargs->last_,
@@ -549,14 +549,15 @@ static void test_ist_common(int const version)
     std::string const gcache_sender_file("ist_sender.cache");
     conf_sender.set("gcache.name", gcache_sender_file);
     conf_sender.set("gcache.size", "1M");
-    gcache::GCache* gcache_sender = new gcache::GCache(conf_sender, dir);
+    gcache::GCache* gcache_sender = new gcache::GCache(NULL, conf_sender, dir);
 
     gu::Config conf_receiver;
     galera::ReplicatorSMM::InitConfig(conf_receiver, NULL, NULL);
     std::string const gcache_receiver_file("ist_receiver.cache");
     conf_receiver.set("gcache.name", gcache_receiver_file);
     conf_receiver.set("gcache.size", "1M");
-    gcache::GCache* gcache_receiver = new gcache::GCache(conf_receiver, dir);
+    gcache::GCache* gcache_receiver = new gcache::GCache(NULL, conf_receiver,
+                                                         dir);
 
     std::string receiver_addr("tcp://127.0.0.1:0");
     wsrep_uuid_t uuid;

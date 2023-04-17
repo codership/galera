@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2021 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -19,6 +19,7 @@
 #include <gu_uuid.hpp>
 #include <gu_gtid.hpp>
 #include <gu_status.hpp>
+#include <gu_progress.hpp>
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -58,6 +59,7 @@ typedef struct gcs_conn gcs_conn_t;
  */
 extern gcs_conn_t*
 gcs_create  (gu_config_t* conf, gcache_t* cache,
+             gu::Progress<gcs_seqno_t>::Callback* progress_cb,
              const char* node_name, const char* inc_addr,
              int repl_proto_ver, int appl_proto_ver);
 

@@ -6,6 +6,7 @@
 
 #include <map>
 #include <stdexcept>
+#include <iostream> // std::cerr
 
 static gu::Config conf;
 

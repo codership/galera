@@ -41,6 +41,7 @@ Config::Config (int argc, char* argv[])
       options_ (),
       log_     (),
       cfg_     (),
+      workdir_ (),
       exit_    (false)
 {
     po::options_description other ("Other options");
@@ -60,6 +61,8 @@ Config::Config (int argc, char* argv[])
         ("donor",    po::value<std::string>(&donor_),   "SST donor name")
         ("options,o",po::value<std::string>(&options_), "GCS/GCOMM option list")
         ("log,l",    po::value<std::string>(&log_),     "Log file")
+        ("workdir,w",po::value<std::string>(&workdir_),
+         "Daemon working directory")
         ;
 
     po::options_description cfg_opt;
@@ -136,10 +139,15 @@ Config::Config (int argc, char* argv[])
     strip_quotes(donor_);
     strip_quotes(options_);
     strip_quotes(log_);
+    strip_quotes(workdir_);
     strip_quotes(cfg_);
 
     if (options_.length() > 0) options_ += "; ";
-    options_ += "gcs.fc_limit=9999999; gcs.fc_factor=1.0; gcs.fc_master_slave=yes";
+    options_ += "gcs.fc_limit=9999999; gcs.fc_factor=1.0; gcs.fc_single_primary=yes";
+    if (!workdir_.empty())
+    {
+        options_ += " base_dir=" + workdir_ + ";";
+    }
 
     // this block must be the very last.
     gu_conf_self_tstamp_on();
@@ -167,6 +175,7 @@ std::ostream& operator << (std::ostream& os, const Config& c)
        << "\n\tdonor:   " << c.donor()
        << "\n\toptions: " << c.options()
        << "\n\tcfg:     " << c.cfg()
+       << "\n\tworkdir: " << c.workdir()
        << "\n\tlog:     " << c.log();
     return os;
 }

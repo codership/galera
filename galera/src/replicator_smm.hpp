@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2020 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2021 Codership Oy <info@codership.com>
 //
 
 //! @file replicator_smm.hpp
@@ -11,6 +11,7 @@
 #define GALERA_REPLICATOR_SMM_HPP
 
 #include "replicator.hpp"
+#include "progress_callback.hpp"
 
 #include "gu_init.h"
 #include "GCache.hpp"
@@ -539,6 +540,12 @@ namespace galera
                         mutex.lock();
                     }
                 }
+                else
+                {
+                    mutex.unlock();
+                    GU_DBUG_SYNC_WAIT("local_monitor_enter_sync");
+                    mutex.lock();
+                }
             }
 #endif //GU_DBUG_ON
 
@@ -983,13 +990,16 @@ namespace galera
         bool          sst_received_;
 
         // services
-        gcache::GCache gcache_;
-        GCS_IMPL       gcs_;
-        ServiceThd     service_thd_;
+        ProgressCallback<int64_t> gcache_progress_cb_;
+        gcache::GCache   gcache_;
+        ProgressCallback<gcs_seqno_t> joined_progress_cb_;
+        GCS_IMPL         gcs_;
+        ServiceThd       service_thd_;
 
         // action sources
         TrxHandleSlave::Pool slave_pool_;
         ActionSource*        as_;
+        ProgressCallback<wsrep_seqno_t>ist_progress_cb_;
         ist::Receiver        ist_receiver_;
         ist::AsyncSenderMap  ist_senders_;
 

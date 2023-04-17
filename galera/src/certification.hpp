@@ -207,7 +207,7 @@ namespace galera
                     // NBO certification depends seqno is set to
                     // WSREP_SEQNO_UNDEFINED. Therefore purge should always
                     // be done for TOI write sets.
-                    if (trx->depends_seqno() >= 0 || trx->is_toi() == true)
+                    if (trx->is_dummy() == false || trx->is_toi() == true)
                     {
                         cert_.purge_for_trx(trx);
                     }

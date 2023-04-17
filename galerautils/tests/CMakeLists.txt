@@ -33,6 +33,8 @@ add_executable(gu_tests
 target_compile_options(gu_tests
   PRIVATE
   -Wno-unused-parameter
+  -Wno-declaration-after-statement
+  -Wno-vla
   )
 
 target_link_libraries(gu_tests galerautils ${GALERA_UNIT_TEST_LIBS})
@@ -56,6 +58,7 @@ add_executable(gu_tests++
   gu_mem_pool_test.cpp
   gu_alloc_test.cpp
   gu_rset_test.cpp
+  gu_utils_test++.cpp
   gu_string_utils_test.cpp
   gu_uri_test.cpp
   gu_config_test.cpp
@@ -66,12 +69,13 @@ add_executable(gu_tests++
   gu_thread_test.cpp
   gu_asio_test.cpp
   gu_deqmap_test.cpp
+  gu_progress_test.cpp
   gu_tests++.cpp
   )
 
 target_compile_definitions(gu_tests++
   PRIVATE
-  -DGU_ASIO_TEST_CERT_DIR="${CMAKE_SOURCE_DIR}/tests/conf")
+  -DGU_ASIO_TEST_CERT_DIR="${PROJECT_SOURCE_DIR}/tests/conf")
 
 # TODO: These should be eventually fixed.
 target_compile_options(gu_tests++
@@ -122,7 +126,9 @@ add_executable(avalanche avalanche.c)
 target_compile_options(avalanche
   PRIVATE
   -Wno-conversion
-  -Wno-unused-parameter)
+  -Wno-unused-parameter
+  -Wno-declaration-after-statement
+  -Wno-vla)
 
 target_link_libraries(avalanche galerautils)
 
@@ -136,4 +142,6 @@ target_link_libraries(gu_to_test galerautils)
 
 target_compile_options(gu_to_test
   PRIVATE
-  -Wno-conversion)
+  -Wno-conversion
+  -Wno-declaration-after-statement
+  -Wno-vla)

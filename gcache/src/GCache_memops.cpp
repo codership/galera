@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2021 Codership Oy <info@codership.com>
  */
 
 #include "GCache.hpp"
@@ -29,7 +29,7 @@ namespace gcache
 #ifndef NDEBUG
         seqno_t const begin(params.debug() ?
                             (seqno2ptr.empty() ?
-                             seqno2ptr.index_begin() : SEQNO_NONE) : SEQNO_NONE);
+                             SEQNO_NONE : seqno2ptr.index_begin()) : SEQNO_NONE);
         if (params.debug())
         {
             assert(begin > 0);
@@ -181,13 +181,6 @@ namespace gcache
         }
         rb.assert_size_free();
 
-#ifndef NDEBUG
-        if (params.debug())
-        {
-            log_info << "GCache::free_common(): seqno_released: "
-                     << seqno_released << " -> " << new_released;
-        }
-#endif
         seqno_released = new_released;
     }
 
@@ -201,8 +194,16 @@ namespace gcache
 
 #ifndef NDEBUG
             if (params.debug()) { log_info << "GCache::free() " << bh; }
+            seqno_t const old_sr(seqno_released);
 #endif
             free_common (bh);
+#ifndef NDEBUG
+            if (params.debug())
+            {
+                log_info << "GCache::free() seqno_released: "
+                         << old_sr << " -> " << seqno_released;
+            }
+#endif
         }
         else {
             log_warn << "Attempt to free a null pointer";

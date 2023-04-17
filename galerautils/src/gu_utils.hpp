@@ -66,7 +66,11 @@ from_string(const std::string& s,
 
     try
     {
-        if ((iss >> f >> ret).fail()) throw NotFound();
+        iss >> f >> ret;
+        if (iss.fail() || not iss.eof())
+        {
+            throw NotFound();
+        }
     }
     catch (gu::Exception& e)
     {
@@ -93,7 +97,11 @@ from_string<void*>(const std::string& s,
     std::istringstream iss(s);
     void*              ret;
 
-    if ((iss >> std::hex >> ret).fail()) throw NotFound();
+    iss >> std::hex >> ret;
+    if (iss.fail() || not iss.eof())
+    {
+        throw NotFound();
+    }
 
     return ret;
 }

@@ -10,10 +10,8 @@ macro(CHECK_ASIO_VERSION)
 #define XSTR(x) STR(x)
 #define STR(x) #x
 #pragma message \"Asio version: \" XSTR(ASIO_VERSION)
-#if ASIO_VERSION < 101008
+#if ASIO_VERSION < 102201
 #error Included asio version is too old
-#elif ASIO_VERSION >= 101100
-#error Included asio version is too new
 #endif
 
 int main()
@@ -39,7 +37,7 @@ endif()
 
 if(NOT ASIO_VERSION_OK)
   message(STATUS "Using bundled asio")
-  include_directories(SYSTEM ${CMAKE_SOURCE_DIR}/asio)
+  include_directories(SYSTEM ${PROJECT_SOURCE_DIR}/asio)
 endif()
 
 add_definitions(-DHAVE_ASIO_HPP)

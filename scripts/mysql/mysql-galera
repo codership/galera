@@ -457,7 +457,7 @@ local DUMP_OPTIONS=" --skip-opt --compact --quick --order-by-primary \
 DB=${DB:-"--all-databases"}
 #set -x
 mysqldump $DUMP_OPTIONS $ROOT_USER $ROOT_PSWD --socket $MYSQL_SOCKET  \
-          $IGNORE_TABLES $DB
+          $IGNORE_TABLES $DB | grep -v AUTO_INCREMENT=
 #set +x
 }
 
@@ -501,7 +501,7 @@ WS_LEVEL=""
 # in 5.6 the following tables are non-deterministic
 IGNORE_TABLES=\
 "--ignore-table=mysql.innodb_table_stats --ignore-table=mysql.innodb_index_stats"
-
+IGNORE_TABLES+=" --ignore-table=mysql.plugin"
 # to use innodb plugin or not
 PLUGIN_OPTS=""
 

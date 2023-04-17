@@ -12,6 +12,7 @@
 #include "gu_macros.h"
 #include <algorithm>
 #include <set>
+#include <iostream> // std::cerr
 
 #include <boost/bind.hpp>
 

@@ -1,9 +1,10 @@
 //
-// Copyright (C) 2010-2017 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2021 Codership Oy <info@codership.com>
 //
 
 #include "key_data.hpp"
 #include "gu_serialize.hpp"
+#include "gu_asio.hpp" //  // gu::init_allowlist_service_v1()
 
 #if defined(GALERA_MULTIMASTER)
 #include "replicator_smm.hpp"
@@ -13,6 +14,8 @@
 #endif
 
 #include "wsrep_params.hpp"
+#include "gu_event_service.hpp"
+#include "wsrep_config_service.h"
 
 #include <cassert>
 
@@ -834,6 +837,9 @@ wsrep_status_t galera_release(wsrep_t*            gh,
     assert(gh != 0);
     assert(gh->ctx != 0);
 
+    // A trx object was not created for this handle
+    if (not ws_handle->opaque) return WSREP_OK;
+
     REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
     TrxHandleMaster* txp(get_local_trx(repl, ws_handle, false));
 
@@ -1634,4 +1640,140 @@ int wsrep_loader(wsrep_t *hptr)
     }
 
     return WSREP_OK;
+}
+
+extern "C"
+int wsrep_init_allowlist_service_v1(wsrep_allowlist_service_v1_t *allowlist_service)
+{
+    return gu::init_allowlist_service_v1(allowlist_service);
+}
+
+extern "C" void wsrep_deinit_allowlist_service_v1()
+{
+    gu::deinit_allowlist_service_v1();
+}
+
+extern "C"
+int wsrep_init_event_service_v1(wsrep_event_service_v1_t *event_service)
+{
+    return gu::EventService::init_v1(event_service);
+}
+
+extern "C" void wsrep_deinit_event_service_v1()
+{
+    gu::EventService::deinit_v1();
+}
+
+static int map_parameter_flags(int flags)
+{
+    int ret = 0;
+    if (flags & gu::Config::Flag::deprecated)
+      ret |= WSREP_PARAM_DEPRECATED;
+    if (flags & gu::Config::Flag::read_only)
+      ret |= WSREP_PARAM_READONLY;
+    if (flags & gu::Config::Flag::type_bool)
+      ret |= WSREP_PARAM_TYPE_BOOL;
+    if (flags & gu::Config::Flag::type_integer)
+      ret |= WSREP_PARAM_TYPE_INTEGER;
+    if (flags & gu::Config::Flag::type_double)
+      ret |= WSREP_PARAM_TYPE_DOUBLE;
+    if (flags & gu::Config::Flag::type_duration)
+      ret |= WSREP_PARAM_TYPE_DOUBLE;
+    return ret;
+}
+
+static int wsrep_parameter_init(wsrep_parameter& wsrep_param,
+                                const std::string& key,
+                                const gu::Config::Parameter& param)
+{
+    wsrep_param.flags = map_parameter_flags(param.flags());
+    wsrep_param.name  = key.c_str();
+    const char* ret = "";
+    switch (param.flags() & gu::Config::Flag::type_mask)
+    {
+    case gu::Config::Flag::type_bool:
+        ret = gu_str2bool(param.value().c_str(), &wsrep_param.value.as_bool);
+        break;
+    case gu::Config::Flag::type_integer:
+    {
+        long long tmp;
+        ret = gu_str2ll(param.value().c_str(), &tmp);
+        wsrep_param.value.as_integer = tmp;
+        break;
+    }
+    case gu::Config::Flag::type_double:
+        ret = gu_str2dbl(param.value().c_str(), &wsrep_param.value.as_double);
+        break;
+    case gu::Config::Flag::type_duration:
+    {
+        try
+        {
+            // durations are mapped to doubles
+            wsrep_param.value.as_double
+                = to_double(gu::datetime::Period(param.value()));
+        }
+        catch (...)
+        {
+            assert(0);
+            return 1;
+        }
+        break;
+    }
+    default:
+        assert((param.flags() & gu::Config::Flag::type_mask) == 0);
+        wsrep_param.value.as_string = param.value().c_str();
+    }
+
+    if (*ret != '\0')
+    {
+        return 1;
+    }
+
+    return 0;
+}
+
+static wsrep_status_t get_parameters(wsrep_t* gh,
+                                     wsrep_get_parameters_cb callback,
+                                     void* context)
+{
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+    const gu::Config& config(repl->params());
+    for (auto &i : config)
+    {
+        const std::string& key(i.first);
+        const gu::Config::Parameter& param(i.second);
+        if (!param.is_hidden())
+        {
+            wsrep_parameter arg;
+            if (wsrep_parameter_init(arg, key, param) ||
+                (callback(&arg, context) != WSREP_OK))
+            {
+                log_error << "Failed to initialize parameter '" << key
+                          << "', value " << param.value()
+                          << " , flags (" << gu::Config::Flag::to_string(param.flags())
+                          << ")";
+                return WSREP_FATAL;
+            }
+        }
+    }
+
+    return WSREP_OK;
+}
+
+extern "C"
+int wsrep_init_config_service_v1(wsrep_config_service_v1_t *config_service)
+{
+    config_service->get_parameters = get_parameters;
+    // Deprecation checks will be done by application which uses
+    // the service.
+    gu::Config::disable_deprecation_check();
+    return WSREP_OK;
+}
+
+extern "C"
+void wsrep_deinit_config_service_v1()
+{
+    gu::Config::enable_deprecation_check();
 }

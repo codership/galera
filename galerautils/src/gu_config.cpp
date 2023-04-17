@@ -102,6 +102,9 @@ gu::Config::parse (const std::string& param_list)
 
 gu::Config::Config() : params_() {}
 
+std::function<void(const std::string&, const gu::Config::Parameter&)>
+    gu::Config::deprecation_check_func_ = check_deprecated;
+
 void
 gu::Config::set_longlong (const std::string& key, long long val)
 {
@@ -153,6 +156,26 @@ gu::Config::check_conversion (const char* str,
     {
         gu_throw_error(EINVAL) << "Invalid value '" << str << "' for " << type
                                << " type.";
+    }
+}
+
+void gu::Config::enable_deprecation_check()
+{
+    deprecation_check_func_ = check_deprecated;
+}
+
+void gu::Config::disable_deprecation_check()
+{
+    deprecation_check_func_ = nullptr;
+}
+
+void gu::Config::check_deprecated(const std::string& key,
+                                  const Parameter& param)
+{
+    if (param.is_deprecated())
+    {
+        log_warn << "Parameter '" << key
+                 << "' is deprecated and will be removed in future versions";
     }
 }
 
@@ -294,7 +317,8 @@ gu_config_is_set (gu_config_t* cnf, const char* key)
 }
 
 int
-gu_config_add (gu_config_t* cnf, const char* key, const char* const val)
+gu_config_add (gu_config_t* cnf, const char* key,
+               const char* const val, int flags)
 {
     if (config_check_set_args (cnf, key, __FUNCTION__)) return -EINVAL;
 
@@ -303,9 +327,9 @@ gu_config_add (gu_config_t* cnf, const char* key, const char* const val)
     try
     {
         if (val != NULL)
-            conf->add (key, val);
+            conf->add (key, val, flags);
         else
-            conf->add (key);
+            conf->add (key, flags);
 
         return 0;
     }

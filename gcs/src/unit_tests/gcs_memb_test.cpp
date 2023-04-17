@@ -116,7 +116,9 @@ Suite *gcs_memb_suite(void)
     Suite *suite = suite_create("GCS membership changes");
     TCase *tcase = tcase_create("gcs_memb");
 
-    suite_add_tcase (suite, tcase);
-    tcase_add_test  (tcase, gcs_memb_test_465);
+    suite_add_tcase  (suite, tcase);
+    tcase_add_test   (tcase, gcs_memb_test_465);
+    tcase_set_timeout(tcase, 30);
+
     return suite;
 }

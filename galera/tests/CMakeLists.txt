@@ -13,12 +13,13 @@ add_executable(galera_check
   ist_check.cpp
   saved_state_check.cpp
   defaults_check.cpp
+  progress_check.cpp
   )
 
 target_include_directories(galera_check
   PRIVATE
-  ${CMAKE_SOURCE_DIR}/galera/src
-  ${CMAKE_SOURCE_DIR}/wsrep/src
+  ${PROJECT_SOURCE_DIR}/galera/src
+  ${PROJECT_SOURCE_DIR}/wsrep/src
   )
 
 # TODO: Fix.

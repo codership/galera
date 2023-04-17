@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2015-2021 Codership Oy <info@codership.com>
  */
 
 #include "gcs_test_utils.hpp"
@@ -46,7 +46,7 @@ GcsGroup::common_ctor(const char*  node_name,
     assert(false == initialized_);
 
     conf_.set("gcache.name", std::string(node_name) + ".cache");
-    gcache_ = new gcache::GCache(conf_, ".");
+    gcache_ = new gcache::GCache(NULL, conf_, ".");
 
     int const err(gcs_group_init(&group_, &conf_,
                                  reinterpret_cast<gcache_t*>(gcache_),

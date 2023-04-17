@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2011-2021 Codership Oy <info@codership.com>
  */
 
 #include "garb_gcs.hpp"
@@ -17,7 +17,7 @@ Gcs::Gcs (gu::Config&        gconf,
 :
     closed_ (true),
     gcs_ (gcs_create (reinterpret_cast<gu_config_t*>(&gconf),
-                      NULL,
+                      NULL, NULL,
                       name.c_str(),
                       "",
                       REPL_PROTO_VER, APPL_PROTO_VER))

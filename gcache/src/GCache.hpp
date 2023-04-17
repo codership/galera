@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2021 Codership Oy <info@codership.com>
  */
 
 #ifndef __GCACHE_H__
@@ -39,7 +39,9 @@ namespace gcache
          * Creates a new gcache file in "gcache.name" conf parameter or
          * in data_dir. If file already exists, it gets overwritten.
          */
-        GCache (gu::Config& cfg, const std::string& data_dir);
+        GCache (ProgressCallback*  pcb,
+                gu::Config&        cfg,
+                const std::string& data_dir);
 
         virtual ~GCache();
 

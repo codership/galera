@@ -383,6 +383,29 @@ START_TEST(test_tcp_acceptor_listen)
 }
 END_TEST
 
+START_TEST(test_tcp_acceptor_listen_already_bound)
+{
+    gu::AsioIoService io_service;
+    gu::URI uri("tcp://127.0.0.1:0");
+    auto acceptor_handler(std::make_shared<MockAcceptorHandler>());
+    auto acceptor(io_service.make_acceptor(uri));
+    acceptor->listen(uri);
+    auto listen_addr(acceptor->listen_addr());
+    ck_assert(listen_addr.find("tcp://127.0.0.1") != std::string::npos);
+
+    auto acceptor2(io_service.make_acceptor(acceptor->listen_addr()));
+    try
+    {
+        acceptor2->listen(acceptor->listen_addr());
+        ck_abort_msg("Exception not thrown for address already in use");
+    }
+    catch (const gu::Exception& e)
+    {
+        ck_assert(e.get_errno() == EADDRINUSE);
+    }
+}
+END_TEST
+
 START_TEST(test_tcp_acceptor_receive_buffer_size_unopened)
 {
     gu::AsioIoService io_service;
@@ -1174,8 +1197,13 @@ START_TEST(test_ssl_certificate_chain)
     client_io_service.run_one(); // Process async connect
     server_io_service.run_one(); // Accept
     client_io_service.run_one(); // Client hello
-    server_io_service.run_one(); // Server handles
-    ck_assert(acceptor_handler->accepted_socket() != 0);
+    client_io_service.run_one(); // Client hello IO completion
+    // server_io_service.run_one(); // Server handles
+    while (acceptor_handler->accepted_socket() != 0)
+    {
+        client_io_service.poll_one();
+        server_io_service.poll_one();
+    }
 }
 END_TEST
 
@@ -1201,7 +1229,13 @@ START_TEST(test_ssl_invalid_cert)
     client_io_service.run_one(); // Process async connect
     server_io_service.run_one(); // Accept
     client_io_service.run_one(); // Client hello
-    server_io_service.run_one(); // Server handles
+    client_io_service.run_one(); // Client hello IO completion
+    // server_io_service.run_one(); // Server handles
+    while (not handler->last_error_code())
+    {
+        client_io_service.poll_one();
+        server_io_service.poll_one();
+    }
     ck_assert(not acceptor_handler->accepted_socket());
     ck_assert_msg(handler->last_error_code().message().find(
                       "unable to get local issuer certificate") !=
@@ -1348,6 +1382,14 @@ struct TlsServiceClientTestFixture
             server_io_service.run_one();
         }
     }
+
+    void run_client_while(const std::function<bool()>& pred)
+    {
+        while (pred())
+        {
+            client_io_service.run_one();
+        }
+    }
 };
 
 START_TEST(test_client_handshake_want_read)
@@ -1362,10 +1404,8 @@ START_TEST(test_client_handshake_want_read)
         cbs,
         f.acceptor_handler->accepted_handler());
     f.server_io_service.run_one();
-    while (f.client_engine->count_client_handshake_called < 2)
-    {
-        f.client_io_service.run_one();
-    }
+    f.run_client_while(
+        [&f] { return f.client_engine->count_client_handshake_called < 2; });
 }
 END_TEST
 
@@ -1373,10 +1413,8 @@ START_TEST(test_client_handshake_want_write)
 {
     TlsServiceClientTestFixture f;
     f.client_engine->next_result = gu::AsioStreamEngine::want_write;
-    while (f.client_engine->count_client_handshake_called < 2)
-    {
-        f.client_io_service.run_one();
-    }
+    f.run_client_while(
+        [&f] { return f.client_engine->count_client_handshake_called < 2; });
 }
 END_TEST
 
@@ -1385,6 +1423,7 @@ START_TEST(test_client_handshake_eof)
     TlsServiceClientTestFixture f;
     f.client_engine->next_result = gu::AsioStreamEngine::eof;
     f.client_io_service.run_one();
+    f.client_io_service.run_one(); // IO completion
     ck_assert(f.socket_handler->connect_handler_called());
     ck_assert(f.socket_handler->last_error_code().is_eof());
     ck_assert(f.client_engine->count_client_handshake_called == 1);
@@ -1398,6 +1437,7 @@ START_TEST(test_client_handshake_eof2)
     // call. The EOF will now returned in client handshake handler.
     f.client_engine->next_result = gu::AsioStreamEngine::want_write;
     f.client_io_service.run_one();
+    f.client_io_service.run_one(); // IO completion
     f.client_engine->next_result = gu::AsioStreamEngine::eof;
     f.client_io_service.run_one();
     ck_assert(f.socket_handler->connect_handler_called());
@@ -1412,6 +1452,7 @@ START_TEST(test_client_handshake_error)
     f.client_engine->next_result = gu::AsioStreamEngine::error;
     f.client_engine->next_error = EPIPE;
     f.client_io_service.run_one();
+    f.client_io_service.run_one(); // IO completion
     ck_assert(f.socket_handler->connect_handler_called());
     ck_assert(f.socket_handler->last_error_code().value() == EPIPE);
     ck_assert(f.client_engine->count_client_handshake_called == 1);
@@ -1425,6 +1466,7 @@ START_TEST(test_client_handshake_error2)
     // call. The error will now returned in client handshake handler.
     f.client_engine->next_result = gu::AsioStreamEngine::want_write;
     f.client_io_service.run_one();
+    f.client_io_service.run_one(); // IO completion
     f.client_engine->next_result = gu::AsioStreamEngine::error;
     f.client_engine->next_error = EPIPE;
     f.client_io_service.run_one();
@@ -1458,9 +1500,32 @@ struct TlsServiceServerTestFixture
         acceptor->async_accept(acceptor_handler, server_engine);
         socket->async_connect(acceptor->listen_addr(), socket_handler);
         client_io_service.run_one();
+        client_io_service.run_one(); // IO completion
         // client_io_service runs out of work. Reset to make
         // followig calls succeed
         client_io_service.reset();
+    }
+
+    void complete_server_handshake()
+    {
+        server_io_service.run_one();
+        server_io_service.run_one();
+    }
+
+    void run_server_while(const std::function<bool()>& pred)
+    {
+        while (pred())
+        {
+            server_io_service.run_one();
+        }
+    }
+
+    void run_client_while(const std::function<bool()>& pred)
+    {
+        while (pred())
+        {
+            client_io_service.run_one();
+        }
     }
 };
 
@@ -1468,24 +1533,20 @@ START_TEST(test_server_handshake_want_read)
 {
     TlsServiceServerTestFixture f;
     f.server_engine->next_result = gu::AsioStreamEngine::want_read;
-    while (f.server_engine->count_server_handshake_called < 1)
-    {
-        f.server_io_service.run_one();
-    }
+    f.run_server_while(
+        [&f]() { return f.server_engine->count_server_handshake_called < 1; });
     ck_assert(f.server_engine->count_server_handshake_called == 1);
+
     // Write to connected socket to make accepted socket readable
     std::array<gu::AsioConstBuffer, 2> cbs;
     cbs[0] = gu::AsioConstBuffer("clie", 4);
     cbs[1] = gu::AsioConstBuffer();
     f.socket->async_write(cbs, f.socket_handler);
-    while (f.socket_handler->bytes_written() < 4)
-    {
-        f.client_io_service.run_one();
-    }
-    while (f.server_engine->count_server_handshake_called < 2)
-    {
-        f.server_io_service.run_one();
-    }
+
+    f.run_client_while(
+        [&f]() { return f.socket_handler->bytes_written() < 4; });
+    f.run_server_while(
+        [&f]() { return f.server_engine->count_server_handshake_called < 2; });
 }
 END_TEST
 
@@ -1493,10 +1554,8 @@ START_TEST(test_server_handshake_want_write)
 {
     TlsServiceServerTestFixture f;
     f.server_engine->next_result = gu::AsioStreamEngine::want_write;
-    while (f.server_engine->count_server_handshake_called < 2)
-    {
-        f.server_io_service.run_one();
-    }
+    f.run_server_while(
+        [&f]() { return f.server_engine->count_server_handshake_called < 2; });
 }
 END_TEST
 
@@ -1518,7 +1577,7 @@ START_TEST(test_server_handshake_eof2)
     // First op causes accept handler to restart server handshake call.
     // The EOF will now handled in server handshake handler.
     f.server_engine->next_result = gu::AsioStreamEngine::want_write;
-    f.server_io_service.run_one();
+    f.complete_server_handshake();
     f.server_engine->next_result = gu::AsioStreamEngine::eof;
     f.server_io_service.run_one();
     // Acceptor silently discards accepted socket which fails during
@@ -1533,7 +1592,7 @@ START_TEST(test_server_handshake_error)
     TlsServiceServerTestFixture f;
     f.server_engine->next_result = gu::AsioStreamEngine::error;
     f.server_engine->next_error = EPIPE;
-    f.server_io_service.run_one();
+    f.complete_server_handshake();
     // Acceptor silently discards accepted socket which fails during
     // handshake and restarts async accept.
     ck_assert(f.acceptor_handler->accepted_socket() == 0);
@@ -1547,7 +1606,7 @@ START_TEST(test_server_handshake_error2)
     // First op causes accept handler to restart server handshake call.
     // The error will now handled in server handshake handler.
     f.server_engine->next_result = gu::AsioStreamEngine::want_write;
-    f.server_io_service.run_one();
+    f.complete_server_handshake();
     f.server_engine->next_result = gu::AsioStreamEngine::error;
     f.server_engine->next_error = EPIPE;
     f.server_io_service.run_one();
@@ -1561,7 +1620,7 @@ END_TEST
 START_TEST(test_read_want_read)
 {
     TlsServiceServerTestFixture f;
-    f.server_io_service.run_one();
+    f.complete_server_handshake();
     ck_assert(f.acceptor_handler->accepted_socket() != 0);
 
     std::array<gu::AsioConstBuffer, 2> cbs;
@@ -1574,7 +1633,8 @@ START_TEST(test_read_want_read)
     f.acceptor_handler->accepted_socket()->async_read(
         gu::AsioMutableBuffer(buf.data(), buf.size()),
         f.acceptor_handler->accepted_handler());
-    f.server_io_service.run_one();
+
+    f.run_server_while([&f]() { return f.server_engine->count_read_called < 1; });
     ck_assert(f.server_engine->count_read_called == 1);
     ck_assert(f.acceptor_handler->accepted_handler()->bytes_read() == 4);
     // Write socket to make accepted socket readable, but do not start
@@ -1583,8 +1643,10 @@ START_TEST(test_read_want_read)
     f.client_io_service.reset();
     f.client_io_service.run_one();
     f.server_engine->next_result = gu::AsioStreamEngine::success;
-    f.server_io_service.run_one();
-    ck_assert(f.server_engine->count_read_called == 2);
+    const auto expect_count_read_called = f.server_engine->count_read_called + 1;
+    f.run_server_while(
+		       [&f, expect_count_read_called]() { return f.server_engine->count_read_called < expect_count_read_called; });
+    ck_assert(f.server_engine->count_read_called == expect_count_read_called);
     // Extra read should just call read() but the communication should
     // be internal, the handler should not see received data.
     ck_assert(f.acceptor_handler->accepted_handler()->bytes_read() == 4);
@@ -1594,7 +1656,7 @@ END_TEST
 START_TEST(test_read_want_write)
 {
     TlsServiceServerTestFixture f;
-    f.server_io_service.run_one();
+    f.complete_server_handshake();
     ck_assert(f.acceptor_handler->accepted_socket() != 0);
 
     std::array<gu::AsioConstBuffer, 2> cbs;
@@ -1607,37 +1669,43 @@ START_TEST(test_read_want_write)
     f.acceptor_handler->accepted_socket()->async_read(
         gu::AsioMutableBuffer(buf.data(), buf.size()),
         f.acceptor_handler->accepted_handler());
-    f.server_io_service.run_one();
-    ck_assert(f.server_engine->count_read_called == 1);
+    const auto expect_count_read_called = f.server_engine->count_read_called + 1;
+    f.run_server_while(
+		       [&f, expect_count_read_called]() { return f.server_engine->count_read_called < expect_count_read_called; });
+
+    ck_assert(f.server_engine->count_read_called == expect_count_read_called);
     ck_assert(f.acceptor_handler->accepted_handler()->bytes_read() == 4);
-    f.server_io_service.run_one();
+    f.run_server_while(
+		       [&f, expect_count_read_called]() { return f.server_engine->count_read_called < expect_count_read_called + 1; });
     // The result want_write means that the previous operation
     // (in this case read) must be called once again once the
     // socket becomes writable.
-    ck_assert(f.server_engine->count_read_called == 2);
+    ck_assert(f.server_engine->count_read_called == expect_count_read_called + 1);
 }
 END_TEST
 
 START_TEST(test_read_eof)
 {
     TlsServiceServerTestFixture f;
-    f.server_io_service.run_one();
+    f.complete_server_handshake();
     ck_assert(f.acceptor_handler->accepted_socket() != 0);
     f.socket->close();
     std::array<char, 1> buf;
     f.acceptor_handler->accepted_socket()->async_read(
         gu::AsioMutableBuffer(buf.data(), buf.size()),
         f.acceptor_handler->accepted_handler());
-    f.server_io_service.run_one();
+    f.run_server_while(
+        [&f]() { return f.server_engine->count_read_called < 1; });
     ck_assert(f.server_engine->count_read_called == 1);
-    ck_assert(f.acceptor_handler->accepted_handler()->last_error_code().is_eof());
+    ck_assert(
+        f.acceptor_handler->accepted_handler()->last_error_code().is_eof());
 }
 END_TEST
 
 START_TEST(test_read_error)
 {
     TlsServiceServerTestFixture f;
-    f.server_io_service.run_one();
+    f.complete_server_handshake();
     ck_assert(f.acceptor_handler->accepted_socket() != 0);
     // Socket close makes the socket readable, but we override
     // the return value with error.
@@ -1648,16 +1716,18 @@ START_TEST(test_read_error)
     f.acceptor_handler->accepted_socket()->async_read(
         gu::AsioMutableBuffer(buf.data(), buf.size()),
         f.acceptor_handler->accepted_handler());
-    f.server_io_service.run_one();
+    f.run_server_while(
+        [&f]() { return f.server_engine->count_read_called < 1; });
     ck_assert(f.server_engine->count_read_called == 1);
-    ck_assert(f.acceptor_handler->accepted_handler()->last_error_code().value() == EPIPE);
+    ck_assert(f.acceptor_handler->accepted_handler()->last_error_code().value()
+              == EPIPE);
 }
 END_TEST
 
 START_TEST(test_write_want_read)
 {
     TlsServiceServerTestFixture f;
-    f.server_io_service.run_one();
+    f.complete_server_handshake();
     ck_assert(f.acceptor_handler->accepted_socket() != 0);
 
     f.server_engine->next_result = gu::AsioStreamEngine::want_read;
@@ -1676,7 +1746,8 @@ START_TEST(test_write_want_read)
     ck_assert(f.socket_handler->bytes_written() == 4);
     // Now the server side socket should become readable and
     // the second call to write should happen.
-    f.server_io_service.run_one();
+    f.run_server_while(
+        [&]() { return f.server_engine->count_write_called < 2; });
     ck_assert(f.acceptor_handler->accepted_handler()->bytes_written() == 4);
     ck_assert(f.server_engine->count_write_called == 2);
 }
@@ -1685,7 +1756,7 @@ END_TEST
 START_TEST(test_write_want_write)
 {
     TlsServiceServerTestFixture f;
-    f.server_io_service.run_one();
+    f.complete_server_handshake();
     ck_assert(f.acceptor_handler->accepted_socket() != 0);
 
     f.server_engine->next_result = gu::AsioStreamEngine::want_write;
@@ -1699,7 +1770,8 @@ START_TEST(test_write_want_write)
     ck_assert(f.server_engine->count_write_called == 1);
     // Now the server side socket should remain writable and the
     // the second call to write should happen.
-    f.server_io_service.run_one();
+    f.run_server_while(
+        [&f]() { return f.server_engine->count_write_called < 2; });
     ck_assert(f.acceptor_handler->accepted_handler()->bytes_written() == 4);
     ck_assert(f.server_engine->count_write_called == 2);
 }
@@ -1708,7 +1780,7 @@ END_TEST
 START_TEST(test_write_eof)
 {
     TlsServiceServerTestFixture f;
-    f.server_io_service.run_one();
+    f.complete_server_handshake();
     ck_assert(f.acceptor_handler->accepted_socket() != 0);
 
     f.server_engine->next_result = gu::AsioStreamEngine::want_read;
@@ -1726,16 +1798,18 @@ START_TEST(test_write_eof)
     f.client_io_service.run_one();
     ck_assert(f.socket_handler->bytes_written() == 4);
     f.server_engine->next_result = gu::AsioStreamEngine::eof;
-    f.server_io_service.run_one();
+    f.run_server_while(
+        [&f] { return f.server_engine->count_write_called < 2; });
     ck_assert(f.server_engine->count_write_called == 2);
-    ck_assert(f.acceptor_handler->accepted_handler()->last_error_code().is_eof());
+    ck_assert(
+        f.acceptor_handler->accepted_handler()->last_error_code().is_eof());
 }
 END_TEST
 
 START_TEST(test_write_error)
 {
     TlsServiceServerTestFixture f;
-    f.server_io_service.run_one();
+    f.complete_server_handshake();
     ck_assert(f.acceptor_handler->accepted_socket() != 0);
 
     f.server_engine->next_result = gu::AsioStreamEngine::error;
@@ -1745,12 +1819,14 @@ START_TEST(test_write_error)
     cbs[1] = gu::AsioConstBuffer();
     f.acceptor_handler->accepted_socket()->async_write(
         cbs, f.acceptor_handler->accepted_handler());
-    f.server_io_service.run_one();
+    f.run_server_while(
+        [&f] { return f.server_engine->count_write_called < 1; });
     ck_assert(f.server_engine->count_write_called == 1);
     // Write will succeed before the error is injected, so there will be
     // some bytes written.
     ck_assert(f.acceptor_handler->accepted_handler()->bytes_written() == 4);
-    ck_assert(f.acceptor_handler->accepted_handler()->last_error_code().value() == EPIPE);
+    ck_assert(f.acceptor_handler->accepted_handler()->last_error_code().value()
+              == EPIPE);
 }
 END_TEST
 
@@ -1842,8 +1918,7 @@ START_TEST(test_datagram_connect_multicast_local_if)
 END_TEST
 
 void test_datagram_send_to_and_async_read_common(
-    gu::AsioIoService& io_service,
-    gu::AsioDatagramSocket& socket,
+    gu::AsioIoService& io_service, gu::AsioDatagramSocket& socket,
     const std::shared_ptr<MockDatagramSocketHandler>& handler)
 {
     gu::URI local_uri(socket.local_addr());
@@ -1861,7 +1936,8 @@ void test_datagram_send_to_and_async_read_common(
                                local_uri.get_port()));
 
     char read_buf[7];
-    socket.async_read(gu::AsioMutableBuffer(read_buf, sizeof(read_buf)), handler);
+    socket.async_read(gu::AsioMutableBuffer(read_buf, sizeof(read_buf)),
+                      handler);
     while (handler->bytes_read() != sizeof(read_buf))
     {
         io_service.run_one();
@@ -1951,9 +2027,10 @@ START_TEST(test_steady_timer)
     // 50msec for some reason.
     ck_assert(
         std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)
-        >= std::chrono::milliseconds(50),
+            >= std::chrono::milliseconds(50),
         "Timer duration less than 50 milliseconds %zu",
-        std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count());
+        std::chrono::duration_cast<std::chrono::milliseconds>(stop - start)
+            .count());
 #endif
 }
 END_TEST
@@ -2030,6 +2107,10 @@ Suite* gu_asio_suite()
 
     tc = tcase_create("test_tcp_acceptor_listen");
     tcase_add_test(tc, test_tcp_acceptor_listen);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_tcp_acceptor_listen_already_bound");
+    tcase_add_test(tc, test_tcp_acceptor_listen_already_bound);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_tcp_acceptor_receive_buffer_size_unopened");
@@ -2275,6 +2356,11 @@ Suite* gu_asio_suite()
     tcase_add_test(tc, test_datagram_open_connect);
     suite_add_tcase(s, tc);
 
+    tc = tcase_create("test_datagram_send_to_and_async_read");
+    tcase_add_test(tc, test_datagram_send_to_and_async_read);
+    suite_add_tcase(s, tc);
+
+#if defined(GALERA_ASIO_TEST_MULTICAST)
     tc = tcase_create("test_datagram_connect_multicast");
     tcase_add_test(tc, test_datagram_connect_multicast);
     suite_add_tcase(s, tc);
@@ -2283,22 +2369,19 @@ Suite* gu_asio_suite()
     tcase_add_test(tc, test_datagram_connect_multicast_local_if);
     suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_datagram_send_to_and_async_read");
-    tcase_add_test(tc, test_datagram_send_to_and_async_read);
-    suite_add_tcase(s, tc);
-
-#if defined(__FreeBSD__)
-    /* fails on FreeBSD with EADDRNOTAVAIL, disable temporarily */
-    (void)test_datagram_send_to_and_async_read_multicast;
-#else
     tc = tcase_create("test_datagram_send_to_and_async_read_multicast");
     tcase_add_test(tc, test_datagram_send_to_and_async_read_multicast);
     suite_add_tcase(s, tc);
-#endif /* FreeBSD */
 
     tc = tcase_create("test_datagram_write_multicast");
     tcase_add_test(tc, test_datagram_write_multicast);
     suite_add_tcase(s, tc);
+#else
+    (void)test_datagram_connect_multicast;
+    (void)test_datagram_connect_multicast_local_if;
+    (void)test_datagram_send_to_and_async_read_multicast;
+    (void)test_datagram_write_multicast;
+#endif /* GALERA_ASIO_TEST_MULTICAST */
 
     //
     // Steady timer

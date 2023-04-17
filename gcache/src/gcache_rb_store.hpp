@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2021 Codership Oy <info@codership.com>
  */
 
 /*! @file ring buffer storage class */
@@ -23,7 +23,8 @@ namespace gcache
     {
     public:
 
-        RingBuffer (const std::string& name,
+        RingBuffer (ProgressCallback*  pcb,
+                    const std::string& name,
                     size_t             size,
                     seqno2ptr_t&       seqno2ptr,
                     gu::UUID&          gid,
@@ -136,6 +137,8 @@ namespace gcache
         }
 #endif
 
+        void dump_map() const;
+
     private:
 
         static size_t const PREAMBLE_LEN = 1024;
@@ -148,6 +151,7 @@ namespace gcache
 
         static int    const DEBUG = 2; // debug flag
 
+        ProgressCallback*  pcb_;
         gu::FileDescriptor fd_;
         gu::MMap           mmap_;
         char*        const preamble_; // ASCII text preamble

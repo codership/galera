@@ -164,6 +164,7 @@ public:
 
     ~GCommConn()
     {
+        delete tp_;
         delete net_;
     }
 
