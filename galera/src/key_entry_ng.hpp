@@ -13,26 +13,23 @@ namespace galera
     {
     public:
         KeyEntryNG(const KeySet::KeyPart& key)
-            : refs_(),
+            : refs_{nullptr, nullptr, nullptr, nullptr},
 #ifndef NDEBUG
-              seqnos_(),
+              seqnos_{0, 0, 0, 0},
 #endif // NDEBUG
               key_(key)
         {
-            std::fill(&refs_[0],
-                      &refs_[KeySet::Key::TYPE_MAX],
-                      static_cast<TrxHandleSlave*>(NULL));
-#ifndef NDEBUG
-            std::fill(&seqnos_[0], &seqnos_[KeySet::Key::TYPE_MAX], 0);
-#endif // NDEBUG
         }
 
         KeyEntryNG(const KeyEntryNG& other)
-        : refs_(), key_(other.key_)
+            : refs_(other.refs_)
+            ,
+#ifndef NDEBUG
+            seqnos_(other.seqnos_)
+            ,
+#endif /* NDEBUG */
+            key_(other.key_)
         {
-            std::copy(&other.refs_[0],
-                      &other.refs_[KeySet::Key::TYPE_MAX],
-                      &refs_[0]);
         }
 
         const KeySet::KeyPart& key() const { return key_; }
@@ -40,6 +37,7 @@ namespace galera
         void ref(wsrep_key_type_t p, const KeySet::KeyPart& k,
                  TrxHandleSlave* trx)
         {
+            assert(p <=  KeySet::Key::TYPE_MAX);
             assert(0 == refs_[p] ||
                    refs_[p]->global_seqno() <= trx->global_seqno());
 
@@ -52,6 +50,7 @@ namespace galera
 
         void unref(wsrep_key_type_t p, const TrxHandleSlave* trx)
         {
+            assert(p <=  KeySet::Key::TYPE_MAX);
             assert(refs_[p] != NULL);
 
             if (refs_[p] == trx)
@@ -67,18 +66,24 @@ namespace galera
 
         bool referenced() const
         {
-            bool ret(refs_[0] != NULL);
-
-            for (int i(1); false == ret && i <= KeySet::Key::TYPE_MAX; ++i)
+            for (auto i : refs_)
             {
-                ret = (refs_[i] != NULL);
+                if (i != nullptr) return true;
             }
+            return false;
+        }
 
-            return ret;
+        void for_each_ref(const std::function<void(const TrxHandleSlave *)>& fn)
+        {
+            for (auto i : refs_)
+            {
+                fn(i);
+            }
         }
 
         const TrxHandleSlave* ref_trx(wsrep_key_type_t const p) const
         {
+            assert(p <=  KeySet::Key::TYPE_MAX);
             return refs_[p];
         }
 
@@ -89,9 +94,11 @@ namespace galera
 
         void swap(KeyEntryNG& other) throw()
         {
-            using std::swap;
-            gu::swap_array(refs_, other.refs_);
-            swap(key_,  other.key_);
+            std::swap(refs_, other.refs_);
+#ifndef NDEBUG
+            std::swap(seqnos_, other.seqnos_);
+#endif /* NDEBUG */
+            std::swap(key_,  other.key_);
         }
 
         KeyEntryNG& operator=(KeyEntryNG ke)
@@ -106,17 +113,12 @@ namespace galera
         }
 
     private:
-
-        TrxHandleSlave* refs_[KeySet::Key::TYPE_MAX + 1];
+        std::array<TrxHandleSlave*, KeySet::Key::TYPE_MAX + 1> refs_;
 #ifndef NDEBUG
-        wsrep_seqno_t seqnos_[KeySet::Key::TYPE_MAX + 1];
+        std::array<wsrep_seqno_t, KeySet::Key::TYPE_MAX + 1> seqnos_;
 #endif // NDEBUG
         KeySet::KeyPart key_;
 
-#ifndef NDEBUG
-        void assert_ref(KeySet::Key::Prefix, TrxHandleSlave*) const;
-        void assert_unref(KeySet::Key::Prefix, TrxHandleSlave*) const;
-#endif /* NDEBUG */
     };
 
     inline void swap(KeyEntryNG& a, KeyEntryNG& b) { a.swap(b); }
