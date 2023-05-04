@@ -73,7 +73,8 @@ namespace galera
             return false;
         }
 
-        void for_each_ref(const std::function<void(const TrxHandleSlave *)>& fn)
+        void
+        for_each_ref(const std::function<void(const TrxHandleSlave*)>& fn) const
         {
             for (auto i : refs_)
             {
