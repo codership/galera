@@ -466,8 +466,6 @@ namespace galera
                                          const TrxHandleSlavePtr&);
         wsrep_status_t cert_and_catch   (TrxHandleMaster*,
                                          const TrxHandleSlavePtr&);
-        wsrep_status_t cert_for_aborted (const TrxHandleSlavePtr&);
-
         // Enter apply monitor for local transaction. Return true
         // if apply monitor was grabbed.
         bool enter_apply_monitor_for_local(TrxHandleMaster&,

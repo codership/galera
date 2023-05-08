@@ -64,7 +64,6 @@ namespace galera
         TestResult append_trx(const TrxHandleSlavePtr&);
         /* Append dummy trx from cert index preload. */
         void append_dummy_preload(const TrxHandleSlavePtr&);
-        TestResult test(const TrxHandleSlavePtr&, bool store_keys);
         wsrep_seqno_t position() const { return position_; }
 
         /* this is for configuration change use */
@@ -146,9 +145,9 @@ namespace galera
         Certification(const Certification&);
         Certification& operator=(const Certification&);
 
-        TestResult test_no_lock(const TrxHandleSlavePtr&, bool store_keys);
-        TestResult do_test(const TrxHandleSlavePtr&, bool store_keys);
-        TestResult do_test_v3to5(TrxHandleSlave*, bool);
+        TestResult test(const TrxHandleSlavePtr&);
+        TestResult do_test(const TrxHandleSlavePtr&);
+        TestResult do_test_v3to5(TrxHandleSlave*);
         TestResult do_test_preordered(TrxHandleSlave*);
         TestResult do_test_nbo(const TrxHandleSlavePtr&);
         void purge_for_trx(TrxHandleSlave*);
@@ -217,10 +216,6 @@ namespace galera
                     if (trx->is_dummy() == false || trx->is_toi() == true)
                     {
                         cert_.purge_for_trx(trx);
-                    }
-                    else
-                    {
-                        log_info << "Purge skipped dummy: " << trx->is_dummy() << " toi " << trx->is_toi();
                     }
                 }
             }

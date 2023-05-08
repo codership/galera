@@ -770,35 +770,21 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster& trx,
 
     if (gu_unlikely(trx.state() == TrxHandle::S_MUST_ABORT))
     {
-        retval = cert_for_aborted(ts);
+        retval = WSREP_BF_ABORT;
 
-        if (retval != WSREP_BF_ABORT)
+        // If the transaction was committing, it must replay. Otherwise
+        // it was an intermediate fragment and we treat it as certification
+        // failure.
+        if (ts->flags() & TrxHandle::F_COMMIT)
         {
-            assert(trx.state() == TrxHandle::S_MUST_ABORT);
-            TX_SET_STATE(trx, TrxHandle::S_ABORTING);
-
-            pending_cert_queue_.push(ts);
-            cancel_monitors_for_local(*ts);
-
-            assert(ts->is_dummy());
-            assert(WSREP_OK != retval);
+            TX_SET_STATE(trx, TrxHandle::S_MUST_REPLAY);
         }
         else
         {
-            // If the transaction was committing, it must replay.
-            if (ts->flags() & TrxHandle::F_COMMIT)
-            {
-                TX_SET_STATE(trx, TrxHandle::S_MUST_REPLAY);
-            }
-            else
-            {
-                TX_SET_STATE(trx, TrxHandle::S_ABORTING);
-
-                pending_cert_queue_.push(ts);
-                cancel_monitors_for_local(*ts);
-
-                retval = WSREP_TRX_FAIL;
-            }
+            TX_SET_STATE(trx, TrxHandle::S_ABORTING);
+            pending_cert_queue_.push(ts);
+            cancel_monitors_for_local(*ts);
+            retval = WSREP_TRX_FAIL;
         }
     }
     else
@@ -992,7 +978,6 @@ wsrep_status_t galera::ReplicatorSMM::certify(TrxHandleMaster&  trx,
         switch(retval)
         {
         case WSREP_BF_ABORT:
-            assert(ts->depends_seqno() >= 0);
             assert(trx.state() == TrxHandle::S_MUST_REPLAY ||
                    !(ts->flags() & TrxHandle::F_COMMIT));
             assert(ts->state() == TrxHandle::S_REPLICATING ||
@@ -2161,7 +2146,7 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t const seq,
     LocalOrder lo(seqno_l);
 
     gu_trace(local_monitor_.enter(lo));
-
+    process_pending_queue(seqno_l);
     if (seq >= cc_seqno_) /* Refs #782. workaround for
                            * assert(seqno >= seqno_released_) in gcache. */
     {
@@ -3179,8 +3164,8 @@ void galera::ReplicatorSMM::process_pending_queue(wsrep_seqno_t local_seqno)
     assert(local_seqno > 0);
     // pending_cert_queue_ contains all writesets that:
     //   a) were BF aborted before being certified
-    //   b) are not going to be replayed even though
-    //      cert_for_aborted() returned TEST_OK for them
+    //   b) are not going to be replayed because of not having
+    //      commit flag set
     //
     // Before certifying the current seqno, check if
     // pending_cert_queue contains any smaller seqno.
@@ -3227,10 +3212,7 @@ bool galera::ReplicatorSMM::enter_local_monitor_for_cert(
             trx->unlock();
         }
         LocalOrder lo(*ts);
-        if (in_replay == false || local_monitor_.entered(lo) == false)
-        {
-            gu_trace(local_monitor_.enter(lo));
-        }
+        gu_trace(local_monitor_.enter(lo));
 
         if (trx != 0) trx->lock();
 
@@ -3257,35 +3239,26 @@ wsrep_status_t galera::ReplicatorSMM::handle_local_monitor_interrupted(
     assert(trx != 0);
     // Did not enter local monitor.
     assert(ts->state() == TrxHandle::S_REPLICATING);
-    wsrep_status_t retval(cert_for_aborted(ts));
+    wsrep_status_t retval = WSREP_BF_ABORT;
 
-    if (WSREP_TRX_FAIL != retval)
+    assert(ts->state() == TrxHandle::S_REPLICATING ||
+           ts->state() == TrxHandle::S_CERTIFYING);
+    assert(trx != 0);
+
+    // If the transaction was committing, it must replay.
+    if (ts->flags() & TrxHandle::F_COMMIT)
     {
-        assert(ts->state() == TrxHandle::S_REPLICATING ||
-               ts->state() == TrxHandle::S_CERTIFYING);
-        assert(WSREP_BF_ABORT == retval);
-        assert(trx != 0);
-
-        // If the transaction was committing, it must replay.
-        if (ts->flags() & TrxHandle::F_COMMIT)
-        {
-            // Return immediately without canceling local monitor,
-            // it needs to be grabbed again in replay stage.
-            TX_SET_STATE(*trx, TrxHandle::S_MUST_REPLAY);
-            return retval;
-        }
-        // if not - we need to rollback, so pretend that certification
-        // failed, but still update cert index to match slaves
-        else
-        {
-            pending_cert_queue_.push(ts);
-            retval = WSREP_TRX_FAIL;
-        }
+        // Return immediately without canceling local monitor,
+        // it needs to be grabbed again in replay stage.
+        TX_SET_STATE(*trx, TrxHandle::S_MUST_REPLAY);
+        return retval;
     }
+    // if not - we need to rollback, so pretend that certification
+    // failed, but still update cert index to match slaves
     else
     {
-        assert(ts->is_dummy());
         pending_cert_queue_.push(ts);
+        retval = WSREP_TRX_FAIL;
     }
 
     assert(WSREP_TRX_FAIL == retval);
@@ -3355,10 +3328,6 @@ wsrep_status_t galera::ReplicatorSMM::finish_cert(
         break;
     }
 
-    // at this point we are about to leave local_monitor_. Make sure
-    // trx checksum was alright before that.
-    ts->verify_checksum();
-
     // we must do seqno assignment 'in order' for std::map reasons,
     // so keeping it inside the monitor. NBO end should never be skipped.
     bool const skip(ts->is_dummy() && !ts->nbo_end());
@@ -3385,6 +3354,9 @@ wsrep_status_t galera::ReplicatorSMM::cert(TrxHandleMaster* trx,
     assert(ts->global_seqno()    != WSREP_SEQNO_UNDEFINED);
     assert(ts->last_seen_seqno() >= 0);
     assert(ts->last_seen_seqno() < ts->global_seqno());
+
+    // Verify checksum before certification to avoid corrupting index.
+    ts->verify_checksum();
 
     LocalOrder lo(*ts);
     // Local monitor is either released or canceled in
@@ -3420,39 +3392,6 @@ wsrep_status_t galera::ReplicatorSMM::cert_and_catch(
     }
     assert(0);
     abort();
-}
-
-/* This must be called BEFORE local_monitor_.self_cancel() due to
- * gcache_.seqno_assign() */
-wsrep_status_t galera::ReplicatorSMM::cert_for_aborted(
-    const TrxHandleSlavePtr& ts)
-{
-    // trx was BF aborted either while it was replicating or
-    // while it was waiting for local monitor
-    assert(ts->state() == TrxHandle::S_REPLICATING ||
-           ts->state() == TrxHandle::S_CERTIFYING);
-
-    Certification::TestResult const res(cert_.test(ts, false));
-
-    switch (res)
-    {
-    case Certification::TEST_OK:
-        return WSREP_BF_ABORT;
-
-    case Certification::TEST_FAILED:
-        // Next step will be monitors release. Make sure that ws was not
-        // corrupted and cert failure is real before proceeding with that.
- //gcf788 - this must be moved to cert(), the caller method
-        assert(ts->is_dummy());
-        ts->verify_checksum();
-        assert(!ts->nbo_end()); // should never be skipped in seqno_assign()
-        return WSREP_TRX_FAIL;
-
-    default:
-        log_fatal << "Unexpected return value from Certification::test(): "
-                  << res;
-        abort();
-    }
 }
 
 bool galera::ReplicatorSMM::enter_apply_monitor_for_local(
