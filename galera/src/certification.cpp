@@ -72,9 +72,10 @@ length_check(const gu::Config& conf)
 }
 
 static void
-report_inconsistency(const galera::Certification::CertIndexNG::value_type& ke,
-                     const galera::KeySetIn& key_set)
+report_stale_entry(const galera::Certification::CertIndexNG::value_type& ke,
+                   const galera::KeySetIn& key_set)
 {
+    std::cerr << "Found stale entry for key: " << ke->key() << "\n";
     key_set.rewind();
     std::cerr << "Key set\n";
     for (long i = 0; i < key_set.count(); ++i)
@@ -84,19 +85,25 @@ report_inconsistency(const galera::Certification::CertIndexNG::value_type& ke,
     }
 }
 
+// Verify that there are no stale entries of ts left after index purge.
+// Is stale entry is found, the corresponding key and the key set is
+// printed into stderr. Debug build will assert.
+//
+// This method requires iterating over whole index, so it is relatively
+// expensive, and should be used only for debugging purposes.
 static void
-check_integrity(const galera::Certification::CertIndexNG& cert_index,
-                const galera::TrxHandleSlave* ts,
-                const galera::KeySetIn& key_set)
+check_purge_complete(const galera::Certification::CertIndexNG& cert_index,
+                     const galera::TrxHandleSlave* ts,
+                     const galera::KeySetIn& key_set)
 {
     std::for_each(
         cert_index.begin(), cert_index.end(),
         [&cert_index, &key_set,
          ts](const galera::Certification::CertIndexNG::value_type& ke) {
-            ke->for_each_ref([ke, &key_set, ts](const TrxHandleSlave* ref) {
+            ke->for_each_ref([&ke, &key_set, ts](const TrxHandleSlave* ref) {
                 if (ts == ref)
                 {
-                    report_inconsistency(ke, key_set);
+                    report_stale_entry(ke, key_set);
                 }
                 assert(ts != ref);
             });
@@ -137,7 +144,7 @@ static void purge_key_set(galera::Certification::CertIndexNG& cert_index,
     }
     if (cert_debug_on)
     {
-        check_integrity(cert_index, ts, key_set);
+        check_purge_complete(cert_index, ts, key_set);
     }
 }
 
@@ -380,11 +387,6 @@ cert_fail:
 
     assert (processed < key_count);
     assert(cert_index_ng_.size() == prev_cert_index_size);
-
-    if (cert_debug_on)
-    {
-        check_integrity(cert_index_ng_, trx, key_set);
-    }
 
     return TEST_FAILED;
 }
