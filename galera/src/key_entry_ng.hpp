@@ -7,6 +7,8 @@
 
 #include "trx_handle.hpp"
 
+#include <array>
+
 namespace galera
 {
     class KeyEntryNG
