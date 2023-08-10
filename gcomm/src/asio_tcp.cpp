@@ -211,14 +211,14 @@ public:
 
     ~DeferredCloseTimer()
     {
-        log_info << "Deferred close timer destruct";
+        log_debug << "Deferred close timer destruct";
     }
 
     void start()
     {
         timer_.expires_from_now(std::chrono::seconds(5));
         timer_.async_wait(shared_from_this());
-        log_info << "Deferred close timer started for socket with "
+        log_debug << "Deferred close timer started for socket with "
                  << "remote endpoint: " << socket_->remote_addr();
     }
 
@@ -230,8 +230,8 @@ public:
 
     virtual void handle_wait(const gu::AsioErrorCode& ec) GALERA_OVERRIDE
     {
-        log_info << "Deferred close timer handle_wait "
-                 << ec << " for " << socket_->socket_;
+        log_debug << "Deferred close timer handle_wait "
+                  << ec << " for " << socket_->socket_;
         socket_->close();
         socket_.reset();
     }
@@ -290,7 +290,7 @@ void gcomm::AsioTcpSocket::write_handler(gu::AsioSocket& socket,
     {
         log_debug << "write handler for " << id()
                   << " state " << state();
-        if (not gu::is_verbose_error(ec))
+        if (ec && not gu::is_verbose_error(ec))
         {
             log_warn << "write_handler(): " << ec.message()
                      << " (" << gu::extra_error_info(ec) << ")";
@@ -598,7 +598,10 @@ size_t gcomm::AsioTcpSocket::read_completion_condition(
         }
         catch (const gu::Exception& e)
         {
-            log_warn << "unserialize error " << e.what();
+            log_warn << "Failed to unserialize message. This may be a "
+                     << "result of corrupt message, port scanner or "
+                     << "another application connecting to "
+                     << "group communication port.";
             FAILED_HANDLER(gu::AsioErrorCode(e.get_errno()));
             return 0;
         }

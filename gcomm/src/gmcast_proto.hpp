@@ -105,7 +105,11 @@ public:
         gmcast_           (gmcast)
     { }
 
-    ~Proto() { tp_->close(); }
+    ~Proto()
+    {
+      tp_->close();
+      tp_ = nullptr;
+    }
 
     void send_msg(const Message& msg, bool ignore_no_buffer_space);
     void send_handshake();
