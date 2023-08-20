@@ -22,6 +22,7 @@ static void log_fn(wsrep_log_level_t level, const char* msg)
 {
     FILE* f = (log_file ? log_file : stdout);
     fprintf(f, "%d: %s", level, msg);
+    fflush(f);
 }
 
 static const char* get_provider()
