@@ -925,6 +925,7 @@ namespace galera
          * |                 9 | SS keys   4 |              2 |               2 |
          * | 4.x            10 | PA range/ 5 | CC events /  3 |               2 |
          * |                   | UPD keys    | idx preload    |                 |
+         * |                11 | SRV keys  6 |              3 |               2 |
          * |--------------------------------------------------------------------|
          *
          * Note: str_proto_ver is decided in replicator_str.cpp based on

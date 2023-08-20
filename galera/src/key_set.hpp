@@ -134,7 +134,7 @@ public:
          * version */
         static int prefix(wsrep_key_type_t const ws_type, int const ws_ver)
         {
-            if (ws_ver >= 0 && ws_ver <= 5)
+            if (ws_ver >= 0 && ws_ver <= WS_VER_MAX)
             {
                 switch (ws_type)
                 {
@@ -163,7 +163,7 @@ public:
 
         wsrep_key_type_t wsrep_type(int const ws_ver) const
         {
-            assert(ws_ver >= 0 && ws_ver <= 5);
+            assert(ws_ver >= 0 && ws_ver <= WS_VER_MAX);
 
             wsrep_key_type_t ret;
 
@@ -384,6 +384,8 @@ public:
     }; /* functor KeyPartEqual */
 
     static void throw_version(int) GU_NORETURN;
+
+    static int const WS_VER_MAX = 6;
 }; /* class KeySet */
 
 inline void
@@ -700,7 +702,7 @@ public:
     {
         assert (version_ != KeySet::EMPTY);
         assert ((uintptr_t(reserved) % GU_WORD_BYTES) == 0);
-        assert (ws_ver <= 5);
+        assert (ws_ver <= KeySet::WS_VER_MAX);
         KeyPart zero(version_);
         prev_().push_back(zero);
     }

@@ -147,7 +147,7 @@ namespace galera
 
         TestResult test(const TrxHandleSlavePtr&);
         TestResult do_test(const TrxHandleSlavePtr&);
-        TestResult do_test_v3to5(TrxHandleSlave*);
+        TestResult do_test_v3to6(TrxHandleSlave*);
         TestResult do_test_preordered(TrxHandleSlave*);
         TestResult do_test_nbo(const TrxHandleSlavePtr&);
         void purge_for_trx(TrxHandleSlave*);

@@ -64,6 +64,7 @@ namespace
         wsrep_seqno_t    last_seen_seqno;
         wsrep_seqno_t    expected_depends_seqno;
         int              flags;
+        wsrep_key_type_t zero_level; // type of the zero-level key
         galera::Certification::TestResult result;
         const char data_ptr[24];
         size_t data_len;
@@ -107,6 +108,16 @@ void run_wsinfo(const WSInfo* const wsi, size_t const nws, int const version)
                              WSREP_KEY_EXCLUSIVE),
                             true));
 
+        if (version >= 6) // version from which zero-level keys were introduced
+        {
+            if (WSREP_KEY_SHARED != wsi[i].zero_level)
+            {
+                trx->append_key(galera::KeyData(version, wsi[i].zero_level));
+            }
+
+            // this is always added last in ReplicatorSMM::replicate()
+            trx->append_key(galera::KeyData(version, WSREP_KEY_SHARED));
+        }
 
         if (wsi[i].data_len)
         {
@@ -171,72 +182,86 @@ START_TEST(test_certification_trx_v3)
         { { {1, } }, 1, 1,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, true,
           1, 1, 0, 0, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         // 2: no dependencies
         { { {1, } }, 1, 2,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, true,
           2, 2, 0, 0, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK , {0}, 0},
         // 3: no dependencies
         { { {2, } }, 1, 3,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, true,
           3, 3, 0, 0, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         // 4: no dependencies
         { { {3, } }, 1, 4,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, true,
           4, 4, 0, 0, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         // 5: shared - exclusive
         // 5: depends on 4
         { { {2, } }, 1, 5,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, false,
           5, 5, 0, 4, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         // 6 - 8: exclusive - shared
         // 6: collides with 5
         { { {1, } }, 1, 6,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, true,
           6, 6, 4, 5, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_FAILED, {0}, 0},
         // 7: depends on 5
         { { {2, } }, 1, 7,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, true,
           7, 7, 4, 5, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         // 8: collides with 5
         { { {1, } }, 1, 8,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1}}, 3, true,
           8, 8, 4, 5, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_FAILED, {0}, 0},
         // 9 - 10: shared key shadows dependency to 5
         // 9: depends on 5
         { { {2, } }, 1, 9,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, true,
           9, 9, 0, 5, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         // 10: depends on 5
         { { {2, } }, 1, 10,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, true,
           10, 10, 6, 5, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         // 11 - 13: exclusive - shared - exclusive dependency
         { { {2, } }, 1, 11,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, false,
           11, 11, 10, 10, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         { { {2, } }, 1, 12,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, true,
           12, 12, 10, 11, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         { { {2, } }, 1, 13,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, false,
           13, 13, 10, 12, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         // 14: conflicts with 13
         { { {1, } }, 1, 14,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1}}, 3, false,
           14, 14, 12, 13, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_FAILED, {0}, 0}
     };
 
@@ -264,19 +289,23 @@ START_TEST(test_certification_trx_different_level_v3)
         { { {1, } }, 1, 1,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, false,
           1, 1, 0, 0, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         { { {2, } }, 2, 2,
           { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2, false,
           2, 2, 0, 1, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         // 2)
         { { {2, } }, 2, 2,
           { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2, false,
           3, 3, 2, 2, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         { { {1, } }, 1, 1,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, false,
           4, 4, 2, 3, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_FAILED, {0}, 0}
     };
 
@@ -305,39 +334,45 @@ START_TEST(test_certification_toi_v3)
     WSInfo wsi[] = {
         // TOI
         { { {1, } }, 1, 1,
-          { {void_cast("1"), 1}, }, 1, false,
+          { {void_cast("1"), 1}, {void_cast("1"), 1}, }, 2, false,
           1, 1, 0, 0,
           TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         // TOI 2 Depends on TOI 1
         { { {2, } }, 2, 2,
           { {void_cast("1"), 1}, }, 1, false,
           2, 2, 0, 1,
           TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         // Trx 3 from the same source depends on TOI 2
         { { {2, } }, 3, 3,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1}}, 3, false,
           3, 3, 2, 2,
           TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         // Trx 4 from different source conflicts with 3
         { { {3, } }, 3, 3,
           { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1}}, 3, false,
           4, 4, 2, 3,
           TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_FAILED, {0}, 0},
         // Non conflicting TOI 5 depends on 4
         { { {1, } }, 2, 2,
           { {void_cast("2"), 1}, }, 1, false,
           5, 5, 0, 4,
           TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         // Trx 6 from different source conflicts with TOI 5
         { { {3, } }, 3, 3,
           { {void_cast("2"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1}}, 3, false,
           6, 6, 4, 5,
           TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_FAILED, {0}, 0}
     };
 
@@ -367,27 +402,32 @@ START_TEST(test_certification_nbo)
           { {void_cast("1"), 1}, }, 1, false,
           1, 1, 0, 0,
           TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         { { {1, } }, 2, 2,
           { {void_cast("1"), 1}, }, 1, false,
           2, 2, 0, 1,
           TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_FAILED, {0}, 0},
         { { {1, } }, 3, 3,
           { {void_cast("1"), 1}, }, 1, false,
           3, 3, 0, 2,
           TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_FAILED, {0}, 0},
         // 4 - 5 no conflict, different key
         { { {1, } }, 4, 4,
           { {void_cast("2"), 1}, }, 1, false,
           4, 4, 0, 3,
           TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         { { {2, } }, 5, 5,
           { {void_cast("2"), 1}, }, 1, false,
           5, 5, 0, 4,
           TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         // 6 ends the NBO with key 1
         // notice the same uuid, conn_id/trx_id as the first entry
@@ -395,6 +435,7 @@ START_TEST(test_certification_nbo)
           { {void_cast("1"), 1}, }, 1, false,
           6, 6, 0, 5,
           TrxHandle::F_ISOLATION | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK,
           {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0},
           24
@@ -404,12 +445,14 @@ START_TEST(test_certification_nbo)
           { {void_cast("1"), 1}, }, 1, false,
           7, 7, 0, 6,
           TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         // Complete seqno 5 to clean up
         { { {2, } }, 8, 8,
           { {void_cast("2"), 1}, }, 1, false,
           8, 8, 0, 7,
           TrxHandle::F_ISOLATION | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK,
           {5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0},
           24
@@ -437,30 +480,36 @@ START_TEST(test_certification_commit_fragment)
         { { {1, } }, 1, 1,
           { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2, true,
           1, 1, 0, 0, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT | TrxHandle::F_PA_UNSAFE,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         { { {2, } }, 2, 2,
           { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2, true,
           2, 2, 0, 1, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT | TrxHandle::F_PA_UNSAFE,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
 
         // TOI vs commit fragment
         { { {2, } }, 2, 2,
           { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2, false,
           3, 3, 2, 2, TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         { { {1, } }, 1, 1,
           { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2, true,
           4, 4, 2, 3, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT | TrxHandle::F_PA_UNSAFE,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_FAILED, {0}, 0},
 
         // commit fragment vs TOI
         { { {2, } }, 2, 2,
           { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2, true,
           5, 5, 3, 4, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT | TrxHandle::F_PA_UNSAFE,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0},
         { { {1, } }, 1, 1,
           { {void_cast("1"), 1}, {void_cast("1"), 1} }, 2, false,
           6, 6, 4, 5, TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
           Certification::TEST_OK, {0}, 0}
 
     };
@@ -471,6 +520,106 @@ START_TEST(test_certification_commit_fragment)
 }
 END_TEST
 
+START_TEST(test_certification_zero_level)
+{
+
+    const int version(6);
+    using galera::Certification;
+    using galera::TrxHandle;
+    using galera::void_cast;
+
+    // Interaction of a zero-level non-SHARED key with "regular" transactions
+    // "Regular" transaction has a zero-level key SHARED, so regarless of TOI or
+    // non-TOI, shared or exclusive, it shall interact as a SHARED key trx:
+    // conflict:
+    // * SHARED,EXCLUSIVE - EXCLUSIVE depends on SHARED
+    // * EXCLUSIVE,SHARED - SHARED conflicts with EXCLUSIVE (except for TOI
+    // which depends)
+    WSInfo wsi[] = {
+        // 1: no dependencies
+        { { {1, } }, 1, 1,
+          { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, true,
+          1, 1, 0, 0, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
+          Certification::TEST_OK, {0}, 0},
+        // 2: exclusive zero-level depends on 1
+        { { {1, } }, 1, 2,
+          {}, 0, true,
+          2, 2, 0, 1, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          WSREP_KEY_EXCLUSIVE,
+          Certification::TEST_OK , {0}, 0},
+        // 3: shared last seen 1 - conflict with 2
+        { { {2, } }, 1, 3,
+          { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, true,
+          3, 3, 1, 2, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
+          Certification::TEST_FAILED, {0}, 0},
+        // 4: depends on 2
+        { { {3, } }, 1, 4,
+          { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, true,
+          4, 4, 2, 2, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
+          Certification::TEST_OK, {0}, 0},
+        // 5: exclusive depends on 4, conflicts with 2
+        { { {2, } }, 1, 5,
+          { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, false,
+          5, 5, 0, 4, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
+          Certification::TEST_FAILED, {0}, 0},
+        // 6: shared depends but does not conflict with 2 because from the same source
+        { { {1, } }, 1, 6,
+          { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, true,
+          6, 6, 1, 2, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
+          Certification::TEST_OK, {0}, 0},
+        // 7: exclusive, saw 2, depends on 6
+        { { {2, } }, 1, 7,
+          { {void_cast("1"), 1}, {void_cast("1"), 1}, {void_cast("1"), 1} }, 3, false,
+          7, 7, 2, 6, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
+          Certification::TEST_OK, {0}, 0},
+        // 8: exclusive zero-level depends on exclusive 7
+        { { {1, } }, 1, 8,
+          {}, 0, true,
+          8, 8, 4, 7, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          WSREP_KEY_EXCLUSIVE,
+          Certification::TEST_OK, {0}, 0},
+        // 9: exclusive zero-level conflicts with exclusive zero-level 8
+        { { {2, } }, 1, 9,
+          {}, 0, true,
+          9, 9, 0, 8, TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          WSREP_KEY_EXCLUSIVE,
+          Certification::TEST_FAILED, {0}, 0},
+        // TOI 1 depends on zero-level 8
+        { { {2, } }, 1, 1,
+          { {void_cast("1"), 1}, }, 1, false,
+          10, 10, 7, 9,
+          TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
+          Certification::TEST_OK, {0}, 0},
+        // TOI 2 Depends on zero-level 8 (same source)
+        { { {1, } }, 2, 2,
+          { {void_cast("1"), 1}, }, 1, false,
+          11, 11, 3, 10,
+          TrxHandle::F_ISOLATION | TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          galera::KeyData::BRANCH_KEY_TYPE,
+          Certification::TEST_OK, {0}, 0},
+        // zero-level 12 from the different source only depends on TOI 2
+        // becaused it is EXCLUSIVE over SHARED
+        { { {2, } }, 3, 3,
+          {}, 0, true,
+          12, 12, 10, 11,
+          TrxHandle::F_BEGIN | TrxHandle::F_COMMIT,
+          WSREP_KEY_EXCLUSIVE,
+          Certification::TEST_OK, {0}, 0},
+    };
+
+    size_t nws(sizeof(wsi)/sizeof(wsi[0]));
+
+    run_wsinfo(wsi, nws, version);
+
+}
+END_TEST
 
 Suite* certification_suite()
 {
@@ -499,6 +648,10 @@ Suite* certification_suite()
 
     t = tcase_create("certification_commit_fragment");
     tcase_add_test(t, test_certification_commit_fragment);
+    suite_add_tcase(s, t);
+
+    t = tcase_create("certification_zero_level");
+    tcase_add_test(t, test_certification_zero_level);
     suite_add_tcase(s, t);
 
     return s;

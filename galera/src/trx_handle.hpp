@@ -432,6 +432,7 @@ namespace galera
                 case WriteSetNG::VER3:
                 case WriteSetNG::VER4:
                 case WriteSetNG::VER5:
+                case WriteSetNG::VER6:
                     write_set_.read_buf (act.buf, act.size);
                     assert(version_ == write_set_.version());
                     write_set_flags_ = fixup_write_set_flags(
@@ -864,7 +865,12 @@ namespace galera
             // The shared key behavior for TOI operations is completely
             // untested, so don't allow it (and it probably does not even
             // make any sense)
-            assert(is_toi() == false  || key.shared() == false);
+            assert(is_toi()        == false
+                   || key.shared() == false
+                   || (key.parts_num == 1
+                       && key.parts->len == 1
+                       /* this could be a server-level key */)
+                );
 
             /*! protection against protocol change during trx lifetime */
             if (key.proto_ver != version())

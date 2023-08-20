@@ -10,6 +10,7 @@ add_library(galera STATIC
   write_set_ng.cpp
   trx_handle.cpp
   key_entry_os.cpp
+  key_data.cpp
   wsdb.cpp
   certification.cpp
   galera_service_thd.cpp
@@ -48,6 +49,7 @@ endif()
 
 add_library(galera_smm_static STATIC
   wsrep_provider.cpp
+  key_data.cpp
   )
 
 target_compile_definitions(galera_smm_static

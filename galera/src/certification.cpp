@@ -152,13 +152,13 @@ void
 galera::Certification::purge_for_trx(TrxHandleSlave* trx)
 {
     assert(mutex_.owned());
-    assert(trx->version() >= 3 || trx->version() <= 5);
+    assert(trx->version() >= 3 || trx->version() <= WriteSetNG::MAX_VERSION);
     const KeySetIn& keys(trx->write_set().keyset());
     keys.rewind();
     purge_key_set(cert_index_ng_, trx, keys, keys.count());
 }
 
-/* Specifically for chain use in certify_and_depend_v3to5() */
+/* Specifically for chain use in certify_and_depend_v3to6() */
 template <wsrep_key_type_t REF_KEY_TYPE>
 bool
 check_against(const galera::KeyEntryNG*   const found,
@@ -194,8 +194,8 @@ check_against(const galera::KeyEntryNG*   const found,
 
     if (gu_likely(0 != ref_trx))
     {
-        if ((REF_KEY_TYPE == WSREP_KEY_EXCLUSIVE ||
-             REF_KEY_TYPE == WSREP_KEY_UPDATE) && ref_trx)
+        if (REF_KEY_TYPE == WSREP_KEY_EXCLUSIVE ||
+            REF_KEY_TYPE == WSREP_KEY_UPDATE)
         {
             cert_debug << KeySet::type(REF_KEY_TYPE) << " match: "
                        << *trx << " <---> " << *ref_trx;
@@ -203,7 +203,8 @@ check_against(const galera::KeyEntryNG*   const found,
 
         if (REF_KEY_TYPE == WSREP_KEY_SHARED    ||
             REF_KEY_TYPE == WSREP_KEY_REFERENCE ||
-            REF_KEY_TYPE == WSREP_KEY_UPDATE) assert(!ref_trx->is_toi());
+            REF_KEY_TYPE == WSREP_KEY_UPDATE)
+            assert(!ref_trx->is_toi() || trx->version() >= 6);
 
         CheckType const check_type(check_table[REF_KEY_TYPE][key_type]);
 
@@ -242,7 +243,7 @@ check_against(const galera::KeyEntryNG*   const found,
 
 /*! for convenience returns true if conflict and false if not */
 static inline bool
-certify_and_depend_v3to5(const galera::KeyEntryNG*   const found,
+certify_and_depend_v3to6(const galera::KeyEntryNG*   const found,
                          const galera::KeySet::KeyPart&    key,
                          galera::TrxHandleSlave*     const trx,
                          bool                        const log_conflict)
@@ -290,7 +291,7 @@ certify_and_depend_v3to5(const galera::KeyEntryNG*   const found,
 
 /* returns true on collision, false otherwise */
 static bool
-certify_v3to5(const galera::Certification::CertIndexNG& cert_index_ng,
+certify_v3to6(const galera::Certification::CertIndexNG& cert_index_ng,
               const galera::KeySet::KeyPart&      key,
               galera::TrxHandleSlave*     const   trx,
               bool                        const   log_conflicts)
@@ -309,7 +310,7 @@ certify_v3to5(const galera::Certification::CertIndexNG& cert_index_ng,
     // Note: For we skip certification for isolated trxs, only
     // cert index and key_list is populated.
     return (!trx->is_toi() &&
-            certify_and_depend_v3to5(kep, key, trx, log_conflicts));
+            certify_and_depend_v3to6(kep, key, trx, log_conflicts));
 }
 
 // Add key to trx references for trx that passed certification.
@@ -341,7 +342,7 @@ static void do_ref_keys(galera::Certification::CertIndexNG& cert_index,
 }
 
 galera::Certification::TestResult
-galera::Certification::do_test_v3to5(TrxHandleSlave* trx)
+galera::Certification::do_test_v3to6(TrxHandleSlave* trx)
 {
     cert_debug << "BEGIN CERTIFICATION v" << trx->version() << ": " << *trx;
 
@@ -361,7 +362,7 @@ galera::Certification::do_test_v3to5(TrxHandleSlave* trx)
     {
         const KeySet::KeyPart& key(key_set.next());
 
-        if (certify_v3to5(cert_index_ng_, key, trx, log_conflicts_))
+        if (certify_v3to6(cert_index_ng_, key, trx, log_conflicts_))
         {
             trx->set_depends_seqno(std::max(trx->depends_seqno(), last_pa_unsafe_));
             goto cert_fail;
@@ -464,7 +465,8 @@ galera::Certification::do_test(const TrxHandleSlavePtr& trx)
     case 3:
     case 4:
     case 5:
-        res = do_test_v3to5(trx.get());
+    case 6:
+        res = do_test_v3to6(trx.get());
         break;
     default:
         gu_throw_fatal << "certification test for version "
@@ -1000,6 +1002,7 @@ void galera::Certification::assign_initial_position(const gu::GTID& gtid,
     case 3:
     case 4:
     case 5:
+    case 6:
         break;
     default:
         gu_throw_fatal << "certification/trx version "

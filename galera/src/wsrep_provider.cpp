@@ -977,14 +977,25 @@ wsrep_status_t galera_append_key(wsrep_t*           const gh,
 
     try
     {
+        int const proto_ver(repl->trx_proto_ver());
         TrxHandleLock lock(*trx);
-        for (size_t i(0); i < keys_num; ++i)
+
+        if (keys_num > 0)
         {
-            galera::KeyData k (repl->trx_proto_ver(),
-                               keys[i].key_parts,
-                               keys[i].key_parts_num,
-                               key_type,
-                               copy);
+            for (size_t i(0); i < keys_num; ++i)
+            {
+                galera::KeyData const k(proto_ver,
+                                        keys[i].key_parts,
+                                        keys[i].key_parts_num,
+                                        key_type,
+                                        copy);
+                gu_trace(trx->append_key(k));
+            }
+        }
+        else if (proto_ver >= 6)
+        {
+            /* Append server-level key (matches every trx)*/
+            galera::KeyData const k(proto_ver, key_type);
             gu_trace(trx->append_key(k));
         }
         retval = WSREP_OK;

@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2018 Codership Oy <info@codership.com>
+// Copyright (C) 2023 Codership Oy <info@codership.com>
 //
 
 #include "key_data.hpp"
@@ -17,3 +17,10 @@ galera::KeyData::print(std::ostream& os) const
         os << "\n\t" << gu::Hexdump(parts[i].ptr, parts[i].len, true);
     }
 }
+
+const wsrep_buf_t
+galera::KeyData::zero_part =
+{
+    "",
+    1
+};

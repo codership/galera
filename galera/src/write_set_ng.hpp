@@ -39,11 +39,12 @@ namespace galera
         {
             VER3 = 3,
             VER4,
-            VER5
+            VER5,
+            VER6
         };
 
         /* Max header version that we can understand */
-        static Version const MAX_VERSION = VER5;
+        static Version const MAX_VERSION = VER6;
 
         /* Parses beginning of the header to detect writeset version and
          * returns it as raw integer for backward compatibility
@@ -91,6 +92,7 @@ namespace galera
             case VER3: return VER3;
             case VER4: return VER4;
             case VER5: return VER5;
+            case VER6: return VER6;
             }
 
             gu_throw_error (EPROTO) << "Unrecognized writeset version: " << v;
@@ -155,6 +157,8 @@ namespace galera
                 case VER4:
                 // fall through
                 case VER5:
+                // fall through
+                case VER6:
                 {
                     GU_COMPILE_ASSERT(0 == (V3_SIZE % GU_MIN_ALIGNMENT),
                                       unaligned_header_size);

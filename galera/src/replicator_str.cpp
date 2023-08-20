@@ -31,6 +31,7 @@ static int get_str_proto_ver(int const group_proto_ver)
         // include handling dangling comma in donor string.
         return 2;
     case 10:
+    case 11:
         // 4.x
         // CC events in IST, certification index preload
         return 3;

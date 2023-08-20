@@ -249,7 +249,7 @@ KeySetOut::KeyPart::KeyPart (KeyParts&      added,
 
     /* only leaf part of the key can be not WSREP_KEY_SHARED */
     bool const leaf (part_num + 1 == kd.parts_num);
-    wsrep_key_type_t const type (leaf ? kd.type : WSREP_KEY_SHARED);
+    wsrep_key_type_t const type (leaf ? kd.type : KeyData::BRANCH_KEY_TYPE);
     int const prefix (KeySet::KeyPart::prefix(type, ws_ver));
 
     assert (kd.parts_num > part_num);

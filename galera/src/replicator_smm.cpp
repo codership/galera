@@ -638,6 +638,13 @@ wsrep_status_t galera::ReplicatorSMM::replicate(TrxHandleMaster& trx,
     assert(trx.state() == TrxHandle::S_EXECUTING ||
            trx.state() == TrxHandle::S_MUST_ABORT);
 
+    if (trx.version() >= 6)
+    {
+        /* By default append zero-level key */
+        galera::KeyData const k(trx.version());
+        gu_trace(trx.append_key(k));
+    }
+
     if (state_() < S_JOINED || trx.state() == TrxHandle::S_MUST_ABORT)
     {
     must_abort:
@@ -2292,7 +2299,7 @@ galera::get_trx_protocol_versions(int proto_ver)
         record_set_ver = gu::RecordSet::VER1;
         break;
     case 6:
-        trx_ver  = 3;
+        trx_ver = 3;
         record_set_ver = gu::RecordSet::VER1;
         break;
     case 7:
@@ -2313,8 +2320,13 @@ galera::get_trx_protocol_versions(int proto_ver)
         break;
     case 10:
         // Protocol upgrade to enable support for:
-        trx_ver = 5;// PA range preset in the writeset,
-                                 // WSREP_KEY_UPDATE support (API v26)
+        trx_ver = 5; // PA range preset in the writeset,
+                     // WSREP_KEY_UPDATE support (API v26)
+        record_set_ver = gu::RecordSet::VER2;
+        break;
+    case 11:
+        // Protocol upgrade to enable support for:
+        trx_ver = 6; // zero-level key in the writeset
         record_set_ver = gu::RecordSet::VER2;
         break;
     default:
