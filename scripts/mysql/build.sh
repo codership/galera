@@ -478,6 +478,7 @@ then
             then
                 BUILD_OPT+=" -DWITH_CURL=system"
                 BUILD_OPT+=" -DWITH_ZLIB=bundled"
+                BUILD_OPT+=" -DWITH_ASAN:BOOL=ON"
             fi
         else # MariaDB-specific build options
             BUILD_OPT+=" -DWITH_SSL=bundled"
