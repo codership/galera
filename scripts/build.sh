@@ -313,7 +313,6 @@ build_packages()
     else # build RPM
         ./rpm.sh $GALERA_VER
     fi
-    local RET=$?
 
     set -e
 
