@@ -217,7 +217,7 @@ done
 # check whether sudo accepts -E to preserve environment
 if [ "$PACKAGE" == "yes" ]
 then
-    if which dpkg >/dev/null 2>&1
+    if which dpkg-buildpackage >/dev/null 2>&1
     then
         echo "Error: Package build not supported on Debian, use dpkg-buildpackage"
         exit 1
