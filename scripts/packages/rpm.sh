@@ -21,7 +21,7 @@ fast_cflags="-O3 -fno-omit-frame-pointer"
 uname -m | grep -q i686 && \
 cpu_cflags="-mtune=i686" || cpu_cflags="-mtune=core2"
 RPM_OPT_FLAGS="$fast_cflags $cpu_cflags"
-GALERA_SPEC=$SCRIPT_ROOT/galera.spec
+GALERA_SPEC=$SCRIPT_ROOT/galera-obs.spec
 
 RELEASE=${RELEASE:-"1"}
 
