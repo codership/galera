@@ -2092,6 +2092,20 @@ END_TEST
 // Datagram
 //
 
+/* Helper to determine if UDP sockets can be opened. */
+static bool have_datagram() try
+{
+  gu::AsioIoService io_service;
+  gu::URI uri("udp://127.0.0.1:0");
+  auto socket(io_service.make_datagram_socket(uri));
+  socket->open(uri);
+  return false;
+}
+catch (...)
+{
+  return false;
+}
+
 class MockDatagramSocketHandler : public gu::AsioDatagramSocketHandler
 {
 public:
@@ -2598,6 +2612,7 @@ Suite* gu_asio_suite()
     //
     // Datagram
     //
+    if (have_datagram()) {
 
     tc = tcase_create("test_datagram_socket");
     tcase_add_test(tc, test_datagram_socket);
@@ -2619,6 +2634,7 @@ Suite* gu_asio_suite()
     tcase_add_test(tc, test_datagram_send_to_and_async_read);
     suite_add_tcase(s, tc);
 
+    }
 #if defined(GALERA_ASIO_TEST_MULTICAST)
     tc = tcase_create("test_datagram_connect_multicast");
     tcase_add_test(tc, test_datagram_connect_multicast);
