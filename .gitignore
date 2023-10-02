@@ -18,6 +18,7 @@ galera/tests/galera_check
 galera/tests/galera_check.passed
 galerautils/src/gu_fnv_bench
 galerautils/tests/gu_tests
+galerautils/tests/certs
 galerautils/tests/gu_tests++
 galerautils/tests/gu_tests++.passed
 galerautils/tests/gu_tests.passed
