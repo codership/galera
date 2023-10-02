@@ -303,7 +303,16 @@ namespace
 
         std::string get_password() const
         {
-            std::string   file(conf_.get(gu::conf::ssl_password_file));
+            std::string   file;
+            try {
+                file = conf_.get(gu::conf::ssl_password_file);
+            }
+            catch (const gu::NotSet&)
+            {
+                gu_throw_error(EINVAL)
+                << gu::conf::ssl_password_file << " is required";
+            }
+
             std::ifstream ifs(file.c_str(), std::ios_base::in);
 
             if (ifs.good() == false)
@@ -316,6 +325,7 @@ namespace
             std::getline(ifs, ret);
             return ret;
         }
+
     private:
         const gu::Config& conf_;
     };
