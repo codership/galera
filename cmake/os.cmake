@@ -11,7 +11,8 @@ set(GALERA_SYSTEM_LIBS ${PTHREAD_LIB} ${RT_LIB})
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   # Check if linkage with atomic library is needed for 8 byte atomics
   set(ATOMIC_8_TEST_C_SOURCE
-     "int main() { long long val; __atomic_fetch_add_8(&val, 1, __ATOMIC_SEQ_CST); return 0;}")
+     "#include <stdatomic.h>
+      int main() { atomic_llong val; atomic_fetch_add(&val, 1); return 0; }")
   check_c_source_compiles("${ATOMIC_8_TEST_C_SOURCE}" GALERA_HAVE_ATOMIC)
   if (NOT GALERA_HAVE_ATOMIC)
     find_library(ATOMIC_LIB NAMES atomic libatomic.so.1)
