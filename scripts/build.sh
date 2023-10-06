@@ -385,6 +385,7 @@ fi
 if [ "$CMAKE" == "yes" ] # Build using CMake
 then
     cmake_args="$CMAKE_OPTS -DGALERA_REVISION=$GALERA_REV"
+    cmake_args="$cmake_args -DCMAKE_C_FLAGS="\'"$CFLAGS"\'" -DCMAKE_CXX_FLAGS="\'"$CXXFLAGS"\'
     [ -n "$TARGET"        ] && \
         echo "WARN: TARGET=$TARGET ignored by CMake build"
     [ -n "$RELEASE"       ] && \
@@ -399,7 +400,7 @@ then
     then
         (cd $build_base && make clean) || :
         rm -f $build_base/CMakeCache.txt
-        cmake $cmake_args $build_base
+        eval cmake $cmake_args $build_base
     fi
 
     if [ "$SKIP_BUILD" != "yes" ]
