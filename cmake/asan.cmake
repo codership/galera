@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2020 Codership Oy <info@codership.com>
+# Copyright (C) 2020-2023 Codership Oy <info@codership.com>
 #
 
 if (GALERA_WITH_ASAN)
@@ -12,6 +12,7 @@ if (GALERA_WITH_UBSAN)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=undefined")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=undefined")
   add_definitions(-DGALERA_WITH_UBSAN)
+  add_definitions(-DGALERA_ONLY_ALIGNED)
 
   find_library(UBSAN_LIB NAMES ubsan libubsan.so.1)
   message(STATUS ${UBSAN_LIB})

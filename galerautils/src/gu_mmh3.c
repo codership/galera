@@ -257,10 +257,11 @@ static uint64_t const GU_MMH128_SEED2 = GU_ULONG_LONG(0x62B821756295C58D);
 extern void
 gu_mmh128 (const void* const msg, size_t const len, void* const out)
 {
-    _mmh3_128_seed (msg, len, GU_MMH128_SEED1, GU_MMH128_SEED2, (uint64_t*)out);
-    uint64_t* const res = (uint64_t*)out;
+    uint64_t res[2];
+    _mmh3_128_seed (msg, len, GU_MMH128_SEED1, GU_MMH128_SEED2, res);
     res[0] = gu_le64(res[0]);
     res[1] = gu_le64(res[1]);
+    memcpy(out, res, sizeof(res));
 }
 
 /* returns hash as an integer, in host byte-order */
@@ -378,8 +379,9 @@ gu_mmh128_get32 (const gu_mmh128_ctx_t* const mmh)
 void
 gu_mmh3_32 (const void* const key, int const len, uint32_t const seed, void* const out)
 {
-    uint32_t const res = _mmh32_seed (key, len, seed);
-    *((uint32_t*)out)  = gu_le32(res);
+    uint32_t res = _mmh32_seed (key, len, seed);
+    res = gu_le32(res);
+    memcpy(out, &res, sizeof(res));
 }
 
 //-----------------------------------------------------------------------------
