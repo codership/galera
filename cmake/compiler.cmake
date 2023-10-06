@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2020 Codership Oy <info@codership.com>
+# Copyright (C) 2020-2023 Codership Oy <info@codership.com>
 #
 # Common compiler and preprocessor options.
 #
@@ -46,7 +46,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Woverloaded-virtual -g")
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   # To detect STD library misuse with Debug builds.
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_ASSERTIONS")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_ASSERTIONS -O0")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
   # Enable debug sync points
   add_definitions(-DGU_DBUG_ON)
 else()

@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2018-2020 Codership Oy <info@codership.com>
+// Copyright (C) 2018-2023 Codership Oy <info@codership.com>
 //
 
 #include <wsrep_api.h>
@@ -307,7 +307,6 @@ START_TEST(defaults)
                       ret, strerror(ret));
     }
 
-    provider.free(&provider);
     mark_point();
 
     /* cleanup files */

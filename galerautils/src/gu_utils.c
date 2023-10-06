@@ -1,4 +1,4 @@
-// Copyright (C) 2010 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2023 Codership Oy <info@codership.com>
 
 /**
  * @file Miscellaneous utility functions
@@ -42,13 +42,20 @@ gu_str2ll (const char* str, long long* ll)
         shift += 10;
         ret++;
 
-        if (llret == ((llret << (shift + 1)) >> (shift + 1))) {
-            llret <<= shift;
-        }
-        else { /* ERANGE */
-            if (llret > 0) llret = LLONG_MAX;
-            else llret = LLONG_MIN;
-            errno = ERANGE;
+        {
+            long long const sign = (llret < 0 ? -1 : 1);
+            unsigned long long ullret = sign * llret;
+
+            if (ullret == ((ullret << (shift + 1)) >> (shift + 1))) {
+                ullret <<= shift;
+                llret = ullret;
+                llret *= sign;
+            }
+            else { /* ERANGE */
+                if (llret > 0) llret = LLONG_MAX;
+                else llret = LLONG_MIN;
+                errno = ERANGE;
+            }
         }
         /* fall through */
     default:

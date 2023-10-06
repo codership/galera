@@ -1,9 +1,13 @@
-/* Copyright (C) 2013-2020 Codership Oy <info@codership.com>
+/* Copyright (C) 2013-2023 Codership Oy <info@codership.com>
  *
  * $Id$
  */
 
 #undef NDEBUG
+
+#if defined(__sun)
+#define GALERA_ONLY_ALIGNED
+#endif
 
 #include "../src/data_set.hpp"
 

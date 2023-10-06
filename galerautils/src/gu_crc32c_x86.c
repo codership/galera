@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2020-2023 Codership Oy <info@codership.com>
  */
 
 /**
@@ -19,8 +19,9 @@
 #include <assert.h>
 #include <stdbool.h>
 
+/* process data preceding the first 4-aligned byte */
 static inline gu_crc32c_t
-crc32c_x86_tail3(gu_crc32c_t state, const uint8_t* ptr, size_t len)
+crc32c_x86_head3(gu_crc32c_t state, const uint8_t* ptr, size_t len)
 {
     assert(len < 4);
 
@@ -31,9 +32,31 @@ crc32c_x86_tail3(gu_crc32c_t state, const uint8_t* ptr, size_t len)
         ptr++;
         /* fall through */
     case 2:
+        /* this byte is 2-aligned */
         state = __builtin_ia32_crc32hi(state, *(uint16_t*)ptr);
         break;
     case 1:
+        state = __builtin_ia32_crc32qi(state, *ptr);
+    }
+
+    return state;
+}
+
+static inline gu_crc32c_t
+crc32c_x86_tail3(gu_crc32c_t state, const uint8_t* ptr, size_t len)
+{
+    assert(len < 4);
+
+    if (len >= 2)
+    {
+        /* this byte is 4-aligned */
+        state = __builtin_ia32_crc32hi(state, *(uint16_t*)ptr);
+        len -= sizeof(uint16_t);
+        ptr += sizeof(uint16_t);
+    }
+
+    if (len > 0)
+    {
         state = __builtin_ia32_crc32qi(state, *ptr);
     }
 
@@ -45,7 +68,16 @@ crc32c_x86(gu_crc32c_t state, const uint8_t* ptr, size_t len)
 {
     static size_t const arg_size = sizeof(uint32_t);
 
-    /* apparently no ptr misalignment protection is needed */
+    size_t align_offset = ((uintptr_t)ptr) % arg_size;
+    if (align_offset)
+    {
+        align_offset = arg_size - align_offset;
+        if (align_offset > len) align_offset = len;
+        state = crc32c_x86_head3(state, ptr, align_offset);
+        len -= align_offset;
+        ptr += align_offset;
+    }
+
     while (len >= arg_size)
     {
         state = __builtin_ia32_crc32si(state, *(uint32_t*)ptr);
@@ -72,6 +104,17 @@ gu_crc32c_x86_64(gu_crc32c_t state, const void* data, size_t len)
 
 #ifdef __LP64__
     static size_t const arg_size = sizeof(uint64_t);
+
+    size_t align_offset = ((uintptr_t)ptr) % arg_size;
+    if (align_offset)
+    {
+        align_offset = arg_size - align_offset;
+        if (align_offset > len) align_offset = len;
+        state = crc32c_x86(state, ptr, align_offset);
+        len -= align_offset;
+        ptr += align_offset;
+    }
+
     uint64_t state64 = state;
 
     while (len >= arg_size)
