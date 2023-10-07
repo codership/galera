@@ -1409,7 +1409,7 @@ group_for_each_donor_in_string (const gcs_group_t* const group,
          * that at least one of the nodes in the list will become available. */
         if (-EAGAIN != err) err = idx;
 
-        begin = end + 1; /* skip comma */
+        if (end) begin = end + 1; /* skip comma */
 
     } while (end != NULL);
 
@@ -1498,7 +1498,7 @@ group_find_ist_donor_by_name_in_string (
                 ret = idx;
             }
         }
-        begin = end + 1;
+        if (end) begin = end + 1;
     } while (end != NULL);
 
     if (ret == -1) {
