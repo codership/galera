@@ -506,7 +506,7 @@ START_TEST (gcs_core_test_api)
     size_t      act_size = sizeof(act3_str);
 
     action_t act_s(act, NULL, NULL, act_size, GCS_ACT_WRITESET, -1, (gu_thread_t)-1);
-    action_t act_r(act, NULL, NULL, -1, (gcs_act_type_t)-1, -1, (gu_thread_t)-1);
+    action_t act_r(act, NULL, NULL, -1, (gcs_act_type_t)GCS_ACT_UNKNOWN, -1, (gu_thread_t)-1);
     long i = 5;
 
     // test basic fragmentaiton
@@ -610,7 +610,7 @@ CORE_TEST_OWN (int gcs_proto_ver)
     size_t               act_size = sizeof(act2_str);
 
     action_t act_s(act, NULL, NULL, act_size, GCS_ACT_WRITESET, -1, (gu_thread_t)-1);
-    action_t act_r(act, NULL, NULL, -1, (gcs_act_type_t)-1, -1, (gu_thread_t)-1);
+    action_t act_r(act, NULL, NULL, -1, (gcs_act_type_t)GCS_ACT_UNKNOWN, -1, (gu_thread_t)-1);
 
     // Create primary and non-primary component messages
     gcs_comp_msg_t* prim     = gcs_comp_msg_new (true, false,  0, 1, 0);

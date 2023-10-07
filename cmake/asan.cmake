@@ -12,6 +12,7 @@ if (GALERA_WITH_UBSAN)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=undefined")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=undefined")
   add_definitions(-DGALERA_WITH_UBSAN)
+  # don't run unit tests that use outdaed unaligned record set format
   add_definitions(-DGALERA_ONLY_ALIGNED)
 
   find_library(UBSAN_LIB NAMES ubsan libubsan.so.1)

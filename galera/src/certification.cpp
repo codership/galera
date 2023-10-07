@@ -98,8 +98,8 @@ check_purge_complete(const galera::Certification::CertIndexNG& cert_index,
 {
     std::for_each(
         cert_index.begin(), cert_index.end(),
-        [&cert_index, &key_set,
-         ts](const galera::Certification::CertIndexNG::value_type& ke) {
+        [&key_set, ts]
+        (const galera::Certification::CertIndexNG::value_type& ke) {
             ke->for_each_ref([&ke, &key_set, ts](const TrxHandleSlave* ref) {
                 if (ts == ref)
                 {
