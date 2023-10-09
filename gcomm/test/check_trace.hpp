@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2014 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2023 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -173,7 +173,7 @@ namespace gcomm
         std::deque<Datagram*> out_;
         bool queue_;
         static std::unique_ptr<Protonet> net_;
-        Protonet& get_net();
+        static Protonet& get_net();
     public:
 
         DummyTransport(const UUID& uuid = UUID::nil(), bool queue = true,
