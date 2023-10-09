@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2023 Codership Oy <info@codership.com>
  */
 
 #include "evs_proto.hpp"
@@ -2490,67 +2490,63 @@ void gcomm::evs::Proto::handle_msg(const Message& msg,
 // Protolay interface
 ////////////////////////////////////////////////////////////////////////
 
-size_t gcomm::evs::Proto::unserialize_message(const UUID& source,
-                                              const Datagram& rb,
-                                              Message* msg)
+std::pair<std::unique_ptr<gcomm::evs::Message>, size_t>
+gcomm::evs::Proto::unserialize_message(const UUID& source, const Datagram& rb)
 {
-    size_t offset;
+    size_t offset = 0;
     const gu::byte_t* begin(gcomm::begin(rb));
     const size_t available(gcomm::available(rb));
-    gu_trace(offset = msg->unserialize(begin,
-                                       available,
-                                       0));
-    if ((msg->flags() & Message::F_SOURCE) == 0)
+    std::unique_ptr<Message> ret;
+    switch (Message::get_type(begin, available, offset))
+    {
+    case Message::EVS_T_NONE: gu_throw_fatal; break;
+    case Message::EVS_T_USER:
+        ret = std::unique_ptr<UserMessage>(new UserMessage);
+        gu_trace(offset = ret->unserialize(begin, available, offset));
+        break;
+    case Message::EVS_T_DELEGATE:
+        ret = std::unique_ptr<DelegateMessage>(new DelegateMessage);
+        gu_trace(offset = ret->unserialize(begin, available, offset));
+        break;
+    case Message::EVS_T_GAP:
+        ret = std::unique_ptr<GapMessage>(new GapMessage);
+        gu_trace(offset = ret->unserialize(begin, available, offset));
+        break;
+    case Message::EVS_T_JOIN:
+        ret = std::unique_ptr<JoinMessage>(new JoinMessage);
+        gu_trace(offset = ret->unserialize(begin, available, offset));
+        break;
+    case Message::EVS_T_INSTALL:
+        ret = std::unique_ptr<InstallMessage>(new InstallMessage);
+        gu_trace(offset = ret->unserialize(begin, available, offset));
+        break;
+    case Message::EVS_T_LEAVE:
+        ret = std::unique_ptr<LeaveMessage>(new LeaveMessage);
+        gu_trace(offset = ret->unserialize(begin, available, offset));
+        break;
+    case Message::EVS_T_DELAYED_LIST:
+        ret = std::unique_ptr<DelayedListMessage>(new DelayedListMessage);
+        gu_trace(offset = ret->unserialize(begin, available, offset));
+        break;
+    default:
+        return {std::unique_ptr<Message>{}, 0};
+    }
+
+    /* Message did not have source field, must be set from source reported
+       by the lower layer. */
+    if ((ret->flags() & Message::F_SOURCE) == 0)
     {
         assert(source != UUID::nil());
         gcomm_assert(source != UUID::nil());
-        msg->set_source(source);
+        ret->set_source(source);
     }
 
-    switch (msg->type())
-    {
-    case Message::EVS_T_NONE:
-        gu_throw_fatal;
-        break;
-    case Message::EVS_T_USER:
-        gu_trace(offset = static_cast<UserMessage&>(*msg).unserialize(
-                     begin, available, offset, true));
-        break;
-    case Message::EVS_T_DELEGATE:
-        gu_trace(offset = static_cast<DelegateMessage&>(*msg).unserialize(
-                     begin, available, offset, true));
-        break;
-    case Message::EVS_T_GAP:
-        gu_trace(offset = static_cast<GapMessage&>(*msg).unserialize(
-                     begin, available, offset, true));
-        break;
-    case Message::EVS_T_JOIN:
-        gu_trace(offset = static_cast<JoinMessage&>(*msg).unserialize(
-                     begin, available, offset, true));
-        break;
-    case Message::EVS_T_INSTALL:
-        gu_trace(offset = static_cast<InstallMessage&>(*msg).unserialize(
-                     begin, available, offset, true));
-        break;
-    case Message::EVS_T_LEAVE:
-        gu_trace(offset = static_cast<LeaveMessage&>(*msg).unserialize(
-                     begin, available, offset, true));
-        break;
-    case Message::EVS_T_DELAYED_LIST:
-        gu_trace(offset = static_cast<DelayedListMessage&>(*msg).unserialize(
-                     begin, available, offset, true));
-        break;
-    }
-    return (offset + rb.offset());
+    return {std::move(ret), offset + rb.offset()};
 }
 
-void gcomm::evs::Proto::handle_up(const void* cid,
-                                  const Datagram& rb,
+void gcomm::evs::Proto::handle_up(const void* cid, const Datagram& rb,
                                   const ProtoUpMeta& um)
 {
-
-    Message msg;
-
     if (state() == S_CLOSED || um.source() == uuid() || is_evicted(um.source()))
     {
         // Silent drop
@@ -2559,12 +2555,16 @@ void gcomm::evs::Proto::handle_up(const void* cid,
 
     gcomm_assert(um.source() != UUID::nil());
 
+    std::pair<std::unique_ptr<Message>, size_t> msg;
     try
     {
-        size_t offset;
-        gu_trace(offset = unserialize_message(um.source(), rb, &msg));
-        handle_msg(msg, Datagram(rb, offset),
-                   (msg.flags() & Message::F_RETRANS) == 0);
+        gu_trace(msg = unserialize_message(um.source(), rb));
+        if (not msg.first) {
+            /* Message could not be serialized. */
+            return;
+        }
+        handle_msg(*msg.first, Datagram(rb, msg.second),
+                   (msg.first->flags() & Message::F_RETRANS) == 0);
     }
     catch (gu::Exception& e)
     {
@@ -2575,11 +2575,11 @@ void gcomm::evs::Proto::handle_up(const void* cid,
             break;
 
         case EINVAL:
-            log_warn << "invalid message: " << msg;
+            log_warn << "invalid message: " << *msg.first;
             break;
 
         default:
-            log_fatal << "exception caused by message: " << msg;
+            log_fatal << "exception caused by message: " << *msg.first;
             std::cerr << " state after handling message: " << *this;
             throw;
         }
@@ -3791,19 +3791,19 @@ void gcomm::evs::Proto::handle_user(const UserMessage& msg,
     }
 }
 
-
 void gcomm::evs::Proto::handle_delegate(const DelegateMessage& msg,
                                         NodeMap::iterator ii,
                                         const Datagram& rb)
 {
     gcomm_assert(ii != known_.end());
     evs_log_debug(D_DELEGATE_MSGS) << "delegate message " << msg;
-    Message umsg;
-    size_t offset;
-    gu_trace(offset = unserialize_message(UUID::nil(), rb, &umsg));
-    gu_trace(handle_msg(umsg, Datagram(rb, offset), false));
+    std::pair<std::unique_ptr<Message>, size_t> umsg;
+    gu_trace(umsg = unserialize_message(UUID::nil(), rb));
+    if (not umsg.first) {
+        return;
+    }
+    gu_trace(handle_msg(*umsg.first, Datagram(rb, umsg.second), false));
 }
-
 
 void gcomm::evs::Proto::handle_gap(const GapMessage& msg, NodeMap::iterator ii)
 {

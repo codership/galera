@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2012 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2023 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -179,8 +179,16 @@ size_t gcomm::evs::Message::serialize(gu::byte_t* const buf,
     return offset;
 }
 
+gcomm::evs::Message::Type gcomm::evs::Message::get_type(const gu::byte_t* buf,
+                                                        size_t buflen,
+                                                        size_t offset)
+{
+    uint8_t b;
+    gu_trace(offset = gu::unserialize1(buf, buflen, offset, b));
+    return static_cast<Type>((b >> 2) & 0x7);
+}
 
-size_t gcomm::evs::Message::unserialize(const gu::byte_t* const buf,
+size_t gcomm::evs::Message::unserialize_common(const gu::byte_t* const buf,
                                         size_t            const buflen,
                                         size_t                  offset)
 {
@@ -267,13 +275,9 @@ size_t gcomm::evs::UserMessage::serialize(gu::byte_t* const buf,
 
 size_t gcomm::evs::UserMessage::unserialize(const gu::byte_t* const buf,
                                             size_t            const buflen,
-                                            size_t                  offset,
-                                            bool                    skip_header)
+                                            size_t                  offset)
 {
-    if (skip_header == false)
-    {
-        gu_trace(offset = Message::unserialize(buf, buflen, offset));
-    }
+    gu_trace(offset = Message::unserialize_common(buf, buflen, offset));
     gu_trace(offset = gu::unserialize1(buf, buflen, offset, user_type_));
     uint8_t b;
     gu_trace(offset = gu::unserialize1(buf, buflen, offset, b));
@@ -340,13 +344,9 @@ size_t gcomm::evs::DelegateMessage::serialize(gu::byte_t* const buf,
 
 size_t gcomm::evs::DelegateMessage::unserialize(const gu::byte_t* const buf,
                                                 size_t            const buflen,
-                                                size_t                  offset,
-                                                bool                    skip_header)
+                                                size_t                  offset)
 {
-    if (skip_header == false)
-    {
-        gu_trace(offset = Message::unserialize(buf, buflen, offset));
-    }
+    gu_trace(offset = Message::unserialize_common(buf, buflen, offset));
     return offset;
 }
 
@@ -371,13 +371,9 @@ size_t gcomm::evs::GapMessage::serialize(gu::byte_t* const buf,
 
 size_t gcomm::evs::GapMessage::unserialize(const gu::byte_t* const buf,
                                            size_t            const buflen,
-                                           size_t                  offset,
-                                           bool                    skip_header)
+                                           size_t                  offset)
 {
-    if (skip_header == false)
-    {
-        gu_trace(offset = Message::unserialize(buf, buflen, offset));
-    }
+    gu_trace(offset = Message::unserialize_common(buf, buflen, offset));
     gu_trace(offset = gu::unserialize8(buf, buflen, offset, seq_));
     gu_trace(offset = gu::unserialize8(buf, buflen, offset, aru_seq_));
     gu_trace(offset = range_uuid_.unserialize(buf, buflen, offset));
@@ -406,13 +402,9 @@ size_t gcomm::evs::JoinMessage::serialize(gu::byte_t* const buf,
 
 size_t gcomm::evs::JoinMessage::unserialize(const gu::byte_t* const buf,
                                             size_t            const buflen,
-                                            size_t                  offset,
-                                            bool                    skip_header)
+                                            size_t                  offset)
 {
-    if (skip_header == false)
-    {
-        gu_trace(offset = Message::unserialize(buf, buflen, offset));
-    }
+    gu_trace(offset = Message::unserialize_common(buf, buflen, offset));
     gu_trace(offset = gu::unserialize8(buf, buflen, offset, seq_));
     gu_trace(offset = gu::unserialize8(buf, buflen, offset, aru_seq_));
     node_list_.clear();
@@ -441,13 +433,9 @@ size_t gcomm::evs::InstallMessage::serialize(gu::byte_t* const buf,
 
 size_t gcomm::evs::InstallMessage::unserialize(const gu::byte_t* const buf,
                                                size_t            const buflen,
-                                               size_t                  offset,
-                                               bool skip_header)
+                                               size_t                  offset)
 {
-    if (skip_header == false)
-    {
-        gu_trace(offset = Message::unserialize(buf, buflen, offset));
-    }
+    gu_trace(offset = Message::unserialize_common(buf, buflen, offset));
     gu_trace(offset = gu::unserialize8(buf, buflen, offset, seq_));
     gu_trace(offset = gu::unserialize8(buf, buflen, offset, aru_seq_));
     gu_trace(offset = install_view_id_.unserialize(buf, buflen, offset));
@@ -477,13 +465,9 @@ size_t gcomm::evs::LeaveMessage::serialize(gu::byte_t* const buf,
 
 size_t gcomm::evs::LeaveMessage::unserialize(const gu::byte_t* const buf,
                                              size_t            const buflen,
-                                             size_t                  offset,
-                                             bool skip_header)
+                                             size_t                  offset)
 {
-    if (skip_header == false)
-    {
-        gu_trace(offset = Message::unserialize(buf, buflen, offset));
-    }
+    gu_trace(offset = Message::unserialize_common(buf, buflen, offset));
     gu_trace(offset = gu::unserialize8(buf, buflen, offset, seq_));
     gu_trace(offset = gu::unserialize8(buf, buflen, offset, aru_seq_));
     return offset;
@@ -512,13 +496,9 @@ size_t gcomm::evs::DelayedListMessage::serialize(gu::byte_t* const buf,
 
 size_t gcomm::evs::DelayedListMessage::unserialize(const gu::byte_t* const buf,
                                                  size_t            const buflen,
-                                                 size_t                  offset,
-                                                 bool skip_header)
+                                                 size_t                  offset)
 {
-    if (skip_header == false)
-    {
-        gu_trace(offset = Message::unserialize(buf, buflen, offset));
-    }
+    gu_trace(offset = Message::unserialize_common(buf, buflen, offset));
     delayed_list_.clear();
     uint8_t list_sz(0);
     gu_trace(offset = gu::unserialize1(buf, buflen, offset, list_sz));

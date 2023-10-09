@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2023 Codership Oy <info@codership.com>
  */
 
 /*!
@@ -288,11 +288,9 @@ private:
     void populate_node_list(MessageNodeList*) const;
     void isolate(gu::datetime::Period period);
 public:
-    static size_t unserialize_message(const UUID&,
-                                      const Datagram&,
-                                      Message*);
-    void handle_msg(const Message& msg,
-                    const Datagram& dg = Datagram(),
+    static std::pair<std::unique_ptr<gcomm::evs::Message>, size_t>
+    unserialize_message(const UUID&, const Datagram&);
+    void handle_msg(const Message& msg, const Datagram& dg = Datagram(),
                     bool direct = true);
     // Protolay
     void handle_up(const void*, const Datagram&, const ProtoUpMeta&);

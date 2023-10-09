@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2023 Codership Oy <info@codership.com>
  */
 
 /*!
@@ -455,12 +455,13 @@ START_TEST(test_input_map_gap_range_list)
 }
 END_TEST
 
-static Datagram* get_msg(DummyTransport* tp, Message* msg, bool release = true)
+static Datagram* get_msg(DummyTransport* tp, std::unique_ptr<Message>& msg,
+                         bool release = true)
 {
     Datagram* rb = tp->out();
     if (rb != 0)
     {
-        gu_trace(Proto::unserialize_message(tp->uuid(), *rb, msg));
+        msg = Proto::unserialize_message(tp->uuid(), *rb).first;
         if (release == true)
         {
             delete rb;
@@ -471,7 +472,7 @@ static Datagram* get_msg(DummyTransport* tp, Message* msg, bool release = true)
 
 static void single_join(DummyTransport* t, Proto* p)
 {
-    Message jm, im, gm;
+    std::unique_ptr<Message> jm, im, gm;
 
     // Initial state is joining
     p->shift_to(Proto::S_JOINING);
@@ -479,42 +480,42 @@ static void single_join(DummyTransport* t, Proto* p)
     // Send join must produce emitted join message
     p->send_join();
 
-    Datagram* rb = get_msg(t, &jm);
+    Datagram* rb = get_msg(t, jm);
     ck_assert(rb != 0);
-    ck_assert(jm.type() == Message::EVS_T_JOIN);
+    ck_assert(jm->type() == Message::EVS_T_JOIN);
 
     // Install message is emitted at the end of JOIN handling
     // 'cause this is the only instance and is always consistent
     // with itself
-    rb = get_msg(t, &im);
+    rb = get_msg(t, im);
     ck_assert(rb != 0);
-    ck_assert(im.type() == Message::EVS_T_INSTALL);
+    ck_assert(im->type() == Message::EVS_T_INSTALL);
 
     // Handling INSTALL message emits three gap messages,
     // one for receiving install message (commit gap), one for
     // shift to install and one for shift to operational
-    rb = get_msg(t, &gm);
+    rb = get_msg(t, gm);
     ck_assert(rb != 0);
-    ck_assert(gm.type() == Message::EVS_T_GAP);
-    ck_assert((gm.flags() & Message::F_COMMIT) != 0);
+    ck_assert(gm->type() == Message::EVS_T_GAP);
+    ck_assert((gm->flags() & Message::F_COMMIT) != 0);
 
-    rb = get_msg(t, &gm);
+    rb = get_msg(t, gm);
     ck_assert(rb != 0);
-    ck_assert(gm.type() == Message::EVS_T_GAP);
-    ck_assert((gm.flags() & Message::F_COMMIT) == 0);
+    ck_assert(gm->type() == Message::EVS_T_GAP);
+    ck_assert((gm->flags() & Message::F_COMMIT) == 0);
 
-    rb = get_msg(t, &gm);
+    rb = get_msg(t, gm);
     ck_assert(rb != 0);
-    ck_assert(gm.type() == Message::EVS_T_GAP);
-    ck_assert((gm.flags() & Message::F_COMMIT) == 0);
+    ck_assert(gm->type() == Message::EVS_T_GAP);
+    ck_assert((gm->flags() & Message::F_COMMIT) == 0);
 
     // State must have evolved JOIN -> S_GATHER -> S_INSTALL -> S_OPERATIONAL
     ck_assert(p->state() == Proto::S_OPERATIONAL);
 
     // Handle join message again, must stay in S_OPERATIONAL, must not
     // emit anything
-    p->handle_msg(jm);
-    rb = get_msg(t, &gm);
+    p->handle_msg(*jm);
+    rb = get_msg(t, gm);
     ck_assert(rb == 0);
     ck_assert(p->state() == Proto::S_OPERATIONAL);
 
@@ -553,11 +554,11 @@ static void double_join(DummyTransport* t1, Proto* p1,
                         DummyTransport* t2, Proto* p2)
 {
 
-    Message jm;
-    Message im;
-    Message gm;
-    Message gm2;
-    Message msg;
+    std::unique_ptr<Message> jm;
+    std::unique_ptr<Message> im;
+    std::unique_ptr<Message> gm;
+    std::unique_ptr<Message> gm2;
+    std::unique_ptr<Message> msg;
 
     Datagram* rb;
 
@@ -570,99 +571,99 @@ static void double_join(DummyTransport* t1, Proto* p1,
     // Expected output: one join message
     p2->send_join(false);
     ck_assert(p2->state() == Proto::S_JOINING);
-    rb = get_msg(t2, &jm);
+    rb = get_msg(t2, jm);
     ck_assert(rb != 0);
-    ck_assert(jm.type() == Message::EVS_T_JOIN);
-    rb = get_msg(t2, &msg);
+    ck_assert(jm->type() == Message::EVS_T_JOIN);
+    rb = get_msg(t2, msg);
     ck_assert(rb == 0);
 
     // Handle node 2's join on node 1
     // Expected output: shift to S_GATHER and one join message
-    p1->handle_msg(jm);
+    p1->handle_msg(*jm);
     ck_assert(p1->state() == Proto::S_GATHER);
-    rb = get_msg(t1, &jm);
+    rb = get_msg(t1, jm);
     ck_assert(rb != 0);
-    ck_assert(jm.type() == Message::EVS_T_JOIN);
-    rb = get_msg(t1, &msg);
+    ck_assert(jm->type() == Message::EVS_T_JOIN);
+    rb = get_msg(t1, msg);
     ck_assert(rb == 0);
 
     // Handle node 1's join on node 2
     // Expected output: shift to S_GATHER and one join message
-    p2->handle_msg(jm);
+    p2->handle_msg(*jm);
     ck_assert(p2->state() == Proto::S_GATHER);
-    rb = get_msg(t2, &jm);
+    rb = get_msg(t2, jm);
     ck_assert(rb != 0);
-    ck_assert(jm.type() == Message::EVS_T_JOIN);
-    rb = get_msg(t2, &msg);
+    ck_assert(jm->type() == Message::EVS_T_JOIN);
+    rb = get_msg(t2, msg);
     ck_assert(rb == 0);
 
     // Handle node 2's join on node 1
     // Expected output: Install and commit gap messages, state stays in S_GATHER
-    p1->handle_msg(jm);
+    p1->handle_msg(*jm);
     ck_assert(p1->state() == Proto::S_GATHER);
-    rb = get_msg(t1, &im);
+    rb = get_msg(t1, im);
     ck_assert(rb != 0);
-    ck_assert(im.type() == Message::EVS_T_INSTALL);
-    rb = get_msg(t1, &gm);
+    ck_assert(im->type() == Message::EVS_T_INSTALL);
+    rb = get_msg(t1, gm);
     ck_assert(rb != 0);
-    ck_assert(gm.type() == Message::EVS_T_GAP);
-    ck_assert((gm.flags() & Message::F_COMMIT) != 0);
-    rb = get_msg(t1, &msg);
+    ck_assert(gm->type() == Message::EVS_T_GAP);
+    ck_assert((gm->flags() & Message::F_COMMIT) != 0);
+    rb = get_msg(t1, msg);
     ck_assert(rb == 0);
 
     // Handle install message on node 2
     // Expected output: commit gap message and state stays in S_RECOVERY
-    p2->handle_msg(im);
+    p2->handle_msg(*im);
     ck_assert(p2->state() == Proto::S_GATHER);
-    rb = get_msg(t2, &gm2);
+    rb = get_msg(t2, gm2);
     ck_assert(rb != 0);
-    ck_assert(gm2.type() == Message::EVS_T_GAP);
-    ck_assert((gm2.flags() & Message::F_COMMIT) != 0);
-    rb = get_msg(t2, &msg);
+    ck_assert(gm2->type() == Message::EVS_T_GAP);
+    ck_assert((gm2->flags() & Message::F_COMMIT) != 0);
+    rb = get_msg(t2, msg);
     ck_assert(rb == 0);
 
     // Handle gap messages
     // Expected output: Both nodes shift to S_INSTALL,
     // both send gap messages
-    p1->handle_msg(gm2);
+    p1->handle_msg(*gm2);
     ck_assert(p1->state() == Proto::S_INSTALL);
-    Message gm12;
-    rb = get_msg(t1, &gm12);
+    std::unique_ptr<Message> gm12;
+    rb = get_msg(t1, gm12);
     ck_assert(rb != 0);
-    ck_assert(gm12.type() == Message::EVS_T_GAP);
-    ck_assert((gm12.flags() & Message::F_COMMIT) == 0);
-    rb = get_msg(t1, &msg);
+    ck_assert(gm12->type() == Message::EVS_T_GAP);
+    ck_assert((gm12->flags() & Message::F_COMMIT) == 0);
+    rb = get_msg(t1, msg);
     ck_assert(rb == 0);
 
-    p2->handle_msg(gm);
+    p2->handle_msg(*gm);
     ck_assert(p2->state() == Proto::S_INSTALL);
-    Message gm22;
-    rb = get_msg(t2, &gm22);
+    std::unique_ptr<Message> gm22;
+    rb = get_msg(t2, gm22);
     ck_assert(rb != 0);
-    ck_assert(gm22.type() == Message::EVS_T_GAP);
-    ck_assert((gm22.flags() & Message::F_COMMIT) == 0);
-    rb = get_msg(t2, &msg);
+    ck_assert(gm22->type() == Message::EVS_T_GAP);
+    ck_assert((gm22->flags() & Message::F_COMMIT) == 0);
+    rb = get_msg(t2, msg);
     ck_assert(rb == 0);
 
     // Handle final gap messages, expected output shift to operational
     // and gap message
 
-    p1->handle_msg(gm22);
+    p1->handle_msg(*gm22);
     ck_assert(p1->state() == Proto::S_OPERATIONAL);
-    rb = get_msg(t1, &msg);
+    rb = get_msg(t1, msg);
     ck_assert(rb != 0);
-    ck_assert(msg.type() == Message::EVS_T_GAP);
-    ck_assert((msg.flags() & Message::F_COMMIT) == 0);
-    rb = get_msg(t1, &msg);
+    ck_assert(msg->type() == Message::EVS_T_GAP);
+    ck_assert((msg->flags() & Message::F_COMMIT) == 0);
+    rb = get_msg(t1, msg);
     ck_assert(rb == 0);
 
-    p2->handle_msg(gm12);
+    p2->handle_msg(*gm12);
     ck_assert(p2->state() == Proto::S_OPERATIONAL);
-    rb = get_msg(t2, &msg);
+    rb = get_msg(t2, msg);
     ck_assert(rb != 0);
-    ck_assert(msg.type() == Message::EVS_T_GAP);
-    ck_assert((msg.flags() & Message::F_COMMIT) == 0);
-    rb = get_msg(t2, &msg);
+    ck_assert(msg->type() == Message::EVS_T_GAP);
+    ck_assert((msg->flags() & Message::F_COMMIT) == 0);
+    rb = get_msg(t2, msg);
     ck_assert(rb == 0);
 
 }
@@ -2031,12 +2032,12 @@ START_TEST(test_gh_100)
     // install message is generated. After that handle install timer
     // on p1 and verify that the newly generated install message has
     // greater install view id seqno than the first one.
-    Message jm;
-    Message im;
-    Message im2;
-    Message gm;
-    Message gm2;
-    Message msg;
+    std::unique_ptr<Message> jm;
+    std::unique_ptr<Message> im;
+    std::unique_ptr<Message> im2;
+    std::unique_ptr<Message> gm;
+    std::unique_ptr<Message> gm2;
+    std::unique_ptr<Message> msg;
 
     Datagram* rb;
 
@@ -2049,56 +2050,56 @@ START_TEST(test_gh_100)
     // Expected output: one join message
     p2.send_join(false);
     ck_assert(p2.state() == Proto::S_JOINING);
-    rb = get_msg(&t2, &jm);
+    rb = get_msg(&t2, jm);
     ck_assert(rb != 0);
-    ck_assert(jm.type() == Message::EVS_T_JOIN);
-    rb = get_msg(&t2, &msg);
+    ck_assert(jm->type() == Message::EVS_T_JOIN);
+    rb = get_msg(&t2, msg);
     ck_assert(rb == 0);
 
     // Handle node 2's join on node 1
     // Expected output: shift to S_GATHER and one join message
-    p1.handle_msg(jm);
+    p1.handle_msg(*jm);
     ck_assert(p1.state() == Proto::S_GATHER);
-    rb = get_msg(&t1, &jm);
+    rb = get_msg(&t1, jm);
     ck_assert(rb != 0);
-    ck_assert(jm.type() == Message::EVS_T_JOIN);
-    rb = get_msg(&t1, &msg);
+    ck_assert(jm->type() == Message::EVS_T_JOIN);
+    rb = get_msg(&t1, msg);
     ck_assert(rb == 0);
 
     // Handle node 1's join on node 2
     // Expected output: shift to S_GATHER and one join message
-    p2.handle_msg(jm);
+    p2.handle_msg(*jm);
     ck_assert(p2.state() == Proto::S_GATHER);
-    rb = get_msg(&t2, &jm);
+    rb = get_msg(&t2, jm);
     ck_assert(rb != 0);
-    ck_assert(jm.type() == Message::EVS_T_JOIN);
-    rb = get_msg(&t2, &msg);
+    ck_assert(jm->type() == Message::EVS_T_JOIN);
+    rb = get_msg(&t2, msg);
     ck_assert(rb == 0);
 
     // Handle node 2's join on node 1
     // Expected output: Install and commit gap messages, state stays in S_GATHER
-    p1.handle_msg(jm);
+    p1.handle_msg(*jm);
     ck_assert(p1.state() == Proto::S_GATHER);
-    rb = get_msg(&t1, &im);
+    rb = get_msg(&t1, im);
     ck_assert(rb != 0);
-    ck_assert(im.type() == Message::EVS_T_INSTALL);
-    rb = get_msg(&t1, &gm);
+    ck_assert(im->type() == Message::EVS_T_INSTALL);
+    rb = get_msg(&t1, gm);
     ck_assert(rb != 0);
-    ck_assert(gm.type() == Message::EVS_T_GAP);
-    ck_assert((gm.flags() & Message::F_COMMIT) != 0);
-    rb = get_msg(&t1, &msg);
+    ck_assert(gm->type() == Message::EVS_T_GAP);
+    ck_assert((gm->flags() & Message::F_COMMIT) != 0);
+    rb = get_msg(&t1, msg);
     ck_assert(rb == 0);
 
     // Handle timers to  to generate shift to GATHER
     p1.handle_inactivity_timer();
     p1.handle_install_timer();
-    rb = get_msg(&t1, &jm);
+    rb = get_msg(&t1, jm);
     ck_assert(rb != 0);
-    ck_assert(jm.type() == Message::EVS_T_JOIN);
-    rb = get_msg(&t1, &im2);
+    ck_assert(jm->type() == Message::EVS_T_JOIN);
+    rb = get_msg(&t1, im2);
     ck_assert(rb != 0);
-    ck_assert(im2.type() == Message::EVS_T_INSTALL);
-    ck_assert(im2.install_view_id().seq() > im.install_view_id().seq());
+    ck_assert(im2->type() == Message::EVS_T_INSTALL);
+    ck_assert(im2->install_view_id().seq() > im->install_view_id().seq());
 
     gcomm::Datagram* tmp;
     while ((tmp = t1.out())) delete tmp;
@@ -2195,14 +2196,14 @@ START_TEST(test_gal_521)
     ck_assert(t2->empty() == false);
 
     Datagram *d1;
-    Message um1;
-    ck_assert((d1 = get_msg(t1, &um1, false)) != 0);
-    ck_assert(um1.type() == Message::EVS_T_USER);
+    std::unique_ptr<Message> um1;
+    ck_assert((d1 = get_msg(t1, um1, false)) != 0);
+    ck_assert(um1->type() == Message::EVS_T_USER);
     ck_assert(t1->empty() == true);
     Datagram *d2;
-    Message um2;
-    ck_assert((d2 = get_msg(t2, &um2, false)) != 0);
-    ck_assert(um2.type() == Message::EVS_T_USER);
+    std::unique_ptr<Message> um2;
+    ck_assert((d2 = get_msg(t2, um2, false)) != 0);
+    ck_assert(um2->type() == Message::EVS_T_USER);
     ck_assert(t2->empty() == true);
 
     // Both of the nodes handle each other's messages. Now due to
@@ -2211,53 +2212,53 @@ START_TEST(test_gal_521)
     // must emit gap messages to make safe_seq to progress.
     evs1->handle_up(0, *d2, ProtoUpMeta(dn[1]->uuid()));
     delete d2;
-    Message gm1;
-    ck_assert(get_msg(t1, &gm1) != 0);
-    ck_assert(gm1.type() == Message::EVS_T_GAP);
+    std::unique_ptr<Message> gm1;
+    ck_assert(get_msg(t1, gm1) != 0);
+    ck_assert(gm1->type() == Message::EVS_T_GAP);
     ck_assert(t1->empty() == true);
 
     evs2->handle_up(0, *d1, ProtoUpMeta(dn[0]->uuid()));
     delete d1;
-    Message gm2;
-    ck_assert(get_msg(t2, &gm2) != 0);
-    ck_assert(gm2.type() == Message::EVS_T_GAP);
+    std::unique_ptr<Message> gm2;
+    ck_assert(get_msg(t2, gm2) != 0);
+    ck_assert(gm2->type() == Message::EVS_T_GAP);
     ck_assert(t2->empty() == true);
 
     // Handle gap messages. The safe_seq is now incremented so the
     // second user messages are now sent from output queue.
-    evs1->handle_msg(gm2);
-    ck_assert((d1 = get_msg(t1, &um1, false)) != 0);
-    ck_assert(um1.type() == Message::EVS_T_USER);
+    evs1->handle_msg(*gm2);
+    ck_assert((d1 = get_msg(t1, um1, false)) != 0);
+    ck_assert(um1->type() == Message::EVS_T_USER);
     ck_assert(t1->empty() == true);
 
-    evs2->handle_msg(gm1);
-    ck_assert((d2 = get_msg(t2, &um2, false)) != 0);
-    ck_assert(um2.type() == Message::EVS_T_USER);
+    evs2->handle_msg(*gm1);
+    ck_assert((d2 = get_msg(t2, um2, false)) != 0);
+    ck_assert(um2->type() == Message::EVS_T_USER);
     ck_assert(t2->empty() == true);
 
     // Handle user messages. Each node should now emit gap
     // because the output queue is empty.
     evs1->handle_up(0, *d2, ProtoUpMeta(dn[1]->uuid()));
     delete d2;
-    ck_assert(get_msg(t1, &gm1) != 0);
-    ck_assert(gm1.type() == Message::EVS_T_GAP);
+    ck_assert(get_msg(t1, gm1) != 0);
+    ck_assert(gm1->type() == Message::EVS_T_GAP);
     ck_assert(t1->empty() == true);
 
     evs2->handle_up(0, *d1, ProtoUpMeta(dn[0]->uuid()));
     delete d1;
-    ck_assert(get_msg(t2, &gm2) != 0);
-    ck_assert(gm2.type() == Message::EVS_T_GAP);
+    ck_assert(get_msg(t2, gm2) != 0);
+    ck_assert(gm2->type() == Message::EVS_T_GAP);
     ck_assert(t2->empty() == true);
 
     // Handle gap messages. No further messages should be emitted
     // since both user messages have been delivered, there are
     // no pending user messages in the output queue and no timers
     // have been expired.
-    evs1->handle_msg(gm2);
-    ck_assert((d1 = get_msg(t1, &um1, false)) == 0);
+    evs1->handle_msg(*gm2);
+    ck_assert((d1 = get_msg(t1, um1, false)) == 0);
 
-    evs2->handle_msg(gm1);
-    ck_assert((d2 = get_msg(t2, &um2, false)) == 0);
+    evs2->handle_msg(*gm1);
+    ck_assert((d2 = get_msg(t2, um2, false)) == 0);
 
 
     std::for_each(dn.begin(), dn.end(), DeleteObject());
@@ -2332,70 +2333,70 @@ START_TEST(test_gap_rate_limit)
     // the rest are handled by node2 for generating gap messages.
     f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE));
     gcomm::Datagram* read_dg;
-    gcomm::evs::Message um1;
-    read_dg = get_msg(&f.tr1, &um1);
+    std::unique_ptr<gcomm::evs::Message> um1;
+    read_dg = get_msg(&f.tr1, um1);
     ck_assert(read_dg != 0);
     f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE));
-    gcomm::evs::Message um2;
-    read_dg = get_msg(&f.tr1, &um2);
+    std::unique_ptr<gcomm::evs::Message> um2;
+    read_dg = get_msg(&f.tr1, um2);
     ck_assert(read_dg != 0);
     f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE));
-    gcomm::evs::Message um3;
-    read_dg = get_msg(&f.tr1, &um3);
+    std::unique_ptr<gcomm::evs::Message> um3;
+    read_dg = get_msg(&f.tr1, um3);
     ck_assert(read_dg != 0);
     f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE));
-    gcomm::evs::Message um4;
-    read_dg = get_msg(&f.tr1, &um4);
+    std::unique_ptr<gcomm::evs::Message> um4;
+    read_dg = get_msg(&f.tr1, um4);
     ck_assert(read_dg != 0);
 
     // Make node2 handle an out of order message and verify that gap is emitted
-    f.evs2.handle_msg(um2);
-    gcomm::evs::Message gm1;
-    read_dg = get_msg(&f.tr2, &gm1);
+    f.evs2.handle_msg(*um2);
+    std::unique_ptr<gcomm::evs::Message> gm1;
+    read_dg = get_msg(&f.tr2, gm1);
     ck_assert(read_dg != 0);
-    ck_assert(gm1.type() == gcomm::evs::Message::EVS_T_GAP);
-    ck_assert(gm1.range_uuid() == f.uuid1);
-    ck_assert(gm1.range().lu() == 0);
-    ck_assert(gm1.range().hs() == 0);
+    ck_assert(gm1->type() == gcomm::evs::Message::EVS_T_GAP);
+    ck_assert(gm1->range_uuid() == f.uuid1);
+    ck_assert(gm1->range().lu() == 0);
+    ck_assert(gm1->range().hs() == 0);
     // The node2 will also send an user message to complete the sequence
     // number. Consume it.
-    gcomm::evs::Message comp_um1;
-    read_dg = get_msg(&f.tr2, &comp_um1);
+    std::unique_ptr<gcomm::evs::Message> comp_um1;
+    read_dg = get_msg(&f.tr2, comp_um1);
     ck_assert(read_dg != 0);
-    ck_assert(comp_um1.type() == gcomm::evs::Message::EVS_T_USER);
-    ck_assert(comp_um1.seq() + comp_um1.seq_range() == 1);
+    ck_assert(comp_um1->type() == gcomm::evs::Message::EVS_T_USER);
+    ck_assert(comp_um1->seq() + comp_um1->seq_range() == 1);
     // No further messages should be emitted
-    read_dg = get_msg(&f.tr2, &comp_um1);
+    read_dg = get_msg(&f.tr2, comp_um1);
     ck_assert(read_dg == 0);
 
     // Handle the second out of order message, gap should not be emitted.
     // There will be a next user message which completes the um3.
-    f.evs2.handle_msg(um3);
-    gcomm::evs::Message comp_um2;
-    read_dg = get_msg(&f.tr2, &comp_um2);
+    f.evs2.handle_msg(*um3);
+    std::unique_ptr<gcomm::evs::Message> comp_um2;
+    read_dg = get_msg(&f.tr2, comp_um2);
     ck_assert(read_dg != 0);
-    ck_assert(comp_um2.type() == gcomm::evs::Message::EVS_T_USER);
-    ck_assert(comp_um2.seq() + comp_um2.seq_range() == 2);
+    ck_assert(comp_um2->type() == gcomm::evs::Message::EVS_T_USER);
+    ck_assert(comp_um2->seq() + comp_um2->seq_range() == 2);
 
     // There should not be any more gap messages.
-    read_dg = get_msg(&f.tr2, &gm1);
+    read_dg = get_msg(&f.tr2, gm1);
     ck_assert(read_dg == 0);
 
     // Move the clock forwards and handle the fourth message, gap should
     // now emitted.
     gu::datetime::SimClock::inc_time(100*gu::datetime::MSec);
-    gcomm::evs::Message gm2;
-    f.evs2.handle_msg(um4);
-    read_dg = get_msg(&f.tr2, &gm2);
+    std::unique_ptr<gcomm::evs::Message> gm2;
+    f.evs2.handle_msg(*um4);
+    read_dg = get_msg(&f.tr2, gm2);
     ck_assert(read_dg != 0);
-    ck_assert(gm2.type() == gcomm::evs::Message::EVS_T_GAP);
-    ck_assert(gm2.range().lu() == 0);
-    ck_assert(gm2.range().hs() == 0);
+    ck_assert(gm2->type() == gcomm::evs::Message::EVS_T_GAP);
+    ck_assert(gm2->range().lu() == 0);
+    ck_assert(gm2->range().hs() == 0);
 
-    gcomm::evs::Message comp_u4;
-    read_dg = get_msg(&f.tr2, &comp_u4);
+    std::unique_ptr<gcomm::evs::Message> comp_u4;
+    read_dg = get_msg(&f.tr2, comp_u4);
     ck_assert(read_dg != 0);
-    ck_assert(comp_u4.type() == gcomm::evs::Message::EVS_T_USER);
+    ck_assert(comp_u4->type() == gcomm::evs::Message::EVS_T_USER);
     log_info << "END test_gap_rate_limit";
 }
 END_TEST
@@ -2427,75 +2428,75 @@ START_TEST(test_gap_rate_limit_delayed)
     // the rest are handled by node2 for generating gap messages.
     f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE));
     gcomm::Datagram* read_dg;
-    gcomm::evs::Message um1;
-    read_dg = get_msg(&f.tr1, &um1);
+    std::unique_ptr<gcomm::evs::Message> um1;
+    read_dg = get_msg(&f.tr1, um1);
     ck_assert(read_dg != 0);
     f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE));
-    gcomm::evs::Message um2;
-    read_dg = get_msg(&f.tr1, &um2);
+    std::unique_ptr<gcomm::evs::Message> um2;
+    read_dg = get_msg(&f.tr1, um2);
     ck_assert(read_dg != 0);
     f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE));
-    gcomm::evs::Message um3;
-    read_dg = get_msg(&f.tr1, &um3);
+    std::unique_ptr<gcomm::evs::Message> um3;
+    read_dg = get_msg(&f.tr1, um3);
     ck_assert(read_dg != 0);
     f.evs1.handle_down(dg, ProtoDownMeta(O_SAFE));
-    gcomm::evs::Message um4;
-    read_dg = get_msg(&f.tr1, &um4);
+    std::unique_ptr<gcomm::evs::Message> um4;
+    read_dg = get_msg(&f.tr1, um4);
     ck_assert(read_dg != 0);
 
     // Make node2 handle an out of order message and verify that gap is emitted
-    f.evs2.handle_msg(um2);
-    gcomm::evs::Message gm1;
-    read_dg = get_msg(&f.tr2, &gm1);
+    f.evs2.handle_msg(*um2);
+    std::unique_ptr<gcomm::evs::Message> gm1;
+    read_dg = get_msg(&f.tr2, gm1);
     ck_assert(read_dg != 0);
-    ck_assert(gm1.type() == gcomm::evs::Message::EVS_T_GAP);
-    ck_assert(gm1.range_uuid() == f.uuid1);
-    ck_assert(gm1.range().lu() == 0);
-    ck_assert(gm1.range().hs() == 0);
+    ck_assert(gm1->type() == gcomm::evs::Message::EVS_T_GAP);
+    ck_assert(gm1->range_uuid() == f.uuid1);
+    ck_assert(gm1->range().lu() == 0);
+    ck_assert(gm1->range().hs() == 0);
     // The node2 will also send an user message to complete the sequence
     // number. Consume it.
-    gcomm::evs::Message comp_um1;
-    read_dg = get_msg(&f.tr2, &comp_um1);
+    std::unique_ptr<gcomm::evs::Message> comp_um1;
+    read_dg = get_msg(&f.tr2, comp_um1);
     ck_assert(read_dg != 0);
-    ck_assert(comp_um1.type() == gcomm::evs::Message::EVS_T_USER);
-    ck_assert(comp_um1.seq() + comp_um1.seq_range() == 1);
+    ck_assert(comp_um1->type() == gcomm::evs::Message::EVS_T_USER);
+    ck_assert(comp_um1->seq() + comp_um1->seq_range() == 1);
     // No further messages should be emitted
-    read_dg = get_msg(&f.tr2, &comp_um1);
+    read_dg = get_msg(&f.tr2, comp_um1);
     ck_assert(read_dg == 0);
 
     // Move time forwards in 1 sec interval and make inactivity check
     // in between. No gap messages should be emitted.
     gu::datetime::SimClock::inc_time(gu::datetime::Sec);
     f.evs2.handle_inactivity_timer();
-    gcomm::evs::Message gm_discard;
-    read_dg = get_msg(&f.tr2, &gm_discard);
+    std::unique_ptr<gcomm::evs::Message> gm_discard;
+    read_dg = get_msg(&f.tr2, gm_discard);
     ck_assert(read_dg == 0);
     // The clock is now advanced over retrans_period + delay margin. Next
     // call to handle_inactivity_timer() should fire the check. Gap message
     // is emitted.
     gu::datetime::SimClock::inc_time(gu::datetime::Sec);
     f.evs2.handle_inactivity_timer();
-    read_dg = get_msg(&f.tr2, &gm1);
+    read_dg = get_msg(&f.tr2, gm1);
     ck_assert(read_dg != 0);
-    ck_assert(gm1.type() == gcomm::evs::Message::EVS_T_GAP);
+    ck_assert(gm1->type() == gcomm::evs::Message::EVS_T_GAP);
     // Now call handle_inactivity_timer() again, gap message should not
     // be emitted due to rate limit.
     // Galera 4 will run with evs protocol version 1 and will emit
     // delayed list at this point.
     f.evs2.handle_inactivity_timer();
-    gcomm::evs::Message dm;
-    read_dg = get_msg(&f.tr2, &dm);
+    std::unique_ptr<gcomm::evs::Message> dm;
+    read_dg = get_msg(&f.tr2, dm);
     ck_assert(read_dg != 0);
-    ck_assert(dm.type() == gcomm::evs::Message::EVS_T_DELAYED_LIST);
-    read_dg = get_msg(&f.tr2, &gm_discard);
+    ck_assert(dm->type() == gcomm::evs::Message::EVS_T_DELAYED_LIST);
+    read_dg = get_msg(&f.tr2, gm_discard);
     ck_assert(read_dg == 0);
     // Move clock forward 100msec, new gap should be now emitted.
     gu::datetime::SimClock::inc_time(100*gu::datetime::MSec);
     f.evs2.handle_inactivity_timer();
-    gcomm::evs::Message gm2;
-    read_dg = get_msg(&f.tr2, &gm2);
+    std::unique_ptr<gcomm::evs::Message> gm2;
+    read_dg = get_msg(&f.tr2, gm2);
     ck_assert(read_dg != 0);
-    ck_assert(gm2.type() == gcomm::evs::Message::EVS_T_GAP);
+    ck_assert(gm2->type() == gcomm::evs::Message::EVS_T_GAP);
     log_info << "END test_gap_rate_limit_delayed";
 
     gcomm::Datagram* tmp;
