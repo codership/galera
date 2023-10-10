@@ -2157,7 +2157,14 @@ void galera::ReplicatorSMM::process_commit_cut(wsrep_seqno_t const seq,
     if (seq >= cc_seqno_) /* Refs #782. workaround for
                            * assert(seqno >= seqno_released_) in gcache. */
     {
+        if (state_() != S_SYNCED)
+        {
+            // make sure that all preceding actions committed
+            // when node is SYNCED seq can't exceed last_committed()
+            apply_monitor_.wait(seq);
+        }
         assert(seq <= last_committed());
+
         cert_.purge_trxs_upto(seq, true);
     }
 
