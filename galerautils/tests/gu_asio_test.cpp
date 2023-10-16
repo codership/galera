@@ -2099,7 +2099,7 @@ static bool have_datagram() try
   gu::URI uri("udp://127.0.0.1:0");
   auto socket(io_service.make_datagram_socket(uri));
   socket->open(uri);
-  return false;
+  return true;
 }
 catch (...)
 {
