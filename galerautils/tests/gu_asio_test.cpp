@@ -1071,18 +1071,19 @@ static X509* create_x509(EVP_PKEY* pkey, X509* issuer, const char* cn)
     X509_set_pubkey(x509, pkey);
 
     auto* name = X509_get_subject_name(x509);
-    X509_NAME_add_entry_by_txt(name, "C", MBSTRING_ASC, (unsigned char*)"FI",
+    static const unsigned char C_str [] = "FI";
+    static const unsigned char ST_str[] = "Uusimaa";
+    static const unsigned char L_str [] = "Helsinki";
+    static const unsigned char O_str [] = "Codership";
+    static const unsigned char OU_str[] = "Galera Devel";
+    X509_NAME_add_entry_by_txt(name, "C",  MBSTRING_ASC, C_str,  -1, -1, 0);
+    X509_NAME_add_entry_by_txt(name, "ST", MBSTRING_ASC, ST_str, -1, -1, 0);
+    X509_NAME_add_entry_by_txt(name, "L",  MBSTRING_ASC, L_str,  -1, -1, 0);
+    X509_NAME_add_entry_by_txt(name, "O",  MBSTRING_ASC, O_str,  -1, -1, 0);
+    X509_NAME_add_entry_by_txt(name, "OU", MBSTRING_ASC, OU_str, -1, -1, 0);
+    X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC,
+                               reinterpret_cast<const unsigned char*>(cn),
                                -1, -1, 0);
-    X509_NAME_add_entry_by_txt(name, "ST", MBSTRING_ASC,
-                               (unsigned char*)"Uusimaa", -1, -1, 0);
-    X509_NAME_add_entry_by_txt(name, "L", MBSTRING_ASC,
-                               (unsigned char*)"Helsinki", -1, -1, 0);
-    X509_NAME_add_entry_by_txt(name, "O", MBSTRING_ASC,
-                               (unsigned char*)"Codership", -1, -1, 0);
-    X509_NAME_add_entry_by_txt(name, "OU", MBSTRING_ASC,
-                               (unsigned char*)"Galera Devel", -1, -1, 0);
-    X509_NAME_add_entry_by_txt(name, "CN", MBSTRING_ASC, (unsigned char*)cn, -1,
-                               -1, 0);
     if (!issuer)
     {
         /* Self signed */
