@@ -5,10 +5,6 @@
 
 #undef NDEBUG
 
-#if defined(__sun)
-#define GALERA_ONLY_ALIGNED
-#endif
-
 #include "../src/data_set.hpp"
 
 #include "gu_logger.hpp"
