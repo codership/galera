@@ -100,11 +100,6 @@ else
     CXX=${CXX:-"g++"}
 fi
 
-if ccache -V > /dev/null 2>&1
-then
-    echo "$CC"  | grep "ccache" > /dev/null || CC="ccache $CC"
-    echo "$CXX" | grep "ccache" > /dev/null || CXX="ccache $CXX"
-fi
 export CC CXX LD_LIBRARY_PATH
 
 CFLAGS=${CFLAGS:-"-O2"}
@@ -217,7 +212,7 @@ done
 # check whether sudo accepts -E to preserve environment
 if [ "$PACKAGE" == "yes" ]
 then
-    if which dpkg >/dev/null 2>&1
+    if which dpkg-buildpackage >/dev/null 2>&1
     then
         echo "Error: Package build not supported on Debian, use dpkg-buildpackage"
         exit 1
@@ -313,7 +308,6 @@ build_packages()
     else # build RPM
         ./rpm.sh $GALERA_VER
     fi
-    local RET=$?
 
     set -e
 
@@ -385,6 +379,10 @@ fi
 if [ "$CMAKE" == "yes" ] # Build using CMake
 then
     cmake_args="$CMAKE_OPTS -DGALERA_REVISION=$GALERA_REV"
+    if ccache -V > /dev/null 2>&1
+    then
+        cmake_args="$cmake_args -DCMAKE_CXX_COMPILER_LAUNCHER=ccache"
+    fi
     [ -n "$TARGET"        ] && \
         echo "WARN: TARGET=$TARGET ignored by CMake build"
     [ -n "$RELEASE"       ] && \
