@@ -2221,9 +2221,24 @@ gcs_set_last_applied (gcs_conn_t* conn, const gu::GTID& gtid)
 
     long ret = gcs_sm_enter (conn->sm, &cond, false, false);
 
-    if (!ret) {
-        ret = gcs_core_set_last_applied (conn->core, gtid);
-        gcs_sm_leave (conn->sm);
+    if (ret)
+    {
+        log_info << "Unable to report last applied write-set to "
+                 << "cluster. Will try later. "
+                 << "(gcs_sm_enter(): " << -ret
+                 << " seqno: " << gtid.seqno() << ")";
+    }
+    else
+    {
+        ret = gcs_core_set_last_applied(conn->core, gtid);
+        gcs_sm_leave(conn->sm);
+        if (ret < 0)
+        {
+            log_info << "Unable to report last applied write-set to "
+                     << "cluster. Will try later. "
+                     << "(gcs_core_set_last_applied(): " << -ret
+                     << " seqno: " << gtid.seqno() << ")";
+        }
     }
 
     gu_cond_destroy (&cond);

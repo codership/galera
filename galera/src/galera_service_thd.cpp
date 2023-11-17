@@ -57,9 +57,6 @@ galera::ServiceThd::thd_func (void* arg)
 
                 if (gu_unlikely(ret < 0))
                 {
-                    log_warn << "Failed to report last committed "
-                             << data.last_committed_ << ", " << ret
-                             << " (" << strerror (-ret) << ')';
                     // @todo: figure out what to do in this case
                 }
                 else
