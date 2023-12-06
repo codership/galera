@@ -42,8 +42,9 @@ namespace gcomm
         // Protolay interface
         void handle_up(const void*, const Datagram&, const ProtoUpMeta&);
         int  handle_down(Datagram&, const ProtoDownMeta&);
-        void handle_stable_view(const View& view);
-        void handle_evict(const UUID& uuid);
+        void handle_stable_view(const View& view) override;
+        void handle_allow_connect(const UUID& uuid) override;
+        void handle_evict(const UUID& uuid) override;
         std::string handle_get_address(const UUID& uuid) const;
         bool set_param(const std::string& key, const std::string& val,
                        Protolay::sync_param_cb_t& sync_param_cb);
@@ -168,8 +169,6 @@ namespace gcomm
             int  retry_cnt_;
             int  max_retries_;
         };
-
-
 
         typedef Map<std::string, AddrEntry> AddrList;
         class AddrListUUIDCmp
@@ -305,6 +304,8 @@ namespace gcomm
                    const void* exclude_id);
         // Reconnecting
         void reconnect();
+        void disable_reconnect(AddrList::value_type&);
+        void enable_reconnect(AddrList::value_type&);
 
         void set_initial_addr(const gu::URI&);
         void add_or_del_addr(const std::string&);

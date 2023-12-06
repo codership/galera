@@ -631,8 +631,7 @@ void gcomm::GMCast::gmcast_forget(const UUID& uuid,
                     erase_proto(pi);
                 }
             }
-            ae.set_max_retries(0);
-            ae.set_retry_cnt(1);
+            disable_reconnect(*ai);
             gu::datetime::Date now(gu::datetime::Date::monotonic());
             // Don't reduce next reconnect time if it is set greater than
             // requested
@@ -724,12 +723,7 @@ void gcomm::GMCast::handle_established(Proto* est)
         return;
     }
 
-    // send_up(Datagram(), p->remote_uuid());
-
-    // init retry cnt to -1 to avoid unnecessary logging at first attempt
-    // max retries will be readjusted in handle stable view
-    AddrList::value(i).set_retry_cnt(-1);
-    AddrList::value(i).set_max_retries(max_initial_reconnect_attempts_);
+    enable_reconnect(*i);
 
     // Cleanup all previously established entries with same
     // remote uuid. It is assumed that the most recent connection
@@ -970,11 +964,7 @@ void gcomm::GMCast::update_addresses()
 
                     AddrEntry& ae(AddrList::value(pi));
 
-                    // init retry cnt to -1 to avoid unnecessary logging
-                    // at first attempt
-                    // max retries will be readjusted in handle stable view
-                    ae.set_retry_cnt(-1);
-                    ae.set_max_retries(max_initial_reconnect_attempts_);
+                    enable_reconnect(*pi);
 
                     // Add some randomness for first reconnect to avoid
                     // simultaneous connects
@@ -1111,6 +1101,30 @@ void gcomm::GMCast::reconnect()
     }
 }
 
+void gcomm::GMCast::disable_reconnect(AddrList::value_type& entry)
+{
+    log_debug << "Disabling reconnect for " << entry.first;
+    entry.second.set_max_retries(0);
+    entry.second.set_retry_cnt(1);
+}
+
+void gcomm::GMCast::enable_reconnect(AddrList::value_type& entry)
+{
+    if (entry.second.retry_cnt() == -1)
+    {
+        return;
+    }
+    log_debug << "Enabling reconnect for " << entry.first;
+    /* Initialize retry cnt to -1 in order to avoid unnecessary logging
+     * at the first connect attempt.
+     * Initial reconnect attempts is limited to terminate reconnection
+     * attempts early if the peer becomes unresponsive. The max retries
+     * is adjusted into higher value in handle_stable_view() once it is
+     * known that the peer has become part of the stable view. */
+    entry.second.set_retry_cnt(-1);
+    entry.second.set_max_retries(max_initial_reconnect_attempts_);
+}
+
 namespace
 {
     class CmpUuidCounts
@@ -1232,15 +1246,15 @@ void gcomm::GMCast::check_liveness()
         if (ae.retry_cnt()             <= ae.max_retries() &&
             live_uuids.find(ae.uuid()) == live_uuids.end())
         {
-            // log_info << self_string()
-            // << " missing live proto entry for " << ae.uuid();
+            log_debug << self_string()
+                      << " missing live proto entry for " << ae.uuid();
             nonlive_uuids.insert(ae.uuid());
             nonlive_peers += AddrList::key(i) + " ";
             should_relay = true;
         }
         else if (ae.last_connect() + peer_timeout_ > now)
         {
-            log_debug << "continuing relaying for "
+            log_debug << "continuing relaying to " << i->first << " for "
                       << (ae.last_connect() + peer_timeout_ - now);
             should_relay = true;
         }
@@ -1250,9 +1264,12 @@ void gcomm::GMCast::check_liveness()
     {
         if (relaying_ == false)
         {
-            log_info << self_string()
-                     << " turning message relay requesting on, nonlive peers: "
-                     << nonlive_peers;
+            if (not nonlive_uuids.empty())
+            {
+                log_info << self_string()
+                         << " turning message relay requesting on, nonlive peers: "
+                         << nonlive_peers;
+            }
             relaying_ = true;
         }
         relay_set_.clear();
@@ -1779,6 +1796,15 @@ void gcomm::GMCast::handle_stable_view(const View& view)
     }
 }
 
+void gcomm::GMCast::handle_allow_connect(const UUID& uuid)
+{
+    auto it = std::find_if(remote_addrs_.begin(), remote_addrs_.end(),
+                            AddrListUUIDCmp(uuid));
+    if (it != remote_addrs_.end())
+    {
+        enable_reconnect(*it);
+    }
+}
 
 void gcomm::GMCast::handle_evict(const UUID& uuid)
 {
@@ -1810,9 +1836,7 @@ void gcomm::GMCast::add_or_del_addr(const std::string& val)
         log_info << "inserting address '" << addr << "'";
         insert_address(addr, UUID(), remote_addrs_);
         AddrList::iterator ai(remote_addrs_.find(addr));
-        AddrList::value(ai).set_max_retries(
-            max_initial_reconnect_attempts_);
-        AddrList::value(ai).set_retry_cnt(-1);
+        enable_reconnect(*ai);
     }
     else if (val.compare(0, 4, "del:") == 0)
     {
@@ -1832,8 +1856,7 @@ void gcomm::GMCast::add_or_del_addr(const std::string& val)
                 }
             }
             AddrEntry& ae(AddrList::value(ai));
-            ae.set_max_retries(0);
-            ae.set_retry_cnt(1);
+            disable_reconnect(*ai);
             ae.set_next_reconnect(gu::datetime::Date::monotonic() + time_wait_);
             update_addresses();
         }

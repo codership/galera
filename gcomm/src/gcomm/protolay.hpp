@@ -322,6 +322,16 @@ public:
         }
     }
 
+    virtual void handle_allow_connect(const UUID& uuid) { }
+    /* Allow connections from remote node identified by uuid. */
+    void allow_connect(const UUID& uuid)
+    {
+        handle_allow_connect(uuid);
+        for (auto& i : down_context_)
+        {
+            i->handle_allow_connect(uuid);
+        }
+    }
 
     virtual void handle_evict(const UUID& uuid) { }
 

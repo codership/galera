@@ -1889,6 +1889,17 @@ void gcomm::evs::Proto::send_join(bool handle)
 
     JoinMessage jm(create_join());
 
+    // Allow connections for all members that may be accepted
+    // in the next view.
+    for (const auto& node : jm.node_list())
+    {
+        if (node.second.operational() && not node.second.suspected()
+            && not node.second.evicted())
+        {
+            allow_connect(node.first);
+        }
+    }
+
     gu::Buffer buf;
     serialize(jm, buf);
     Datagram dg(buf);
