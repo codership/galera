@@ -605,7 +605,7 @@ void gcomm::evs::Proto::handle_inactivity_timer()
 void gcomm::evs::Proto::handle_retrans_timer()
 {
     evs_log_debug(D_TIMERS) << "retrans timer";
-    if (state() == S_GATHER)
+    if (state() == S_GATHER || state() == S_JOINING)
     {
         if (install_message_ != 0)
         {
@@ -800,6 +800,7 @@ gu::datetime::Date gcomm::evs::Proto::next_expiration(const Timer t) const
         case S_OPERATIONAL:
         case S_LEAVING:
             return (now + retrans_period_);
+        case S_JOINING:
         case S_GATHER:
         case S_INSTALL:
             return (now + join_retrans_period_);
@@ -2281,7 +2282,7 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
 
     if (source == UUID::nil())
     {
-        log_warn << "Received message with nil source UUDI, dropping";
+        log_warn << "Received message with nil source UUID, dropping";
         return;
     }
 
@@ -2296,6 +2297,21 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
             "node in current view, old: " << i->first << " new: " << source;
         return;
     }
+
+    // When joining, wait until at least one of the existing node sees
+    // a join message from joining node. This is to reduce the probability
+    // of install timeouts because of already ongoing cluster configuration
+    // changes.
+    const auto is_join_message_with_self
+        = msg.type() == Message::EVS_T_JOIN
+          && msg.node_list().find(my_uuid_) != msg.node_list().end();
+    if (state() == S_JOINING && not is_join_message_with_self)
+    {
+        evs_log_debug(D_FOREIGN_MSGS)
+            << "Join message without self in S_JOINING state, dropping message";
+        return;
+    }
+
     evs_log_info(I_STATE) << " detected new message source "
                           << source;
 
@@ -2303,12 +2319,10 @@ void gcomm::evs::Proto::handle_foreign(const Message& msg)
                  std::make_pair(source, Node(*this))));
     assert(NodeMap::value(i).operational() == true);
 
-    if (state() == S_JOINING || state() == S_GATHER ||
-        state() == S_OPERATIONAL)
+    if (state() == S_JOINING || state() == S_GATHER || state() == S_OPERATIONAL)
     {
         evs_log_info(I_STATE)
-            << " shift to GATHER due to foreign message from "
-            << msg.source();
+            << " shift to GATHER due to foreign message from " << msg.source();
         gu_trace(shift_to(S_GATHER, false));
         // Reset install timer each time foreign message is seen to
         // synchronize install timers.
@@ -2815,6 +2829,7 @@ void gcomm::evs::Proto::shift_to(const State s, const bool send_j)
     }
     case S_JOINING:
         state_ = S_JOINING;
+        reset_timer(T_RETRANS);
         reset_timer(T_STATS);
         break;
     case S_LEAVING:
@@ -4411,7 +4426,6 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
     Node& inst(NodeMap::value(ii));
 
     evs_log_debug(D_JOIN_MSGS) << " " << msg;
-
     if (state() == S_LEAVING)
     {
         if (msg.source_view_id() == current_view_.id())

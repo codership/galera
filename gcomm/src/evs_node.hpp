@@ -70,11 +70,6 @@ public:
         operational_ = op;
     }
     bool operational() const { return operational_; }
-
-    void set_suspected(const bool s)
-    {
-        suspected_ = s;
-    }
     bool suspected() const { return suspected_; }
 
     void set_committed(const bool comm) { committed_ = comm; }
