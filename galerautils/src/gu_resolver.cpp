@@ -17,7 +17,7 @@
 #include <map>
 #include <stdexcept>
 
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__)
 # include <ifaddrs.h>
 # define IPV6_ADD_MEMBERSHIP IPV6_JOIN_GROUP
 # define IPV6_DROP_MEMBERSHIP IPV6_LEAVE_GROUP
@@ -27,7 +27,7 @@ extern "C" /* old style cast */
 static int const GU_SIOCGIFCONF  = SIOCGIFCONF;
 static int const GU_SIOCGIFINDEX = SIOCGIFINDEX;
 }
-#endif /* !__APPLE__ && !__FreeBSD__ */
+#endif /* !__APPLE__ && !__FreeBSD__ && !__NetBSD__ */
 
 //using namespace std;
 using std::make_pair;
@@ -79,7 +79,7 @@ private:
             family,
             socktype,
             protocol,
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 	    0, // FreeBSD gives ENOMEM error with non-zero value
 #else
             sizeof(struct sockaddr),
@@ -208,7 +208,7 @@ static unsigned int get_ifindex_by_addr(const gu::net::Sockaddr& addr)
 
     unsigned int idx(-1);
     int err(0);
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__)
     struct ifaddrs *if_addrs = NULL;
     struct ifaddrs *if_addr = NULL;
 
@@ -235,7 +235,7 @@ static unsigned int get_ifindex_by_addr(const gu::net::Sockaddr& addr)
     }
 
 out:
-# else /* !__APPLE__ && !__FreeBSD__ */
+# else /* !__APPLE__ && !__FreeBSD__ && !__NetBSD__ */
     struct ifconf ifc;
     memset(&ifc, 0, sizeof(struct ifconf));
     ifc.ifc_len = 16*sizeof(struct ifreq);
@@ -272,7 +272,7 @@ out:
                 }
 #if defined(__linux__) || defined(__GNU__)
                 idx = ifrp->ifr_ifindex;
-#elif defined(__sun__) || defined(__FreeBSD_kernel__)
+#elif defined(__sun__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__)
                 idx = ifrp->ifr_index;
 #else
 # error "Unsupported ifreq structure"
@@ -287,7 +287,7 @@ out:
     
 out:
     close(fd);
-#endif /* !__APPLE__ && !__FreeBSD__ */
+#endif /* !__APPLE__ && !__FreeBSD__ && !__NetBSD__ */
     if (err != 0)
     {
         gu_throw_error(err) << "failed to get interface index";

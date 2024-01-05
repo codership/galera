@@ -41,7 +41,7 @@
 # error "Byte order not defined"
 #endif
 
-#if defined(__sun__)
+#if defined(__sun__) || defined(__NetBSD__)
 # if defined (_LP64)
 #  define GU_WORDSIZE 64
 # else

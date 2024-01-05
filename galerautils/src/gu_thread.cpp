@@ -89,6 +89,13 @@ void gu::thread_set_schedparam(pthread_t thd, const gu::ThreadSchedparam& sp)
 #else
     struct sched_param spstr = { sp.prio() };
 #endif
+#if defined(__NetBSD__)
+    if (sp.policy() == SCHED_OTHER)
+    {
+        /* NetBSD does not allow setting priorities for SCHED_OTHER */
+        return;
+    }
+#endif
     int err;
     if ((err = pthread_setschedparam(thd, sp.policy(), &spstr)) != 0)
     {

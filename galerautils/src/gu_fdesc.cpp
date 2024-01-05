@@ -235,13 +235,16 @@ namespace gu
 #if defined(__APPLE__)
         if (-1 == fcntl (fd_, F_SETSIZE, size_) && -1 == ftruncate (fd_, size_))
         {
+#elif defined(__NetBSD__)
+        if (-1 == ftruncate (fd_, size_) || 0 != posix_fallocate (fd_, start, diff))
+        {
 #else
         int const ret = posix_fallocate (fd_, start, diff);
         if (0 != ret)
         {
             errno = ret;
 #endif
-            if ((EINVAL == errno || ENOSYS == errno) && start >= 0 && diff > 0)
+            if ((EINVAL == errno || ENOSYS == errno || EOPNOTSUPP == errno) && start >= 0 && diff > 0)
             {
                 // FS does not support the operation, try physical write
                 write_file (start);
