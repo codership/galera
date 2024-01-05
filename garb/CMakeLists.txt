@@ -31,14 +31,51 @@ target_compile_options(garbd
 target_link_libraries(garbd gcs4garb gcomm gcache
   ${Boost_PROGRAM_OPTIONS_LIBRARIES})
 
-install(TARGETS garbd DESTINATION bin)
+# Make the install destination for garbd binary configurable
+if(NOT DEFINED INSTALL_GARBD)
+  set(INSTALL_GARBD "bin" CACHE STRING "path to install garbd binary to")
+endif()
+
+install(TARGETS garbd
+  DESTINATION ${INSTALL_GARBD})
+
 if (NOT ${CMAKE_SYSTEM_NAME} MATCHES ".*BSD")
+
+  # Make the install destination for garbd-systemd wrapper script configurable
+  if(NOT DEFINED INSTALL_GARBD-SYSTEMD)
+    set(INSTALL_GARBD-SYSTEMD "share" CACHE STRING "path to install garbd-systemd wrapper script to")
+  endif()
+
+  install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/files/garb-systemd
+    DESTINATION ${INSTALL_GARBD-SYSTEMD})
+
+  # Make the install destination for garbd configuration file configurable
+  if(NOT DEFINED INSTALL_CONFIGURATION)
+    set(INSTALL_CONFIGURATION "share" CACHE STRING "path to install garbd configuration to")
+  endif()
+
   install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/files/garb.cnf
+    DESTINATION ${INSTALL_CONFIGURATION}
+    RENAME garb)
+
+  # Make the install destination for garbd systemd service file configurable
+  if(NOT DEFINED INSTALL_SYSTEMD_SERVICE)
+    set(INSTALL_SYSTEMD_SERVICE "share" CACHE STRING "path to install garbd Systemd service to")
+  endif()
+
+  install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/files/garb.service
-    ${CMAKE_CURRENT_SOURCE_DIR}/files/garb-systemd
-    DESTINATION share)
+    DESTINATION ${INSTALL_SYSTEMD_SERVICE})
+
+  # Make the install destination for manpage configurable
+  if(NOT DEFINED INSTALL_MANPAGE)
+    set(INSTALL_MANPAGE "man/man8" CACHE STRING "path to install manpage to")
+  endif()
+
   install(FILES
     ${PROJECT_SOURCE_DIR}/man/garbd.8
-    DESTINATION man/man8)
+    DESTINATION ${INSTALL_MANPAGE})
+
 endif()

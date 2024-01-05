@@ -30,4 +30,5 @@ Other contributors:
  * Christian Hesse <mail@eworm.de>
  * Andrzej Godziuk <gdr@gdr.name>
  * Otto Kekäläinen <otto@kekalainen.net>
+ * Michal Schorm <mschorm@centrum.cz>
  [add name and email/username above this line, but leave this line intact]
