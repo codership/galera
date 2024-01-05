@@ -934,7 +934,7 @@ END_TEST
 
 static std::string get_cert_dir()
 {
-    static_assert(::strlen(GU_ASIO_TEST_CERT_DIR) > 0);
+    assert(::strlen(GU_ASIO_TEST_CERT_DIR) > 0);
     const std::string ret{ GU_ASIO_TEST_CERT_DIR };
     auto* dir = opendir(ret.c_str());
     if (!dir)
