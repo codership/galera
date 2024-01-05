@@ -1,0 +1,15 @@
+#Teemu Ollakka Nov 17th, 2020:
+# SONAME is useful only for libraries which are intended to be linked
+# against, but not so much for libraries which are loaded dynamically
+# during runtime.
+#
+# Debian policy about shared libraries:
+# https://www.debian.org/doc/debian-policy/ch-sharedlibs.html
+#
+# "Shared libraries that are internal to a particular package or that are
+# only loaded as dynamic modules are not covered by this section and are
+# not subject to its requirements."
+#
+# This seems also be the approach CMake has taken, see for example
+# https://stackoverflow.com/a/42186654
+galera-4: sharedobject-in-library-directory-missing-soname [usr/lib/libgalera_smm.so]

@@ -11,7 +11,7 @@ WantedBy=multi-user.target
 Alias=garbd.service
 
 [Service]
-User=nobody
+User=_galera
 ExecStart=/usr/bin/garb-systemd start
 
 # Use SIGINT because with the default SIGTERM
