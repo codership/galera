@@ -1395,7 +1395,7 @@ _close(gcs_conn_t* conn, bool join_recv_thread)
             assert (GCS_CONN_CLOSED == conn->state);
         }
 
-        gu_info ("Closing replication queue.");
+        gu_info ("Closing send queue.");
         struct gcs_repl_act** act_ptr;
         /* At this point (state == CLOSED) no new threads should be able to
          * queue for repl (check gcs_repl()), and recv thread is joined, so no
@@ -1418,7 +1418,7 @@ _close(gcs_conn_t* conn, bool join_recv_thread)
         /* wake all gcs_recv() threads () */
         // FIXME: this can block waiting for applicaiton threads to fetch all
         // items. In certain situations this can block forever. Ticket #113
-        gu_info ("Closing slave action queue.");
+        gu_info ("Closing receive queue.");
         gu_fifo_close (conn->recv_q);
     }
 

@@ -427,13 +427,15 @@ galera::Certification::do_test(const TrxHandleSlavePtr& trx)
 
     // trx->is_certified() == true during index rebuild from IST, do_test()
     // must not fail, just populate index
+    auto const cert_interval(trx->global_seqno() - trx->last_seen_seqno());
     if (gu_unlikely(trx->certified() == false &&
                     (trx->last_seen_seqno() < initial_position_ ||
-                     trx->global_seqno()-trx->last_seen_seqno() > max_length_)))
+                     cert_interval > max_length_)))
     {
-        if (trx->global_seqno() - trx->last_seen_seqno() > max_length_)
+        if (cert_interval > max_length_)
         {
-            log_warn << "certification interval for trx " << *trx
+            log_warn << "certification interval " << cert_interval
+                     << " for trx " << *trx
                      << " exceeds the limit of " << max_length_;
         }
 

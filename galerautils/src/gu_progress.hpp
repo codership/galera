@@ -49,10 +49,10 @@ namespace gu
 
         void log(gu::datetime::Date const now)
         {
-            log_info << prefix_ << "..."
-                     << std::fixed << std::setprecision(1) << std::setw(5)
+            log_info << prefix_ << "... "
+                     << std::fixed << std::setprecision(1)
                      << (double(current_)/total_ * 100) << "% ("
-                     << std::setw(total_digits_) << current_ << '/' << total_
+                     << current_ << '/' << total_
                      << units_ << ") complete.";
 
             last_log_time_ = now;
@@ -121,7 +121,7 @@ namespace gu
             /* while we may want to limit the rate of logging the progress,
              * it still makes sense (for monitoring) to call the callback
              * much more frequently */
-            static gu::datetime::Period cb_interval("PT0.5S");
+            static gu::datetime::Period const cb_interval("PT0.5S");
 
             current_ += increment;
 
