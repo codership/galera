@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2016 Codership Oy <info@codership.com> */
+/* Copyright (C) 2011-2023 Codership Oy <info@codership.com> */
 
 #ifndef _GARB_RECV_LOOP_HPP_
 #define _GARB_RECV_LOOP_HPP_
@@ -25,7 +25,9 @@ public:
 
 private:
 
+    bool one_loop();
     void loop();
+    void close_connection();
 
     const Config& config_;
     gu::Config    gconf_;
@@ -59,6 +61,7 @@ private:
     gu::UUID    uuid_;
     gu::seqno_t seqno_;
     int         proto_;
+    bool        closed_;
 
 }; /* RecvLoop */
 

@@ -163,6 +163,7 @@ Gcs::close ()
     else
     {
         log_warn << "Attempt to close a closed connection";
+        assert(0);
     }
 }
 

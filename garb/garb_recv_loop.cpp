@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2020 Codership Oy <info@codership.com> */
+/* Copyright (C) 2011-2023 Codership Oy <info@codership.com> */
 
 #include "garb_recv_loop.hpp"
 
@@ -17,6 +17,15 @@ signal_handler (int signum)
     global_gcs->close();
 }
 
+void
+RecvLoop::close_connection()
+{
+    if (!closed_)
+    {
+        gcs_.close();
+        closed_ = true;
+    }
+}
 
 RecvLoop::RecvLoop (const Config& config)
     :
@@ -27,7 +36,8 @@ RecvLoop::RecvLoop (const Config& config)
     gcs_   (gconf_, config_.name(), config_.address(), config_.group()),
     uuid_  (GU_UUID_NIL),
     seqno_ (GCS_SEQNO_ILL),
-    proto_ (0)
+    proto_ (0),
+    closed_(false)
 {
     /* set up signal handlers */
     global_gcs = &gcs_;
@@ -52,88 +62,106 @@ RecvLoop::RecvLoop (const Config& config)
     loop();
 }
 
+/* return true to exit loop */
+bool
+RecvLoop::one_loop()
+{
+    gcs_action act;
+
+    gcs_.recv (act);
+
+    switch (act.type)
+    {
+    case GCS_ACT_WRITESET:
+        seqno_ = act.seqno_g;
+        if (gu_unlikely(proto_ == 0 && !(seqno_ & 127)))
+        {
+            /* report_interval_ of 128 in old protocol */
+            gcs_.set_last_applied (gu::GTID(uuid_, seqno_));
+        }
+        break;
+    case GCS_ACT_COMMIT_CUT:
+        break;
+    case GCS_ACT_STATE_REQ:
+        /* we can't donate state */
+        gcs_.join (gu::GTID(uuid_, seqno_),-ENOSYS);
+        break;
+    case GCS_ACT_CCHANGE:
+    {
+        gcs_act_cchange const cc(act.buf, act.size);
+
+        if (cc.conf_id > 0) /* PC */
+        {
+            int const my_idx(act.seqno_g);
+            assert(my_idx >= 0);
+
+            gcs_node_state const my_state(cc.memb[my_idx].state_);
+
+            if (GCS_NODE_STATE_PRIM == my_state)
+            {
+                uuid_  = cc.uuid;
+                seqno_ = cc.seqno;
+                gcs_.request_state_transfer (config_.sst(),config_.donor());
+                gcs_.join(gu::GTID(cc.uuid, cc.seqno), 0);
+            }
+
+            proto_ = gcs_.proto_ver();
+        }
+        else
+        {
+            if (cc.memb.size() == 0) // SELF-LEAVE after closing connection
+            {
+                log_info << "Exiting main loop";
+                return true;
+            }
+            uuid_  = GU_UUID_NIL;
+            seqno_ = GCS_SEQNO_ILL;
+        }
+
+        if (config_.sst() != Config::DEFAULT_SST)
+        {
+            // we requested custom SST, so we're done here
+            close_connection();
+        }
+
+        break;
+    }
+    case GCS_ACT_INCONSISTENCY:
+        // something went terribly wrong, restart needed
+        close_connection();
+        break;
+    case GCS_ACT_JOIN:
+    case GCS_ACT_SYNC:
+    case GCS_ACT_FLOW:
+    case GCS_ACT_VOTE:
+    case GCS_ACT_SERVICE:
+    case GCS_ACT_ERROR:
+    case GCS_ACT_UNKNOWN:
+        break;
+    }
+
+    if (act.buf)
+    {
+        ::free(const_cast<void*>(act.buf));
+    }
+
+    return false;
+}
+
 void
 RecvLoop::loop()
 {
-    while (1)
+    while (true)
     {
-        gcs_action act;
-
-        gcs_.recv (act);
-
-        switch (act.type)
+        try
         {
-        case GCS_ACT_WRITESET:
-            seqno_ = act.seqno_g;
-            if (gu_unlikely(proto_ == 0 && !(seqno_ & 127)))
-                /* report_interval_ of 128 in old protocol */
-            {
-                gcs_.set_last_applied (gu::GTID(uuid_, seqno_));
-            }
-            break;
-        case GCS_ACT_COMMIT_CUT:
-            break;
-        case GCS_ACT_STATE_REQ:
-            /* we can't donate state */
-            gcs_.join (gu::GTID(uuid_, seqno_),-ENOSYS);
-            break;
-        case GCS_ACT_CCHANGE:
-        {
-            gcs_act_cchange const cc(act.buf, act.size);
-
-            if (cc.conf_id > 0) /* PC */
-            {
-                int const my_idx(act.seqno_g);
-                assert(my_idx >= 0);
-
-                gcs_node_state const my_state(cc.memb[my_idx].state_);
-
-                if (GCS_NODE_STATE_PRIM == my_state)
-                {
-                    uuid_  = cc.uuid;
-                    seqno_ = cc.seqno;
-                    gcs_.request_state_transfer (config_.sst(),config_.donor());
-                    gcs_.join(gu::GTID(cc.uuid, cc.seqno), 0);
-                }
-
-                proto_ = gcs_.proto_ver();
-            }
-            else
-            {
-                if (cc.memb.size() == 0) // SELF-LEAVE after closing connection
-                {
-                    log_info << "Exiting main loop";
-                    return;
-                }
-                uuid_  = GU_UUID_NIL;
-                seqno_ = GCS_SEQNO_ILL;
-            }
-
-            if (config_.sst() != Config::DEFAULT_SST)
-            {
-                // we requested custom SST, so we're done here
-                gcs_.close();
-            }
-
-            break;
+            if (one_loop()) return;
         }
-        case GCS_ACT_INCONSISTENCY:
-            // something went terribly wrong, restart needed
-            gcs_.close();
-            return;
-        case GCS_ACT_JOIN:
-        case GCS_ACT_SYNC:
-        case GCS_ACT_FLOW:
-        case GCS_ACT_VOTE:
-        case GCS_ACT_SERVICE:
-        case GCS_ACT_ERROR:
-        case GCS_ACT_UNKNOWN:
-            break;
-        }
-
-        if (act.buf)
+        catch(gu::Exception& e)
         {
-            ::free(const_cast<void*>(act.buf));
+            log_error << e.what();
+            close_connection();
+            /* continue looping to clear recv queue */
         }
     }
 }
