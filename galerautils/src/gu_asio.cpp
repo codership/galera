@@ -600,20 +600,20 @@ void gu::ssl_init_options(gu::Config& conf)
         conf.set(conf::ssl_cipher, cipher_list);
 
         // compression
-        bool compression(conf.get(conf::ssl_compression, true));
-        if (compression == false)
+        try
         {
-            log_info << "disabling SSL compression";
-            sk_SSL_COMP_zero(SSL_COMP_get_compression_methods());
-        }
-        else
-        {
+            (void) conf.get(conf::ssl_compression);
+            // warn the user if socket.ssl_compression is set explicitly
             log_warn << "SSL compression is not effective. The option "
                      << conf::ssl_compression << " is deprecated and "
                      << "will be removed in future releases.";
         }
-        conf.set(conf::ssl_compression, compression);
-
+        catch (NotSet&)
+        {
+            // this is a desirable situation
+        }
+        log_info << "not using SSL compression";
+        sk_SSL_COMP_zero(SSL_COMP_get_compression_methods());
 
         // verify that asio::ssl::context can be initialized with provided
         // values
