@@ -230,8 +230,8 @@ group_redo_last_applied (gcs_group_t* group)
         assert( 0  < group->last_applied_proto_ver ||
                -1 == group->last_applied_proto_ver /* for unit tests */);
 
-        log_debug << "last_last_applied[" << n << "]: "
-                  << node->id << ", " << node->last_applied << ", "
+        log_debug << "last_last_applied[" << group->nodes[n].name << "]: "
+                  << node->id << ", " << node->last_applied << ", count: "
                   << (group_count_last_applied(*group, *node) ? "yes" : "no");
 
         /* NOTE: It is crucial for consistency that last_applied algorithm
@@ -287,7 +287,7 @@ group_redo_last_applied (gcs_group_t* group)
     }
 
     log_debug << "final last_applied on " << group->nodes[group->my_idx].name
-              << "): " << group->last_applied;
+              << ": " << group->last_applied;
 }
 
 static void
@@ -436,8 +436,10 @@ group_post_state_exchange (gcs_group_t* group)
             group->prim_uuid  = group->state_uuid;
             group->state_uuid = GU_UUID_NIL;
 
-            if (quorum->gcs_proto_ver >= 2) // see below for older version
+            if (quorum->gcs_proto_ver == 2) // see below for other versions
             {
+                /* version 2 was a mistake, but we can't eliminate this code
+                 * path for the sake of backward compatibility */
                 assert(quorum->last_applied >= 0);
                 group->last_applied = quorum->last_applied;
             }
@@ -465,11 +467,10 @@ group_post_state_exchange (gcs_group_t* group)
         GROUP_UPDATE_PROTO_VER(appl);
 #undef GROUP_UPDATE_PROTO_VER
 
-        if (quorum->gcs_proto_ver < 2) // see above for newer version
+        if (quorum->gcs_proto_ver != 2) // see above for version 2
         {
             group_redo_last_applied(group);
         }
-        // votes will be recounted on CC action creation
     }
     else {
         // non-primary configuration
@@ -811,6 +812,11 @@ gcs_group_handle_last_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
 
     gcs_node_set_last_applied (&group->nodes[msg->sender_idx], gtid.seqno());
     assert(group->nodes[msg->sender_idx].last_applied >= 0);
+
+    log_debug << "Got last applied " << gtid.seqno() << " from "
+              << msg->sender_idx << " (" << group->nodes[msg->sender_idx].name
+              << "). Last node: " << group->last_node << " ("
+              << group->nodes[group->last_node].name << ")";
 
     if (msg->sender_idx == group->last_node   &&
         gtid.seqno()    >  group->last_applied) {

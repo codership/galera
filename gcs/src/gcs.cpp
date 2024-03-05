@@ -2230,6 +2230,7 @@ gcs_set_last_applied (gcs_conn_t* conn, const gu::GTID& gtid)
     }
     else
     {
+        log_debug << "Sending last applied seqno: " << gtid.seqno();
         ret = gcs_core_set_last_applied(conn->core, gtid);
         gcs_sm_leave(conn->sm);
         if (ret < 0)

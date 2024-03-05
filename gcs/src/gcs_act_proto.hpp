@@ -22,8 +22,10 @@ typedef uint8_t gcs_proto_t;
  * 0 - initial version
  * 1 - support for totally ordered CC events
  * 2 - support for commit cut in state exchange msg
+ * 3 - fix for commit cut tracking issue
+ *     (needs protocol version bump to keep it identical on all nodes)
  */
-#define GCS_PROTO_MAX 2
+#define GCS_PROTO_MAX 3
 
 /*! Internal action fragment data representation */
 typedef struct gcs_act_frag
