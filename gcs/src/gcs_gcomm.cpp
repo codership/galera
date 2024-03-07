@@ -24,10 +24,10 @@
 #include <gu_backtrace.hpp>
 #include <gu_throw.hpp>
 #include <gu_logger.hpp>
-#include <gu_barrier.hpp>
 #include <gu_thread.hpp>
 
 #include <deque>
+#include <future>
 
 using namespace std;
 using namespace gu;
@@ -148,7 +148,6 @@ public:
         uuid_(),
         thd_(),
         schedparam_(conf_.get(gcomm_thread_schedparam_opt)),
-        barrier_(2),
         uri_(u),
         net_(Protonet::create(conf_)),
         tp_(0),
@@ -157,7 +156,8 @@ public:
         terminated_(false),
         error_(0),
         recv_buf_(),
-        current_view_()
+        current_view_(),
+        connect_task_()
     {
         log_info << "backend: " << net_->type();
     }
@@ -172,7 +172,7 @@ public:
 
     void connect(bool) { }
 
-    void connect(const string& channel, bool const bootstrap);
+    void connect(string channel, bool const bootstrap);
 
     void close(bool force = false)
     {
@@ -283,11 +283,12 @@ private:
 
     void unref() { }
 
+    void print_connect_diag(const std::string&, bool boostrap) const;
+
     gu::Config&       conf_;
     gcomm::UUID       uuid_;
     gu_thread_t       thd_;
     ThreadSchedparam  schedparam_;
-    Barrier           barrier_;
     URI               uri_;
     Protonet*         net_;
     Transport*        tp_;
@@ -297,6 +298,7 @@ private:
     int               error_;
     RecvBuf           recv_buf_;
     View              current_view_;
+    std::packaged_task<void()> connect_task_;
 };
 
 extern "C"
@@ -306,43 +308,9 @@ void* run_fn(void* arg)
     gu_thread_exit(0);
 }
 
-void GCommConn::connect(const string& channel, bool const bootstrap)
+void GCommConn::print_connect_diag(const std::string& channel,
+                                   bool const bootstrap) const
 {
-    if (tp_ != 0)
-    {
-        gu_throw_fatal << "backend connection already open";
-    }
-
-
-    error_ = ENOTCONN;
-    int err;
-    if ((err = gu_thread_create(
-             &thd_, 0, run_fn, this)) != 0)
-    {
-        gu_throw_error(err) << "Failed to create thread";
-    }
-
-    // Helper to call barrier_.wait() when goes out of scope
-    class StartBarrier
-    {
-    public:
-        StartBarrier(Barrier& barrier) : barrier_(barrier) { }
-        ~StartBarrier()
-        {
-            barrier_.wait();
-        }
-    private:
-        Barrier& barrier_;
-    } start_barrier(barrier_);
-
-    thread_set_schedparam(thd_, schedparam_);
-    log_info << "gcomm thread scheduling priority set to "
-             << thread_get_schedparam(thd_) << " ";
-
-    uri_.set_option("gmcast.group", channel);
-    tp_ = Transport::create(*net_, uri_);
-    gcomm::connect(tp_, this);
-
     if (bootstrap)
     {
         log_info << "gcomm: bootstrapping new group '" << channel << '\'';
@@ -369,14 +337,48 @@ void GCommConn::connect(const string& channel, bool const bootstrap)
         log_info << "gcomm: connecting to group '" << channel
                  << "', peer '" << peer << "'";
     }
+}
 
-    tp_->connect(bootstrap);
+void GCommConn::connect(string channel, bool const bootstrap)
+{
+    if (tp_ != 0)
+    {
+        gu_throw_fatal << "backend connection already open";
+    }
 
-    uuid_ = tp_->uuid();
+    /* This task is invoked at the very beginning of
+     * run() method. */
+    connect_task_ = std::packaged_task<void()>{
+        [this, channel, bootstrap]()
+        {
+            gcomm::Critical<Protonet> crit(*net_);
+            uri_.set_option("gmcast.group", channel);
+            tp_ = Transport::create(*net_, uri_);
+            gcomm::connect(tp_, this);
+            print_connect_diag(channel, bootstrap);
+            tp_->connect(bootstrap);
+            uuid_ = tp_->uuid();
+            error_ = 0;
+            log_info << "gcomm: connected";
+        }
+    };
 
-    error_ = 0;
+    auto future = connect_task_.get_future();
 
-    log_info << "gcomm: connected";
+    error_ = ENOTCONN;
+    int err;
+    if ((err = gu_thread_create(
+             &thd_, 0, run_fn, this)) != 0)
+    {
+        gu_throw_error(err) << "Failed to create thread";
+    }
+
+    thread_set_schedparam(thd_, schedparam_);
+    log_info << "gcomm thread scheduling priority set to "
+             << thread_get_schedparam(thd_) << " ";
+
+    /* Will throw if an exception was thrown in connect_task. */
+    future.get();
 }
 
 void
@@ -417,7 +419,7 @@ GCommConn::handle_up(const void* id, const Datagram& dg, const ProtoUpMeta& um)
 
 void GCommConn::run()
 {
-    barrier_.wait();
+    connect_task_();
     if (error_ != 0) return;
 
     while (true)
@@ -721,7 +723,6 @@ static GCS_BACKEND_OPEN_FN(gcomm_open)
 
     try
     {
-        gcomm::Critical<Protonet> crit(conn.get_pnet());
         conn.connect(channel, bootstrap);
     }
     catch (Exception& e)
