@@ -925,6 +925,8 @@ END_TEST
 #include <openssl/engine.h>
 #include <openssl/pem.h>
 #include <openssl/x509v3.h>
+#include <openssl/ssl.h>
+#include <openssl/opensslv.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
@@ -1052,7 +1054,7 @@ static void set_x509v3_extensions(X509* x509, X509* issuer)
     X509V3_CTX ctx;
     X509V3_set_ctx(&ctx, issuer ? issuer : x509, x509, nullptr, nullptr, 0);
     X509V3_set_nconf(&ctx, conf);
-    if (!X509V3_EXT_add_nconf(conf, &ctx, "extensions", x509))
+    if (!X509V3_EXT_add_nconf(conf, &ctx, (char *)"extensions", x509))
     {
         throw_error("Could not add extension");
     }
@@ -1183,6 +1185,12 @@ static void generate_chains()
 
 static void generate_certificates()
 {
+#if OPENSSL_VERSION_NUMBER < 0x30004000L
+#ifdef OPENSSL_INIT_LOAD_SSL_STRINGS
+    OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS, NULL);
+#endif
+#endif
+
   generate_self_signed();
   generate_chains();
 }
