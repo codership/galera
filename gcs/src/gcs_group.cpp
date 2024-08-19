@@ -328,7 +328,7 @@ group_go_non_primary (gcs_group_t* group)
     // what else? Do we want to change anything about the node here?
 }
 
-static void
+static int
 group_check_proto_ver(gcs_group_t* group)
 {
     assert(group->quorum.primary); // must be called only on primary CC
@@ -339,8 +339,8 @@ group_check_proto_ver(gcs_group_t* group)
 #define GROUP_CHECK_NODE_PROTO_VER(LEVEL)                               \
     if (node.LEVEL < group->quorum.LEVEL) {                             \
         gu_fatal("Group requested %s: %d, max supported by this node: %d." \
-                 "Upgrade the node before joining this group."          \
-                 "Need to abort.",                                      \
+                 " Upgrade the node before joining this group."         \
+                 " Must abort.",                                        \
                  #LEVEL, group->quorum.LEVEL, node.LEVEL);              \
         fail = true;                                                    \
     }
@@ -351,12 +351,14 @@ group_check_proto_ver(gcs_group_t* group)
 
 #undef GROUP_CHECK_NODE_PROTO_VER
 
-    if (fail) gu_abort();
+    if (fail) return -ENOTRECOVERABLE;
+
+    return 0;
 }
 
 static const char group_empty_id[GCS_COMP_MEMB_ID_MAX_LEN + 1] = { 0, };
 
-static void
+static int
 group_check_donor (gcs_group_t* group)
 {
     gcs_node_state_t const my_state = group->nodes[group->my_idx].status;
@@ -372,20 +374,20 @@ group_check_donor (gcs_group_t* group)
             if (i != group->my_idx &&
                 !memcmp (donor_id, group->nodes[i].id,
                          sizeof (group->nodes[i].id)))
-                return;
+                return 0;
         }
 
         gu_warn ("Donor %s is no longer in the group. State transfer cannot "
-                 "be completed, need to abort. Aborting...", donor_id);
+                 "be completed, need to abort.", donor_id);
 
-        gu_abort();
+        return -ENOTRECOVERABLE;
     }
 
-    return;
+    return 0;
 }
 
 /*! Processes state messages and sets group parameters accordingly */
-static void
+static int
 group_post_state_exchange (gcs_group_t* group)
 {
     assert(group->memb_mtx_.locked());
@@ -406,7 +408,7 @@ group_post_state_exchange (gcs_group_t* group)
             (new_exchange &&
              gu_uuid_compare (&group->state_uuid,
                               gcs_state_msg_uuid(states[i]))))
-            return; // not all states from THIS state exch. received, wait
+            return 0; // not all states from THIS state exch. received, wait
     }
     gu_debug ("STATE EXCHANGE: " GU_UUID_FORMAT " complete.",
               GU_UUID_ARGS(&group->state_uuid));
@@ -424,7 +426,7 @@ group_post_state_exchange (gcs_group_t* group)
     }
     else {
         gu_fatal ("Negative quorum version: %d", quorum->version);
-        gu_abort();
+        return -ENOTRECOVERABLE;
     }
 
     // Update each node state based on quorum outcome:
@@ -446,7 +448,7 @@ group_post_state_exchange (gcs_group_t* group)
                          (long long)group->act_id_, (long long)quorum->act_id,
                          (long long)(group->act_id_ - quorum->act_id));
                 group->state  = GCS_GROUP_INCONSISTENT;
-                return;
+                return 0;
             }
             group->state      = GCS_GROUP_PRIMARY;
             group->act_id_    = quorum->act_id;
@@ -517,19 +519,22 @@ group_post_state_exchange (gcs_group_t* group)
              int(quorum->vote_policy),
              GU_UUID_ARGS(&quorum->group_uuid));
 
-    if (quorum->primary) group_check_proto_ver(group);
-    group_check_donor(group);
+    if (quorum->primary) {
+        int const err(group_check_proto_ver(group));
+        if (err) return err;
+    }
+    return group_check_donor(group);
 }
 
 // does basic sanity check of the component message (in response to #145)
-static void
+static int
 group_check_comp_msg (bool prim, long my_idx, long members)
 {
     if (my_idx >= 0) {
-        if (my_idx < members) return;
+        if (my_idx < members) return 0;
     }
     else {
-        if (!prim && (0 == members)) return;
+        if (!prim && (0 == members)) return 0;
     }
 
     gu_fatal ("Malformed component message from backend: "
@@ -537,7 +542,7 @@ group_check_comp_msg (bool prim, long my_idx, long members)
               prim ? "PRIMARY" : "NON-PRIMARY", my_idx, members);
 
     assert (0);
-    gu_abort ();
+    return -ENOTRECOVERABLE;
 }
 
 gcs_group_state_t
@@ -552,7 +557,10 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
     const long new_my_idx    = gcs_comp_msg_self     (comp);
     const long new_nodes_num = gcs_comp_msg_num      (comp);
 
-    group_check_comp_msg (prim_comp, new_my_idx, new_nodes_num);
+    {
+        int const err(group_check_comp_msg(prim_comp, new_my_idx,new_nodes_num));
+        if (err) return gcs_group_state_t(err);
+    }
 
     if (new_my_idx >= 0) {
         gu_info ("New COMPONENT: primary = %s, bootstrap = %s, my_idx = %ld, "
@@ -692,7 +700,8 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
             if (GCS_GROUP_PRIMARY == group->state) {
                 /* since we don't have any new nodes since last PRIMARY,
                    we skip state exchange */
-                group_post_state_exchange (group);
+                int const err(group_post_state_exchange(group));
+                if (err) return gcs_group_state_t(err);
             }
         }
 
@@ -751,7 +760,8 @@ gcs_group_handle_state_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
                     gu::Lock lock(group->memb_mtx_);
                     group->memb_epoch_ = group->act_id_;
                     gcs_node_record_state(&group->nodes[msg->sender_idx], state);
-                    group_post_state_exchange (group);
+                    int const err(group_post_state_exchange(group));
+                    if (err) return gcs_group_state_t(err);
                 }
             }
             else {

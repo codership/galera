@@ -1046,7 +1046,9 @@ core_handle_state_msg (gcs_core_t*          core,
     if (GCS_GROUP_WAIT_STATE_MSG == gcs_group_state (group))
     {
         if (gu_mutex_lock (&core->send_lock)) abort();
-        ret = gcs_group_handle_state_msg (group, msg);
+        // cast to int is needed to distinguish between positive enums and
+        // negative error codes
+        ret = int(gcs_group_handle_state_msg (group, msg));
 
         switch (ret) {
         case GCS_GROUP_PRIMARY:
@@ -1345,6 +1347,8 @@ out:
             conn->backend.close(&conn->backend);
             if (GCS_ACT_INCONSISTENCY != recv_act->act.type) {
                 /* inconsistency event must be passed up */
+                gu_fatal("Unrecoverable error happened above. Aborting...");
+                usleep(1000000); // give it a second
                 gu_abort();
             }
         }
