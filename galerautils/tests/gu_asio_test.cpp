@@ -1059,7 +1059,7 @@ END_TEST
 
 #include <openssl/bn.h>
 #include <openssl/conf.h>
-#include <openssl/engine.h>
+#include <openssl/err.h>
 #include <openssl/pem.h>
 #include <openssl/x509v3.h>
 #include <openssl/ssl.h>
