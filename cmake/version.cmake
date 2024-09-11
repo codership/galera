@@ -17,10 +17,10 @@ set(GALERA_VERSION
 
 #
 # First determine GALERA_GIT_REVISION. If it is stored into file
-# in source root, the value is taken from there. Otherwise
+# in build dir root, the value is taken from there. Otherwise
 # revision is read from PROJECT_SOURCE_DIR with git rev-parse.
 #
-if (NOT EXISTS ${PROJECT_SOURCE_DIR}/GALERA_GIT_REVISION)
+if (NOT EXISTS ${CMAKE_BINARY_DIR}/GALERA_GIT_REVISION)
   execute_process(
     COMMAND git rev-parse --short HEAD
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
@@ -31,9 +31,9 @@ if (NOT EXISTS ${PROJECT_SOURCE_DIR}/GALERA_GIT_REVISION)
   else()
     set(GALERA_GIT_REVISION "XXXX")
   endif()
-  file(WRITE ${PROJECT_SOURCE_DIR}/GALERA_GIT_REVISION ${GALERA_GIT_REVISION})
+  file(WRITE ${CMAKE_BINARY_DIR}/GALERA_GIT_REVISION ${GALERA_GIT_REVISION})
 else()
-  file (READ ${PROJECT_SOURCE_DIR}/GALERA_GIT_REVISION var)
+  file (READ ${CMAKE_BINARY_DIR}/GALERA_GIT_REVISION var)
   string(STRIP ${var} GALERA_GIT_REVISION)
 endif()
 

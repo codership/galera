@@ -303,8 +303,9 @@ namespace gcomm
         void connect(bool first)
         {
             gu_trace(std::for_each(protos_.rbegin(), protos_.rend(),
-                                   std::bind2nd(
-                                       std::mem_fun(&Protolay::connect), first)));
+                                   [first](Protolay* pl)
+                                   { pl->connect(first); }));
+            ;
         }
 
         void close(bool force = false)
@@ -314,8 +315,6 @@ namespace gcomm
             {
                 (*i)->close();
             }
-            // gu_trace(std::for_each(protos.rbegin(), protos.rend(),
-            //                       std::mem_fun(&Protolay::close)));
         }
 
 
@@ -326,8 +325,6 @@ namespace gcomm
             {
                 (*i)->close(uuid);
             }
-            // gu_trace(std::for_each(protos.rbegin(), protos.rend(),
-            //                       std::mem_fun(&Protolay::close)));
         }
 
         void send()
@@ -420,7 +417,7 @@ namespace gcomm
         gu::datetime::Date handle_timers()
         {
             std::for_each(protos_.begin(), protos_.end(),
-                          std::mem_fun(&Protolay::handle_timers));
+                          [](Protolay* pl) { pl->handle_timers(); });
             return gu::datetime::Date::max();
         }
 

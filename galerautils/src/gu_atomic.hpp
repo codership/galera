@@ -19,7 +19,7 @@ namespace gu
     class Atomic
     {
     public:
-        Atomic<I>(I i = 0) : i_(i) { }
+        Atomic(I i = 0) : i_(i) { }
 
         I operator()() const
         {
