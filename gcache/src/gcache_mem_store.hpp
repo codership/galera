@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2018 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2024 Codership Oy <info@codership.com>
  */
 
 /*! @file mem store class */
@@ -26,6 +26,7 @@ namespace gcache
               size_     (0),
               allocd_   (),
               seqno2ptr_(seqno2ptr),
+              seqno_locked_(SEQNO_MAX),
               debug_    (dbg & DEBUG)
         {}
 
@@ -141,6 +142,7 @@ namespace gcache
         void discard (BufferHeader* bh)
         {
             assert (BH_is_released(bh));
+            assert (bh->seqno_g < seqno_locked_);
 
             size_ -= bh->size;
             allocd_.erase(bh);
@@ -156,6 +158,10 @@ namespace gcache
 
         void set_debug(int const dbg) { debug_ = dbg & DEBUG; }
 
+        void seqno_lock(seqno_t const seqno_g) { seqno_locked_ = seqno_g; }
+
+        void seqno_unlock() { seqno_locked_ = SEQNO_MAX; }
+
     private:
 
         static int const DEBUG = 1;
@@ -166,6 +172,7 @@ namespace gcache
         size_t          size_;
         std::set<void*> allocd_;
         seqno2ptr_t&    seqno2ptr_;
+        seqno_t         seqno_locked_;
         int             debug_;
     };
 }

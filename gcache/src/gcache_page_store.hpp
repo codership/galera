@@ -1,5 +1,9 @@
 /*
+<<<<<<< HEAD
  * Copyright (C) 2010-2022 Codership Oy <info@codership.com>
+=======
+ * Copyright (C) 2010-2024 Codership Oy <info@codership.com>
+>>>>>>> gcache-seqno-lock-4.x
  */
 
 /*! @file page store class */
@@ -81,6 +85,10 @@ namespace gcache
         bool  page_cleanup_needed() const { return total_size_ > keep_size_; }
 
         void  reset();
+
+        void  seqno_lock(seqno_t) {}
+
+        void  seqno_unlock() {}
 
         void  set_enc_key(const Page::EncKey& key);
 

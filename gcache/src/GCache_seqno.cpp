@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2021 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2024 Codership Oy <info@codership.com>
  */
 
 #include "gcache_bh.hpp"
@@ -308,7 +308,13 @@ namespace gcache
 
         seqno_locked_count++;
 
-        if (seqno_g < seqno_locked) seqno_locked = seqno_g;
+        if (seqno_g < seqno_locked)
+        {
+            seqno_locked = seqno_g;
+            mem.seqno_lock(seqno_locked);
+            rb.seqno_lock(seqno_locked);
+            ps.seqno_lock(seqno_locked);
+        }
     }
 
     /*!
@@ -411,7 +417,13 @@ namespace gcache
         {
             assert(seqno_locked < SEQNO_MAX);
             seqno_locked_count--;
-            if (0 == seqno_locked_count) seqno_locked = SEQNO_MAX;
+            if (0 == seqno_locked_count)
+            {
+                seqno_locked = SEQNO_MAX;
+                mem.seqno_unlock();
+                rb.seqno_unlock();
+                ps.seqno_unlock();
+            }
         }
         else
         {
