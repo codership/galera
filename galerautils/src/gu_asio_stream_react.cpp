@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2020-2024 Codership Oy <info@codership.com>
+// Copyright (C) 2020-2025 Codership Oy <info@codership.com>
 //
 
 #define GU_ASIO_IMPL
@@ -91,6 +91,8 @@ void gu::AsioStreamReact::close() try
     {
         GU_ASIO_DEBUG(debug_print() << "Socket not open on close");
     }
+
+    gu::connection_monitor_disconnect((wsrep_connection_key_t)this);
     socket_.close();
 }
 // Catch all the possible exceptions here, not only asio ones.
@@ -198,11 +200,22 @@ void gu::AsioStreamReact::connect(const gu::URI& uri) try
     socket_.connect(resolve_result->endpoint());
     connected_ = true;
     prepare_engine(false);
+    assign_addresses();
+
     auto result(engine_->client_handshake());
     switch (result)
     {
     case AsioStreamEngine::success:
+    {
+        if (!gu_tls_service)
+        {
+            gu::connection_monitor_connect((wsrep_connection_key_t)this,
+                                           scheme_,
+                                           local_addr_,
+                                           remote_addr_);
+	}
         return;
+    }
     case AsioStreamEngine::want_read:
     case AsioStreamEngine::want_write:
     case AsioStreamEngine::eof:
@@ -346,6 +359,12 @@ void gu::AsioStreamReact::complete_client_handshake(
     switch (result)
     {
     case AsioStreamEngine::success:
+#ifdef GALERA_HAVE_SSL
+        if (!gu_tls_service)
+        {
+            engine_->update_SSL_info(this);
+        }
+#endif
         handshake_complete_ = true;
         handler->connect_handler(*this, AsioErrorCode());
         break;
@@ -389,6 +408,15 @@ void gu::AsioStreamReact::connect_handler(
     set_socket_options(socket_);
     prepare_engine(true);
     assign_addresses();
+
+    if (!gu_tls_service)
+    {
+        gu::connection_monitor_connect((wsrep_connection_key_t)this,
+                                       scheme_,
+                                       local_addr_,
+                                       remote_addr_);
+    }
+
     GU_ASIO_DEBUG(debug_print()
                   << " AsioStreamReact::connect_handler: init handshake");
     auto result(engine_->client_handshake());
@@ -478,6 +506,17 @@ void gu::AsioStreamReact::complete_server_handshake(
     switch (result)
     {
     case AsioStreamEngine::success:
+#ifdef GALERA_HAVE_SSL
+        if (!gu_tls_service)
+        {
+            gu::connection_monitor_connect((wsrep_connection_key_t)this,
+                                           scheme_,
+                                           local_addr_,
+                                           remote_addr_);
+
+            engine_->update_SSL_info(this);
+        }
+#endif
         handshake_complete_ = true;
         handler->connect_handler(*this, AsioErrorCode());
         break;
@@ -950,6 +989,17 @@ std::shared_ptr<gu::AsioSocket> gu::AsioAcceptorReact::accept() try
     switch (result)
     {
     case AsioStreamEngine::success:
+#ifdef GALERA_HAVE_SSL
+        if (!gu_tls_service)
+        {
+            gu::connection_monitor_connect((wsrep_connection_key_t)socket.get(),
+                                           scheme_,
+                                           socket->local_addr(),
+                                           socket->remote_addr());
+
+            socket->engine_->update_SSL_info((wsrep_connection_key_t)socket.get());
+        }
+#endif
         return socket;
     case AsioStreamEngine::want_read:
     case AsioStreamEngine::want_write:

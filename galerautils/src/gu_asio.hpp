@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2014-2024 Codership Oy <info@codership.com>
+// Copyright (C) 2014-2025 Codership Oy <info@codership.com>
 //
 
 
@@ -17,6 +17,7 @@
 #include "wsrep_tls_service.h"
 #include "wsrep_allowlist_service.h"
 #include "wsrep_node_isolation.h"
+#include "wsrep_connection_monitor_service.h"
 
 #include <netinet/tcp.h> // tcp_info
 
@@ -27,6 +28,7 @@
 #include <memory>
 #include <string>
 
+extern wsrep_tls_service_v1_t* gu_tls_service;
 namespace gu
 {
     // URI schemes for networking
@@ -808,6 +810,22 @@ namespace gu
     extern std::atomic<enum wsrep_node_isolation_mode>
         gu_asio_node_isolation_mode;
 
+    /* Init/deinit global connection monitoring service hooks */
+    int init_connection_monitor_service_v1(wsrep_connection_monitor_service_v1_t*);
+    void deinit_connection_monitor_service_v1();
+    /* Connection monitor connect callback */
+    void connection_monitor_connect(wsrep_connection_key_t id,
+                                    const std::string& scheme,
+                                    const std::string& local_addr,
+                                    const std::string& remote_addr);
+    /* Connection monitor disconnect callback */
+    void connection_monitor_disconnect(wsrep_connection_key_t id);
+    /* Connection monitor ssl info callback */
+    void connection_monitor_ssl_info(wsrep_connection_key_t id,
+                                     const std::string& cipher,
+                                     const std::string& issuer,
+                                     const std::string& subject,
+                                     const std::string& version);
 }
 
 #endif // GU_ASIO_HPP

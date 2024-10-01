@@ -55,7 +55,7 @@ public:
     virtual std::string local_addr() const GALERA_OVERRIDE;
     virtual std::string remote_addr() const GALERA_OVERRIDE;
     virtual State state() const GALERA_OVERRIDE { return state_; }
-    virtual SocketId id() const GALERA_OVERRIDE { return &socket_; }
+    virtual SocketId id() const GALERA_OVERRIDE { return socket_.get(); }
     virtual SocketStats stats() const GALERA_OVERRIDE;
 private:
     // AsioSocketHandler interface

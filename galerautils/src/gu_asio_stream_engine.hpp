@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2020 Codership Oy <info@codership.com>
+// Copyright (C) 2020-2025 Codership Oy <info@codership.com>
 //
 
 #ifndef GU_ASIO_STREAM_ENGINE_HPP
@@ -116,6 +116,11 @@ namespace gu
         static std::shared_ptr<AsioStreamEngine> make(
             AsioIoService&, const std::string& scheme, int fd,
             bool non_blocking);
+
+        /**
+         * Update SSL/TLS information
+         */
+        virtual void update_SSL_info(wsrep_connection_key_t id) = 0;
 
     protected:
         AsioStreamEngine() { }

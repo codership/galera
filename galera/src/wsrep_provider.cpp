@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2021 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2024 Codership Oy <info@codership.com>
 //
 
 #include "key_data.hpp"
@@ -20,6 +20,7 @@
 #include "gu_event_service.hpp"
 #include "wsrep_config_service.h"
 #include "wsrep_node_isolation.h"
+#include "wsrep_connection_monitor_service.h"
 
 #include <cassert>
 
@@ -1663,6 +1664,16 @@ static wsrep_t galera_str = {
 extern "C"
 int wsrep_loader(wsrep_t *hptr);
 
+extern "C"
+int wsrep_init_connection_monitor_service_v1(wsrep_connection_monitor_service_v1_t *connection_monitor_service)
+{
+    return gu::init_connection_monitor_service_v1(connection_monitor_service);
+}
+
+extern "C" void wsrep_deinit_connection_monitor_service_v1()
+{
+    gu::deinit_connection_monitor_service_v1();
+}
 
 extern "C"
 int wsrep_loader(wsrep_t *hptr)

@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2014-2020 Codership Oy <info@codership.com>
+// Copyright (C) 2014-2025 Codership Oy <info@codership.com>
 //
 
 #include "gu_config.hpp"
@@ -49,9 +49,11 @@
 #include <fstream>
 #include <mutex>
 
-static wsrep_tls_service_v1_t* gu_tls_service(0);
+wsrep_tls_service_v1_t* gu_tls_service(0);
 
 static wsrep_allowlist_service_v1_t* gu_allowlist_service(0);
+
+static wsrep_connection_monitor_service_v1_t* gu_connection_monitor_service(0);
 
 //
 // AsioIpAddress wrapper
@@ -954,3 +956,97 @@ void gu::deinit_allowlist_service_v1()
 std::atomic<enum wsrep_node_isolation_mode> gu::gu_asio_node_isolation_mode{
     WSREP_NODE_ISOLATION_NOT_ISOLATED
 };
+
+//
+// ConnectionMonitor
+//
+
+static std::mutex gu_connection_monitor_service_init_mutex;
+static size_t gu_connection_monitor_service_usage;
+
+int gu::init_connection_monitor_service_v1(wsrep_connection_monitor_service_v1_t* connection_monitor)
+{
+    log_info << "init_connection_monitor_service_v1";
+    std::lock_guard<std::mutex> lock(gu_connection_monitor_service_init_mutex);
+    ++gu_connection_monitor_service_usage;
+    if (gu_connection_monitor_service)
+    {
+        assert(gu_connection_monitor_service == connection_monitor);
+        return 0;
+    }
+    gu_connection_monitor_service = connection_monitor;
+    return 0;
+}
+
+void gu::deinit_connection_monitor_service_v1()
+{
+    log_info << "deinit_connection_monitor_service_v1";
+    std::lock_guard<std::mutex> lock(gu_connection_monitor_service_init_mutex);
+    assert(gu_connection_monitor_service_usage > 0);
+    --gu_connection_monitor_service_usage;
+    if (gu_connection_monitor_service_usage == 0)
+        gu_connection_monitor_service = 0;
+}
+
+void gu::connection_monitor_connect(wsrep_connection_key_t id,
+                                    const std::string& scheme,
+                                    const std::string& local_addr,
+                                    const std::string& remote_addr)
+{
+    if (gu_connection_monitor_service == nullptr)
+    {
+        return; // No action
+    }
+
+    // tcp://127.0.0.1:19006 --> 127.0.0.1:19006
+    std::string ra = remote_addr.substr(6, remote_addr.length());
+    std::string la = local_addr.substr(6, local_addr.length());
+
+    wsrep_buf_t const lscheme = {scheme.c_str(), scheme.length() };
+    wsrep_buf_t const laddr   = {la.c_str(), la.length() };
+    wsrep_buf_t const raddr   = {ra.c_str(), ra.length() };
+
+    gu_connection_monitor_service->connection_monitor_connect_cb(
+        gu_connection_monitor_service->context,
+        id,
+        &lscheme,
+        &laddr,
+        &raddr);
+}
+
+void gu::connection_monitor_disconnect(wsrep_connection_key_t id)
+{
+    if (gu_connection_monitor_service == nullptr)
+    {
+        return; // No action
+    }
+
+    gu_connection_monitor_service->connection_monitor_disconnect_cb(
+        gu_connection_monitor_service->context,
+        id);
+}
+
+void gu::connection_monitor_ssl_info(wsrep_connection_key_t id,
+                                     const std::string& cipher,
+                                     const std::string& issuer,
+                                     const std::string& subject,
+                                     const std::string& version)
+{
+    if (gu_connection_monitor_service == nullptr)
+    {
+        return; // No action
+    }
+
+    wsrep_buf_t const ch = {cipher.c_str(), cipher.length() };
+    wsrep_buf_t const iss = {issuer.c_str(), issuer.length() };
+    wsrep_buf_t const sub = {subject.c_str(), subject.length() };
+    wsrep_buf_t const vers = {version.c_str(), version.length() };
+
+    gu_connection_monitor_service->connection_monitor_ssl_info_cb(
+        gu_connection_monitor_service->context,
+        id,
+        &ch,
+        &iss,
+        &sub,
+        &vers);
+}
