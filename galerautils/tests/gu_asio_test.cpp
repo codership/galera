@@ -1560,6 +1560,20 @@ START_TEST(test_ssl_compression_option)
 }
 END_TEST
 
+START_TEST(test_ssl_cipher)
+{
+    auto config(get_ssl_config());
+    config.set("socket.ssl_cipher", "AES256-SHA");
+    gu::AsioIoService io_service(config);
+    gu::URI uri("ssl://127.0.0.1:0");
+    auto acceptor_handler(std::make_shared<MockAcceptorHandler>());
+    auto acceptor(io_service.make_acceptor(uri));
+    acceptor->listen(uri);
+    acceptor->async_accept(acceptor_handler, acceptor_handler->next_socket_handler);
+    test_async_read_write_common(io_service, *acceptor, *acceptor_handler);
+}
+END_TEST
+
 static gu::Config get_ssl_chain_config(int index)
 {
     gu::Config ret;
@@ -2618,6 +2632,10 @@ Suite* gu_asio_suite()
 
     tc = tcase_create("test_ssl_compression_option");
     tcase_add_test(tc, test_ssl_compression_option);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_ssl_cipher");
+    tcase_add_test(tc, test_ssl_cipher);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_ssl_certificate_chain");
