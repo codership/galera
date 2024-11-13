@@ -547,8 +547,7 @@ void gu::ssl_register_params(gu::Config& conf)
              gu::Config::Flag::read_only |
              gu::Config::Flag::type_bool);
     conf.add(gu::conf::ssl_cipher,
-             gu::Config::Flag::read_only |
-             gu::Config::Flag::type_bool);
+             gu::Config::Flag::read_only);
     conf.add(gu::conf::ssl_compression,
              gu::Config::Flag::read_only |
              gu::Config::Flag::type_bool |
