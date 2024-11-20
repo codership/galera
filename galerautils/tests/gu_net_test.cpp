@@ -20,7 +20,7 @@
 using std::vector;
 using std::string;
 using std::deque;
-using std::mem_fun;
+using std::mem_fn;
 using std::for_each;
 using namespace gu;
 using namespace gu::net;
