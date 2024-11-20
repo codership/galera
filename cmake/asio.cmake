@@ -40,4 +40,9 @@ if(NOT ASIO_VERSION_OK)
   include_directories(SYSTEM ${PROJECT_SOURCE_DIR}/asio)
 endif()
 
+check_include_file_cxx(openssl/engine.h HAVE_ENGINE_H)
+if(NOT HAVE_ENGINE_H)
+  add_definitions(-DOPENSSL_NO_ENGINE)
+endif()
+
 add_definitions(-DHAVE_ASIO_HPP)
