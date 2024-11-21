@@ -222,13 +222,17 @@ std::ostream& operator <<(std::ostream& os, const gcs_action& act);
  * @param act_in    action buffer vector (total size is passed in action)
  * @param action    action struct
  * @param scheduled whether the call was preceded by gcs_schedule()
+ * @param seq_cb    callback struct for signalling the caller once the
+ *                  replication sequence has been established
  * @return          negative error code, action size in case of success
  * @retval -EINTR:  thread was interrupted while waiting to enter the monitor
  */
 extern long gcs_replv (gcs_conn_t*          conn,
                        const struct gu_buf* act_in,
                        struct gcs_action*   action,
-                       bool                 scheduled);
+                       bool                 scheduled,
+                       const wsrep_seq_cb_t* seq_cb
+);
 
 /*! A wrapper for single buffer communication */
 static inline long gcs_repl (gcs_conn_t*        const conn,
@@ -236,7 +240,7 @@ static inline long gcs_repl (gcs_conn_t*        const conn,
                              bool               const scheduled)
 {
     struct gu_buf const buf = { action->buf, action->size };
-    return gcs_replv (conn, &buf, action, scheduled);
+    return gcs_replv (conn, &buf, action, scheduled, nullptr);
 }
 
 /*! @brief Receives an action from group.
