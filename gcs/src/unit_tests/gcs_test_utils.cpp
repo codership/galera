@@ -9,6 +9,8 @@
 
 #include <boost/filesystem.hpp>
 
+#include "gu_inttypes.hpp"
+
 namespace gcs_test
 {
 
@@ -427,16 +429,20 @@ gt_group::deliver_join_sync_msg(int const src, gcs_msg_type_t const type)
 gcs_seqno_t
 gt_group::deliver_last_applied(int const from, gcs_seqno_t const la)
 {
-    gcs_seqno_t res = GCS_SEQNO_ILL;
-
-    if (nodes_num > 0) res = nodes[0]->deliver_last_applied(from, la);
+    gcs_seqno_t const ret(nodes_num > 0 ?
+                          nodes[0]->deliver_last_applied(from, la) :
+                          GCS_SEQNO_ILL);
 
     for (int i(1); i < nodes_num; ++i)
     {
-        ck_assert(nodes[i]->deliver_last_applied(from, la) == res);
+        gcs_seqno_t const res(nodes[i]->deliver_last_applied(from, la));
+        ck_assert_msg((ret == res || proto_ver <= 2),
+                      "nodes[%d]->deliver_last_applied(%d, %" PRId64 "): %"
+                      PRId64 ", expected %" PRId64 ", proto_ver %d",
+                      i, from, la, res, ret, proto_ver);
     }
 
-    return res;
+    return ret;
 }
 
 bool
@@ -593,6 +599,7 @@ gt_group::gt_group(int const num, int const gcs_proto_ver, bool const prim,
                    bool const enc)
     : nodes(),
       nodes_num(0),
+      proto_ver(gcs_proto_ver),
       primary(prim)
 {
     if (num > 0)

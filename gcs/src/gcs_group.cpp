@@ -232,6 +232,9 @@ group_count_last_applied(const gcs_group_t& group, const gcs_node_t& node)
 static inline void
 group_redo_last_applied (gcs_group_t* group)
 {
+    /* protocols 2-3-4 had error in commit cut recalculation */
+    bool const proto_cond(group->quorum.gcs_proto_ver > 4 ||
+                          group->quorum.gcs_proto_ver < 2);
     gu_seqno_t last_applied = GU_LLONG_MAX;
     int        last_node    = -1;
     int        n;
@@ -267,7 +270,7 @@ group_redo_last_applied (gcs_group_t* group)
                          << " below the current " << group->last_applied;
             }
 #endif /* NDEBUG */
-            if (seqno >= group->last_applied || group->quorum.gcs_proto_ver < 2)
+            if (proto_cond || seqno >= group->last_applied)
             {
                 last_applied = seqno;
                 last_node    = n;
@@ -293,10 +296,17 @@ group_redo_last_applied (gcs_group_t* group)
     }
 
     if (gu_likely (last_node >= 0)) {
-        assert(last_applied >= group->last_applied ||
-               group->quorum.gcs_proto_ver < 2);
-        group->last_applied = last_applied;
-        group->last_node    = last_node;
+        assert(last_applied < GU_LLONG_MAX);
+        assert(last_applied >= group->last_applied || proto_cond);
+        /* make sure group-wide last applied is monotonically increasing:
+         * newly SYNCED node may temporarily result in lower last_applied. */
+        if (last_applied > group->last_applied ||
+            group->quorum.gcs_proto_ver < 2)
+        {
+            group->last_applied = last_applied;
+        }
+        /* should always be the most lagging node to trigger recalculation ASAP*/
+        group->last_node = last_node;
     }
 
     log_debug << "final last_applied on " << group->nodes[group->my_idx].name
@@ -860,7 +870,8 @@ gcs_group_handle_last_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
     log_debug << "Got last applied " << gtid.seqno() << " from "
               << msg->sender_idx << " (" << group->nodes[msg->sender_idx].name
               << "). Last node: " << group->last_node << " ("
-              << group->nodes[group->last_node].name << ")";
+              << (group->last_node >= 0 ?
+                  group->nodes[group->last_node].name : " ") << ")";
 
     if (msg->sender_idx == group->last_node   &&
         gtid.seqno()    >  group->last_applied) {

@@ -26,8 +26,10 @@ typedef uint8_t gcs_proto_t;
  *     (needs protocol version bump to keep it identical on all nodes)
  * 4 - fix for the error voting protocol
  *     (must keep it identical on all nodes)
+ * 5 - fix for commit cut tracking for just SYNCED nodes
+ *     (must keep it identical on all nodes)
  */
-#define GCS_PROTO_MAX 4
+#define GCS_PROTO_MAX 5
 
 /*! Internal action fragment data representation */
 typedef struct gcs_act_frag
