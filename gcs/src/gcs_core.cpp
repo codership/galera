@@ -1676,6 +1676,11 @@ void gcs_core_get_membership(const gcs_core_t* const   core,
     gcs_group_get_membership(core->group, alloc, memb);
 }
 
+void gcs_core_get_protocols(gcs_core_t* core, int& appl, int& repl, int& gcs)
+{
+    core->group.get_protocols(appl, repl, gcs);
+}
+
 #ifdef GCS_CORE_TESTING
 
 gcs_backend_t*

@@ -101,6 +101,14 @@ typedef struct gcs_group
               int          appl_proto_ver);
     ~gcs_group();
 
+    void
+    get_protocols(int& appl, int& repl, int& gcs)
+    {
+        appl = quorum.appl_proto_ver;
+        repl = quorum.repl_proto_ver;
+        gcs  = quorum.gcs_proto_ver;
+    }
+
     static void
     register_params(gu::Config& cnf);
 }

@@ -31,7 +31,7 @@ namespace gcache
                 discard_tail(s);
                 seqno_max = s;
                 seqno_released = s;
-                assert(seqno_max == seqno2ptr.index_back());
+                assert(seqno2ptr.empty() || seqno_max == seqno2ptr.index_back());
             }
             return;
         }

@@ -177,6 +177,8 @@ void gcs_core_get_membership(const gcs_core_t* core,
                              wsrep_allocator_cb alloc,
                              struct wsrep_membership** memb);
 
+void gcs_core_get_protocols(gcs_core_t* core, int& appl, int& repl, int& gcs);
+
 #ifdef GCS_CORE_TESTING // things compiled only for unit tests
 
 /* gcs_core_send() interface does not allow enough concurrency control to model

@@ -496,6 +496,9 @@ struct gcs_stats
     int       send_q_len;     //! current send queue length
     int       send_q_len_max; //! maximum send queue length
     int       send_q_len_min; //! minimum send queue length
+    int       proto_appl;     //! application protocol level
+    int       proto_repl;     //! replicator protocol level
+    int       proto_gcs;      //! GCS protocol level
     bool      fc_active;      //! flow control is currently active
     bool      fc_requested;   //! flow control is requested by this node
 };

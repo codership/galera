@@ -2461,6 +2461,11 @@ gcs_get_stats (gcs_conn_t* conn, struct gcs_stats* stats)
     stats->fc_received = conn->stats_fc_received;
     stats->fc_active   = fc_active(conn);
     stats->fc_requested= conn->stop_sent_ > 0;
+
+    gcs_core_get_protocols(conn->core,
+                           stats->proto_appl,
+                           stats->proto_repl,
+                           stats->proto_gcs);
 }
 
 void
