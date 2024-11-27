@@ -46,16 +46,16 @@ https://github.com/codership/mysql-wsrep into some directory (hereafter
 
 After successful build, demo package can be found under scripts/mysql.
 
-BUILDING - on Ubuntu 16.04 or later
+BUILDING - on Ubuntu 20.04 or later
 
  1) apt-get install check cmake libasio-dev libboost-dev \
          libboost-program-options-dev libssl-dev
 
 Then proceed as described above.
 
-BUILDING - on CentOS/RHEL 6 or later
+BUILDING - on RHEL 8 or later
 
- 1) yum install gcc gcc-c++ cmake boost-devel check-devel
+ 1) yum install gcc gcc-c++ cmake boost-devel check-devel openssl-devel
 
 Then proceed as described above.
 

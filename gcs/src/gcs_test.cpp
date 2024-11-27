@@ -729,10 +729,11 @@ int main (int argc, char *argv[])
     gu_config_set_string(gconf, "gcache.size", "0");
     gu_config_set_string(gconf, "gcache.page_size", "1M");
 
-    gcs_register_params(gconf);
+    gcs_register_params(*reinterpret_cast<gu::Config*>(gconf));
 
     if (!(cache = gcache_create (gconf, ""))) goto out;
-    if (!(gcs = gcs_create (gconf, cache, NULL, NULL, NULL, 0, 0))) goto out;
+    if (!(gcs = gcs_create (*reinterpret_cast<gu::Config*>(gconf),
+                            cache, NULL, NULL, NULL, 0, 0))) goto out;
     puts ("debug"); fflush(stdout);
     /* the following hack won't work if there is 0.0.0.0 in URL options */
     bstrap = (NULL != strstr(conf.backend, "0.0.0.0"));

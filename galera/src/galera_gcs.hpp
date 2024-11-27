@@ -96,7 +96,7 @@ namespace galera
             const char* node_name     = 0,
             const char* node_incoming = 0)
             :
-            conn_(gcs_create(reinterpret_cast<gu_config_t*>(&config),
+            conn_(gcs_create(config,
                              reinterpret_cast<gcache_t*>(&cache),
                              cb,
                              node_name, node_incoming,

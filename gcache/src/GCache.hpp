@@ -154,7 +154,7 @@ namespace gcache
          * Move lock to a given seqno.
          * @throws gu::NotFound if seqno is not in the cache.
          */
-        void  seqno_lock (seqno_t const seqno_g);
+        void  seqno_lock (seqno_t seqno_g);
 
         /*!
          * Get pointer to buffer identified by seqno.

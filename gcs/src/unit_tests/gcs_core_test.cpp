@@ -399,7 +399,7 @@ core_test_init (gu::Config* config,
         Cache = new gcache::GCache(NULL, *config, ".");
     }
 
-    Core = gcs_core_create (reinterpret_cast<gu_config_t*>(config),
+    Core = gcs_core_create (*config,
                             reinterpret_cast<gcache_t*>(Cache),
                             "core_test", "aaa.bbb.ccc.ddd:xxxx", 0, 0,
                             gcs_proto_ver);

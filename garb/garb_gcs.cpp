@@ -16,7 +16,7 @@ Gcs::Gcs (gu::Config&        gconf,
           const std::string& group)
 :
     closed_ (true),
-    gcs_ (gcs_create (reinterpret_cast<gu_config_t*>(&gconf),
+    gcs_ (gcs_create (gconf,
                       NULL, NULL,
                       name.c_str(),
                       "",

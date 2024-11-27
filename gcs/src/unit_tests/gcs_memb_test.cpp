@@ -11,7 +11,6 @@
 
 #include "gu_uuid.h"
 
-#include "gcs_test_utils.hpp"
 #include "gcs_memb_test.hpp" // must be included last
 
 using namespace gcs_test;

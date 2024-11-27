@@ -27,14 +27,15 @@
 #include "gcs_act.hpp"
 #include "gcs_act_proto.hpp"
 
+#include <gu_config.hpp>
 #include <galerautils.h>
 
 #include <stdint.h>
 #include <stdlib.h>
 
 /* 'static' method to register configuration variables */
-extern bool
-gcs_core_register (gu_config_t* conf);
+extern void
+gcs_core_register (gu::Config& conf);
 
 struct gcs_core;
 typedef struct gcs_core gcs_core_t;
@@ -45,7 +46,7 @@ typedef struct gcs_core gcs_core_t;
  * @param gcs_proto_ver only for unit tests
  */
 extern gcs_core_t*
-gcs_core_create (gu_config_t* conf,
+gcs_core_create (gu::Config&  conf,
                  gcache_t*    cache,
                  const char*  node_name,
                  const char*  inc_addr,
@@ -193,6 +194,8 @@ void gcs_core_get_membership(const gcs_core_t* core,
 void gcs_core_get_membership(const gcs_core_t* core,
                              wsrep_allocator_cb alloc,
                              struct wsrep_membership** memb);
+
+void gcs_core_get_protocols(gcs_core_t* core, int& appl, int& repl, int& gcs);
 
 #ifdef GCS_CORE_TESTING // things compiled only for unit tests
 

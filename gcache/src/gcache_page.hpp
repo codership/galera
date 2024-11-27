@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2019 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2024 Codership Oy <info@codership.com>
  */
 
 /*! @file page file class */
@@ -152,6 +152,10 @@ namespace gcache
         const std::string& name() const { return fd_.name(); }
 
         void reset ();
+
+        void  seqno_lock(seqno_t) {}
+
+        void  seqno_unlock() {}
 
         /* Drop filesystem cache on the file */
         void drop_fs_cache() const;

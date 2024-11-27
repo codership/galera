@@ -133,7 +133,7 @@ public:
         }
     }
 
-    /* Parse a string of semicolumn separated key=value pairs into a vector.
+    /* Parse a string of semicolon separated key=value pairs into a vector.
      * Throws Exception in case of parsing error. */
     static void
     parse (std::vector<std::pair<std::string, std::string> >& params_vector,

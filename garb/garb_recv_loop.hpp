@@ -37,10 +37,7 @@ private:
         RegisterParams(gu::Config& cnf)
         {
             gu::ssl_register_params(cnf);
-            if (gcs_register_params(reinterpret_cast<gu_config_t*>(&cnf)))
-            {
-                gu_throw_fatal << "Error initializing GCS parameters";
-            }
+            gcs_register_params(cnf);
             cnf.add(COMMON_BASE_DIR_KEY);
         }
     }

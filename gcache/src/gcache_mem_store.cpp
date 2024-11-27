@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2024 Codership Oy <info@codership.com>
  */
 
 #include "gcache_mem_store.hpp"
@@ -18,7 +18,7 @@ MemStore::have_free_space (size_type size)
         /* try to free some released bufs */
         BufferHeader* const bh(ptr2BH(seqno2ptr_.front()));
 
-        if (BH_is_released(bh)) /* discard buffer */
+        if (BH_is_released(bh) && bh->seqno_g < seqno_locked_) /*discard buffer*/
         {
             seqno2ptr_.pop_front();
             bh->seqno_g = SEQNO_ILL;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2021 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2024 Codership Oy <info@codership.com>
  */
 
 /*! @file ring buffer storage class */
@@ -71,6 +71,10 @@ namespace gcache
         const std::string& rb_name() const { return fd_.name(); }
 
         void  reset();
+
+        void  seqno_lock(seqno_t const seqno_g) { seqno_locked_ = seqno_g; }
+
+        void  seqno_unlock() { seqno_locked_ = SEQNO_MAX; }
 
         void  seqno_reset();
 
@@ -172,6 +176,7 @@ namespace gcache
 
         seqno2ptr_t&       seqno2ptr_;
         gu::UUID&          gid_;
+        seqno_t            seqno_locked_;
 
         size_t       const size_cache_;
         size_t             size_free_;

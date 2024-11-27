@@ -119,6 +119,15 @@ __attribute__((__packed__));
 
 struct gcs_conn
 {
+    gcs_conn(gu::Config& conf,
+             gcache_t*   gcache,
+             gu::Progress<gcs_seqno_t>::Callback* progress_cb,
+             const char* node_name,
+             const char* inc_addr,
+             int repl_proto_ver,
+             int appl_proto_ver);
+    ~gcs_conn();
+
     gu::UUID group_uuid;
     char* my_name;
     char* channel;
@@ -129,7 +138,6 @@ struct gcs_conn
     gcs_conn_state_t  state;
 
     gu_config_t*      config;
-    bool              config_is_local;
     struct gcs_params params;
 
     gcache_t*    gcache;
@@ -248,65 +256,63 @@ struct gcs_repl_act
     { }
 };
 
-/*! Releases resources associated with parameters */
-static void
-_cleanup_params (gcs_conn_t* conn)
+gcs_conn::gcs_conn(gu::Config& conf,
+                   gcache_t*   cache,
+                   gu::Progress<gcs_seqno_t>::Callback* const progress_cb,
+                   const char* const node_name,
+                   const char* const inc_addr,
+                   int const repl_proto_ver,
+                   int const appl_proto_ver)
+    :
+    group_uuid(),
+    my_name(),
+    channel(),
+    socket(),
+    my_idx(),
+    memb_num(),
+    state(GCS_CONN_DESTROYED),
+    config(reinterpret_cast<gu_config_t*>(&conf)),
+    params(conf),
+    gcache(cache),
+    sm(),
+    local_act_id(),
+    global_seqno(),
+    repl_q(),
+    send_thread(),
+    recv_q(),
+    recv_q_size(),
+    recv_thread(),
+    timeout(),
+    fc_lock(),
+    stfc(),
+    stop_sent_(),
+    stop_count(),
+    queue_len(),
+    upper_limit(),
+    lower_limit(),
+    fc_offset(),
+    max_fc_state(),
+    stats_fc_stop_sent(),
+    stats_fc_cont_sent(),
+    stats_fc_received(),
+    conf_id(),
+    need_to_join(),
+    join_gtid(),
+    join_code(),
+    sync_sent_(),
+    core(),
+    vote_lock_(),
+    vote_cond_(),
+    vote_gtid_(),
+    vote_res_(),
+    vote_wait_(),
+    vote_err_(),
+    inner_close_count(),
+    outer_close_count(),
+    progress_cb_(progress_cb),
+    progress_()
 {
-    if (conn->config_is_local) gu_config_destroy(conn->config);
-}
-
-/*! Creates local configuration object if no external is submitted */
-static long
-_init_params (gcs_conn_t* conn, gu_config_t* conf)
-{
-    long rc;
-
-    conn->config = conf;
-    conn->config_is_local = false;
-
-    if (!conn->config) {
-        conn->config = gu_config_create();
-
-        if (conn->config) {
-            conn->config_is_local = true;
-        }
-        else {
-            rc = -ENOMEM;
-            goto enomem;
-        }
-    }
-
-    rc = gcs_params_init (&conn->params, conn->config);
-
-    if (!rc) return 0;
-
-    _cleanup_params (conn);
-
-enomem:
-
-    gu_error ("Parameter initialization failed: %s", strerror (-rc));
-
-    return rc;
-}
-
-/* Creates a group connection handle */
-gcs_conn_t*
-gcs_create (gu_config_t* const conf, gcache_t* const gcache,
-            gu::Progress<gcs_seqno_t>::Callback* const progress_cb,
-            const char* const node_name, const char* const inc_addr,
-            int const repl_proto_ver, int const appl_proto_ver)
-{
-    gcs_conn_t* conn = GU_CALLOC (1, gcs_conn_t);
-
-    if (!conn) {
-        gu_error ("Could not allocate GCS connection handle: %s",
-                  strerror (ENOMEM));
-        return NULL;
-    }
-
-    if (_init_params (conn, conf)) {
-        goto init_params_failed;
-    }
+    auto conn(this); // to minimize diff
 
     if (gcs_fc_init (&conn->stfc,
                      conn->params.recv_q_hard_limit,
@@ -317,7 +323,8 @@ gcs_create (gu_config_t* const conf, gcache_t* const gcache,
     }
 
     conn->state = GCS_CONN_DESTROYED;
-    conn->core  = gcs_core_create (conf, gcache, node_name, inc_addr,
+    conn->core  = gcs_core_create (conf, conn->gcache,
+                                   node_name, inc_addr,
                                    repl_proto_ver, appl_proto_ver);
     if (!conn->core) {
         gu_error ("Failed to create core.");
@@ -357,7 +364,6 @@ gcs_create (gu_config_t* const conf, gcache_t* const gcache,
     conn->global_seqno = 0;
     conn->fc_offset    = 0;
     conn->timeout      = GU_TIME_ETERNITY;
-    conn->gcache       = gcache;
     conn->max_fc_state = conn->params.sync_donor ?
         GCS_CONN_DONOR : GCS_CONN_JOINED;
 
@@ -369,7 +375,7 @@ gcs_create (gu_config_t* const conf, gcache_t* const gcache,
     conn->progress_cb_ = progress_cb;
     conn->progress_ = NULL;
 
-    return conn; // success
+    return; // success
 
 sm_create_failed:
 
@@ -386,14 +392,26 @@ repl_q_failed:
 core_create_failed:
 fc_init_failed:
 
-    _cleanup_params (conn);
+    gu_throw_fatal << "Failed to create GCS connection handle.";
+}
 
-init_params_failed:
-
-    gu_free (conn);
-
-    gu_error ("Failed to create GCS connection handle.");
-    return NULL; // failure
+/* Creates a group connection handle */
+gcs_conn_t*
+gcs_create (gu::Config& conf, gcache_t* gcache,
+            gu::Progress<gcs_seqno_t>::Callback* const progress_cb,
+            const char* const node_name, const char* const inc_addr,
+            int const repl_proto_ver, int const appl_proto_ver)
+{
+    try
+    {
+        return new gcs_conn(conf, gcache,
+                            progress_cb, node_name, inc_addr,
+                            repl_proto_ver, appl_proto_ver);
+    }
+    catch (...)
+    {
+        return nullptr;
+    }
 }
 
 long
@@ -1737,11 +1755,10 @@ long gcs_close (gcs_conn_t *conn)
     return ret;
 }
 
-/* Frees resources associated with GCS connection handle */
-long gcs_destroy (gcs_conn_t *conn)
+gcs_conn::~gcs_conn()
 {
-    long err;
-
+    auto conn(this); // to minimize diff
+    int err;
     gu_cond_t tmp_cond;
     gu_cond_init (gu::get_cond_key(gu::GU_COND_KEY_GCS_DESTROY), &tmp_cond);
 
@@ -1755,7 +1772,7 @@ long gcs_destroy (gcs_conn_t *conn)
 
             gu_cond_destroy (&tmp_cond);
 
-            return -EBADFD;
+            gu_throw_error(EBADFD);
         }
 
         gcs_sm_leave (conn->sm);
@@ -1765,7 +1782,7 @@ long gcs_destroy (gcs_conn_t *conn)
          * to acquire the lock and give up gracefully */
     }
     else {
-        gu_debug("gcs_destroy: gcs_sm_enter() err = %ld", err);
+        gu_debug("gcs_destroy: gcs_sm_enter() err = %d", err);
         // We should still cleanup resources
     }
 
@@ -1775,25 +1792,31 @@ long gcs_destroy (gcs_conn_t *conn)
     gcs_sm_destroy (conn->sm);
 
     if ((err = gcs_fifo_lite_destroy (conn->repl_q))) {
-        gu_debug ("Error destroying repl FIFO: %ld (%s)", err, strerror(-err));
-        return err;
+        gu_debug ("Error destroying repl FIFO: %d (%s)", err, strerror(-err));
+        gu_throw_error(-err);
     }
 
     if ((err = gcs_core_destroy (conn->core))) {
-        gu_debug ("Error destroying core: %ld (%s)", err, strerror(-err));
-        return err;
+        gu_debug ("Error destroying core: %d (%s)", err, strerror(-err));
+        gu_throw_error(-err);
     }
 
     gu_cond_destroy(&conn->vote_cond_);
     gu_mutex_destroy(&conn->vote_lock_);
     /* This must not last for long */
     while (gu_mutex_destroy (&conn->fc_lock));
+}
 
-    _cleanup_params (conn);
-
-    gu_free (conn);
-
-    return 0;
+/* Frees resources associated with GCS connection handle */
+long gcs_destroy (gcs_conn_t *conn)
+{
+    try {
+        delete conn;
+        return 0;
+    }
+    catch (...) {
+        return -1;
+    }
 }
 
 /* Puts action in the send queue and returns */
@@ -2438,6 +2461,11 @@ gcs_get_stats (gcs_conn_t* conn, struct gcs_stats* stats)
     stats->fc_received = conn->stats_fc_received;
     stats->fc_active   = fc_active(conn);
     stats->fc_requested= conn->stop_sent_ > 0;
+
+    gcs_core_get_protocols(conn->core,
+                           stats->proto_appl,
+                           stats->proto_repl,
+                           stats->proto_gcs);
 }
 
 void
@@ -2710,9 +2738,10 @@ _set_max_throttle (gcs_conn_t* conn, const char* value)
     }
 }
 
-bool gcs_register_params (gu_config_t* const conf)
+void gcs_register_params (gu::Config& conf)
 {
-    return (gcs_params_register (conf) || gcs_core_register (conf));
+    gcs_params::register_params(conf);
+    gcs_core_register(conf);
 }
 
 long gcs_param_set  (gcs_conn_t* conn, const char* key, const char *value)

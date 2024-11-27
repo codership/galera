@@ -24,7 +24,6 @@
 #include "gu_config.hpp"
 
 extern std::string const GCS_VOTE_POLICY_KEY;
-extern void gcs_group_register(gu::Config* cnf); // register parameters
 extern uint8_t gcs_group_conf_to_vote_policy(gu::Config& cnf);
 
 #include "gu_status.hpp"
@@ -58,7 +57,7 @@ typedef struct gcs_group
     gcs_seqno_t   memb_epoch_;
 
     gcache_t*     cache;
-    gu::Config*   cnf;
+    gu::Config&   cnf;
     gcs_seqno_t   act_id_;      // current(last) action seqno
     gcs_seqno_t   conf_id;      // current configuration seqno
     gu_uuid_t     state_uuid;   // state exchange id
@@ -72,7 +71,7 @@ typedef struct gcs_group
     long          last_node;    // node that last reported commit_cut
     gcs_seqno_t   vote_request_seqno; // last vote request was passed for it
     VoteResult    vote_result;  // last vote result
-    VoteHistory*  vote_history; // history of group votes
+    VoteHistory   vote_history; // history of group votes
     uint8_t       vote_policy;
     bool          frag_reset;   // indicate that fragmentation was reset
     gcs_node_t*   nodes;        // array of node contexts
@@ -94,27 +93,27 @@ typedef struct gcs_group
     gcs_state_quorum_t quorum;
     int last_applied_proto_ver;
 
-    gcs_group() :
-        memb_mtx_(gu::get_mutex_key(gu::GU_MUTEX_KEY_GCS_MEMBERSHIP)),
-        gcs_proto_ver(0),
-        repl_proto_ver(0),
-        appl_proto_ver(0)
-    { }
+    gcs_group(gu::Config&  cnf,
+              gcache_t*    cache,
+              const char*  node_name, ///< can be null
+              const char*  inc_addr,  ///< can be null
+              gcs_proto_t  gcs_proto_ver,
+              int          repl_proto_ver,
+              int          appl_proto_ver);
+    ~gcs_group();
+
+    void
+    get_protocols(int& appl, int& repl, int& gcs)
+    {
+        appl = quorum.appl_proto_ver;
+        repl = quorum.repl_proto_ver;
+        gcs  = quorum.gcs_proto_ver;
+    }
+
+    static void
+    register_params(gu::Config& cnf);
 }
 gcs_group_t;
-
-/*!
- * Initialize group at startup
- */
-extern int
-gcs_group_init (gcs_group_t* group,
-                gu::Config*  cnf,
-                gcache_t*    cache,
-                const char*  node_name, ///< can be null
-                const char*  inc_addr,  ///< can be null
-                gcs_proto_t  gcs_proto_ver,
-                int          repl_proto_ver,
-                int          appl_proto_ver);
 
 /*!
  * Initialize group action history parameters. See gcs.h
@@ -131,12 +130,6 @@ gcs_group_init_history (gcs_group_t*    group,
 extern void
 group_nodes_free (gcs_group_t* group);
 #endif // GCS_CORE_TESTING
-
-/*!
- * Free group resources
- */
-extern void
-gcs_group_free (gcs_group_t* group);
 
 /*! Forget the action if it is not to be delivered */
 extern void

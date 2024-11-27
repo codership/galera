@@ -24,11 +24,6 @@ namespace gcs_test
     public:
 
         GcsGroup();
-        GcsGroup(const std::string& node_id,
-                 const std::string& inc_addr,
-                 bool enc,
-                 gcs_proto_t gver = 1, int pver = 2, int aver = 3);
-
         ~GcsGroup();
 
         void init(const std::string& node_name,
@@ -38,17 +33,17 @@ namespace gcs_test
                   int          repl_proto_ver,
                   int          appl_proto_ver);
 
-        struct gcs_group* group() { return &group_;  }
+        struct gcs_group* group() { return group_;  }
         struct gcs_group* operator()(){ return group();  }
-        struct gcs_group* operator->(){ return &group_;  }
+        struct gcs_group* operator->(){ return group_;  }
 
         gu::Config&       config() { return conf_; }
         gcache::GCache*   gcache() { return gcache_; }
 
-        gcs_group_state_t state() const { return group_.state; }
+        gcs_group_state_t state() const { return group_->state; }
 
         gcs_node_state_t  node_state() const
-        { return group_.nodes[group_.my_idx].status; }
+        { return group_->nodes[group_->my_idx].status; }
 
     private:
 
@@ -62,7 +57,7 @@ namespace gcs_test
         gu::Config         conf_;
         InitConfig         init_;
         gcache::GCache*    gcache_;
-        struct gcs_group   group_;
+        gcs_group*         group_;
         bool               initialized_;
     };
 } /* namespace gcs_test */
@@ -89,6 +84,7 @@ struct gt_group
 {
     struct gt_node* nodes[GT_MAX_NODES];
     int             nodes_num;
+    int             proto_ver;
     bool            primary;
 
     explicit gt_group(int  num           = 0,
