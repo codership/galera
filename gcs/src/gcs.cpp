@@ -1885,7 +1885,8 @@ fc_active(gcs_conn_t* conn)
 long gcs_replv (gcs_conn_t*          const conn,      //!<in
                 const struct gu_buf* const act_in,    //!<in
                 struct gcs_action*   const act,       //!<inout
-                bool                 const scheduled) //!<in
+                bool                 const scheduled,
+                const wsrep_seq_cb_t* const seq_cb) //!<in
 {
     if (gu_unlikely((size_t)act->size > GCS_MAX_ACT_SIZE)) return -EMSGSIZE;
 
@@ -1959,6 +1960,12 @@ long gcs_replv (gcs_conn_t*          const conn,      //!<in
 
             /* now we can go waiting for action delivery */
             if (ret >= 0) {
+                /* Sequential consistency is now guaranteed by the
+                 * backend. */
+                if (seq_cb && seq_cb->fn)
+                {
+                    seq_cb->fn(seq_cb->ctx);
+                }
                 gu_cond_wait (&repl_act.wait_cond, &repl_act.wait_mutex);
 #ifndef GCS_FOR_GARB
                 /* assert (act->buf != 0); */

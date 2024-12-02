@@ -108,7 +108,8 @@ namespace galera
         void process_apply_error(TrxHandleSlave&, const wsrep_buf_t&);
 
         wsrep_status_t send(TrxHandleMaster& trx, wsrep_trx_meta_t*);
-        wsrep_status_t replicate(TrxHandleMaster& trx, wsrep_trx_meta_t*);
+        wsrep_status_t replicate(TrxHandleMaster& trx, wsrep_trx_meta_t*,
+                                 const wsrep_seq_cb_t* seq_cb);
         wsrep_status_t abort_trx(TrxHandleMaster& trx, wsrep_seqno_t bf_seqno,
                                  wsrep_seqno_t* victim_seqno);
         wsrep_status_t certify(TrxHandleMaster& trx, wsrep_trx_meta_t*);

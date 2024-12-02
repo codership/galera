@@ -536,12 +536,12 @@ galera_terminate_trx(wsrep_t*           const gh,
     return repl->terminate_trx(*trx, meta);
 }
 
-extern "C"
-wsrep_status_t galera_certify(wsrep_t*           const gh,
-                              wsrep_conn_id_t    const conn_id,
-                              wsrep_ws_handle_t* const trx_handle,
-                              uint32_t           const flags,
-                              wsrep_trx_meta_t*  const meta)
+extern "C" wsrep_status_t wsrep_certify_v1(wsrep_t* gh,
+                                           wsrep_conn_id_t conn_id,
+                                           wsrep_ws_handle_t* trx_handle,
+                                           uint32_t flags,
+                                           wsrep_trx_meta_t* meta,
+                                           const wsrep_seq_cb_t* seq_cb)
 {
     assert(gh != 0);
     assert(gh->ctx != 0);
@@ -629,7 +629,7 @@ wsrep_status_t galera_certify(wsrep_t*           const gh,
             }
         }
 
-        retval = repl->replicate(trx, meta);
+        retval = repl->replicate(trx, meta, seq_cb);
 
         if (meta)
         {
@@ -700,6 +700,16 @@ wsrep_status_t galera_certify(wsrep_t*           const gh,
     trx.release_write_set_out();
 
     return retval;
+}
+
+extern "C"
+wsrep_status_t galera_certify(wsrep_t*           const gh,
+                              wsrep_conn_id_t    const conn_id,
+                              wsrep_ws_handle_t* const trx_handle,
+                              uint32_t           const flags,
+                              wsrep_trx_meta_t*  const meta)
+{
+  return wsrep_certify_v1(gh, conn_id, trx_handle, flags, meta, nullptr);
 }
 
 
@@ -1228,7 +1238,7 @@ wsrep_status_t galera_to_execute_start(wsrep_t*                const gh,
 
         if (trx.nbo_end() == false)
         {
-            retval = repl->replicate(trx, meta);
+            retval = repl->replicate(trx, meta, nullptr);
             assert((retval == WSREP_OK && trx.ts() != 0 &&
                     trx.ts()->global_seqno() > 0) ||
                    (retval != WSREP_OK && (trx.ts() == 0  ||
