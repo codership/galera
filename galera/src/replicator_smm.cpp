@@ -485,7 +485,6 @@ void galera::ReplicatorSMM::apply_trx(void* recv_ctx, TrxHandleSlave& ts)
     ApplyException ae;
 
     ApplyOrder ao(ts);
-    CommitOrder co(ts, co_mode_);
 
     TX_SET_STATE(ts, TrxHandle::S_APPLYING);
 
