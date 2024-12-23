@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2021 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2025 Codership Oy <info@codership.com>
  */
 
 #include "GCache.hpp"
@@ -43,8 +43,9 @@ namespace gcache
 #ifndef NDEBUG
             if (params.debug())
             {
-                log_info << "GCache::discard_seqno(" << begin << " - " << seqno
-                         << "): " << seqno_locked << " is locked, bailing out.";
+                log_info << "GCache::discard_seqno(" << begin << " - "
+                         << seqno << "): " << seqno_locked
+                         << " is locked, bailing out.";
             }
 #endif
             return false;
@@ -66,8 +67,8 @@ namespace gcache
                 if (params.debug())
                 {
                     log_info << "GCache::discard_seqno(" << begin << " - "
-                             << seqno << "): "
-                             << bh->seqno_g << " not released, bailing out.";
+                             << seqno << "): " << bh->seqno_g
+                             << " not released, bailing out.";
                 }
 #endif
                 return false;
@@ -162,22 +163,10 @@ namespace gcache
         {
         case BUFFER_IN_MEM:  mem.free (bh); break;
         case BUFFER_IN_RB:   rb.free  (bh); break;
-        case BUFFER_IN_PAGE:
-            if (gu_likely(bh->seqno_g > 0))
-            {
-                if (gu_unlikely(!discard_seqno(bh->seqno_g)))
-                {
-                    new_released = (bh->seqno_g - 1);
-                    assert(seqno_released <= new_released);
-                }
-            }
-            else
-            {
-                assert(bh->seqno_g != SEQNO_ILL);
-                bh->seqno_g = SEQNO_ILL;
-                ps.discard (bh);
-            }
-            break;
+        case BUFFER_IN_PAGE: ps.free  (bh); break;
+        default:
+            log_fatal << "Memory corruption: unrecognized store: " << bh->store;
+            abort();
         }
         rb.assert_size_free();
 
@@ -190,6 +179,9 @@ namespace gcache
         if (gu_likely(0 != ptr))
         {
             BufferHeader* const bh(ptr2BH(ptr));
+            /* free() should not be used on ordered buffers,
+             * GCache::seqno_release() should be used instead */
+            assert(bh->seqno_g <= 0);
             gu::Lock      lock(mtx);
 
 #ifndef NDEBUG

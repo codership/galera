@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2024 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2025 Codership Oy <info@codership.com>
  */
 
 /*! @file page store class */
@@ -20,7 +20,8 @@ namespace gcache
     {
     public:
 
-        PageStore (const std::string& dir_name,
+        PageStore (SeqnoMap&          seqno_map,
+                   const std::string& dir_name,
                    size_t             keep_size,
                    size_t             page_size,
                    int                dbg,
@@ -37,22 +38,42 @@ namespace gcache
 
         void* realloc (void* ptr, size_type size);
 
-        void  free    (BufferHeader* bh) { assert(0); }
+        void  free    (BufferHeader* bh)
+        {
+            assert(BH_is_released(bh));
+            free_page_ptr(static_cast<Page*>(BH_ctx(bh)), bh);
+        }
 
-        void  repossess(BufferHeader* bh) { assert(0); }
+        void  repossess(BufferHeader* bh)
+        {
+            assert(BH_is_released(bh));
+            static_cast<Page*>(BH_ctx(bh))->repossess(bh);
+        }
 
         void  discard (BufferHeader* bh)
         {
             assert(BH_is_released(bh));
-            assert(SEQNO_ILL == bh->seqno_g);
-            free_page_ptr(static_cast<Page*>(BH_ctx(bh)), bh);
+            static_cast<Page*>(BH_ctx(bh))->discard(bh);
         }
 
         void  reset();
 
-        void  seqno_lock(seqno_t) {}
+        void  seqno_assign(BufferHeader* bh, seqno_t s)
+        {
+            static_cast<Page*>(BH_ctx(bh))->seqno_assign(s);
+        }
 
-        void  seqno_unlock() {}
+        void  seqno_lock(seqno_t s)
+        {
+            assert(s < seqno_locked_);
+            seqno_locked_ = s;
+        }
+
+        void  seqno_unlock()
+        {
+            seqno_locked_ = SEQNO_MAX;
+            cleanup();
+        }
 
         void  set_page_size (size_t size) { page_size_ = size; }
 
@@ -64,12 +85,21 @@ namespace gcache
         size_t count()       const { return count_;        }
         size_t total_pages() const { return pages_.size(); }
         size_t total_size()  const { return total_size_;   }
+        size_t keep_size()   const { return keep_size_;    }
+        size_t keep_page()   const { return keep_page_;    }
+        size_t page_size()   const { return page_size_;    }
+
+#ifdef GCACHE_PAGE_STORE_UNIT_TEST
+        void   wait_page_discard() const;
+#endif /* GCACHE_PAGE_STORE_UNIT_TEST */
 
     private:
 
         static int  const DEBUG = 4; // debug flag
 
+        SeqnoMap&         seqno_map_;
         std::string const base_name_; /* /.../.../gcache.page. */
+        seqno_t           seqno_locked_;
         size_t            keep_size_; /* how much pages to keep after freeing*/
         size_t            page_size_; /* min size of the individual page */
         bool        const keep_page_; /* whether to keep the last page */
@@ -80,9 +110,7 @@ namespace gcache
         size_t            total_size_;
         pthread_attr_t    delete_page_attr_;
         int               debug_;
-#ifndef GCACHE_DETACH_THREAD
-        pthread_t         delete_thr_;
-#endif /* GCACHE_DETACH_THREAD */
+        mutable pthread_t delete_thr_;
 
         void new_page    (size_type size);
 
@@ -91,6 +119,9 @@ namespace gcache
 
         // cleans up extra pages.
         void cleanup     ();
+#ifndef GCACHE_PAGE_STORE_UNIT_TEST
+        void wait_page_discard() const;
+#endif /* !GCACHE_PAGE_STORE_UNIT_TEST */
 
         void* malloc_new (size_type size);
 
@@ -98,7 +129,7 @@ namespace gcache
         free_page_ptr (Page* page, BufferHeader* bh)
         {
             page->free(bh);
-            if (0 == page->used()) cleanup();
+            if (0 == page->used() && pages_.front() == page) cleanup();
         }
 
         PageStore(const gcache::PageStore&);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2018 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2025 Codership Oy <info@codership.com>
  */
 
 /*! @file page store implementation */
@@ -47,73 +47,116 @@ make_page_name (const std::string& base_name, size_t count)
     return os.str();
 }
 
-static void*
-remove_file (void* __restrict__ arg)
+static void
+remove_file (const std::string& file_name)
 {
-    char* const file_name (static_cast<char*>(arg));
-
-    if (NULL != file_name)
+    if (file_name.length() > 0)
     {
-        if (remove (file_name))
+        if (::remove(file_name.c_str()))
         {
             int err = errno;
 
-            log_error << "Failed to remove page file '" << file_name << "': "
-                      << err << " (" << strerror(err) << ")";
+            log_error << "Failed to remove page file '" << file_name
+                      << "': " << err << " (" << strerror(err) << ")";
         }
         else
         {
             log_info << "Deleted page " << file_name;
         }
-
-        free (file_name);
     }
     else
     {
-        log_error << "Null file name in " << __FUNCTION__;
+        log_error << "Empty file name in " << __FUNCTION__;
     }
+}
+
+struct delete_thread_arg
+{
+    gcache::SeqnoMap& seqno_map_;
+    gcache::Page&     page_;
+    pthread_t         previous_thread_;
+    bool              debug_;
+
+    delete_thread_arg(gcache::SeqnoMap& m, gcache::Page& p, pthread_t t, bool d)
+        :
+        seqno_map_(m),
+        page_     (p),
+        previous_thread_(t),
+        debug_    (d)
+    {}
+    ~delete_thread_arg() { delete &page_; }
+};
+
+static void*
+discard_page(void* __restrict__ a)
+{
+    delete_thread_arg* arg(static_cast<delete_thread_arg*>(a));
+
+    auto& page(arg->page_);
+
+#ifndef NDEBUG
+    if (arg->debug_) { log_info << "PageStore::discard_page() prev. thread: "
+                                << arg->previous_thread_ << ", page: "
+                                << page; }
+#endif
+
+    if (arg->previous_thread_ != pthread_t(-1))
+        pthread_join(arg->previous_thread_, NULL);
+
+    if (page.seqno_max() > 0)
+        arg->seqno_map_.seqno_discard(page.seqno_max());
+
+    std::string const file_name(page.name());
+
+    delete arg;
+
+    remove_file(file_name);
 
     pthread_exit(NULL);
 }
 
+/* This method does minimum work while holding global lock and then
+ * delegates seqno2ptr map cleanup to a dedicated thread. If there is a
+ * previously launched thread it will be joined by the new one. */
 bool
 gcache::PageStore::delete_page ()
 {
     Page* const page = pages_.front();
 
-    if (page->used() > 0) return false;
+#ifndef NDEBUG
+    if (debug_) { log_info << "PageStore::delete_page() " << *page; }
+#endif
+
+    if (page->used() > 0 || page->seqno_max() >= seqno_locked_)
+        return false;
 
     pages_.pop_front();
-
-    char* const file_name(strdup(page->name().c_str()));
-
     total_size_ -= page->size();
-
     if (current_ == page) current_ = 0;
 
-    delete page;
+    /* While we are still holding global lock close the page and up the
+     * low available limit to the max seqno contained in a page */
+    seqno_map_.set_low_limit(page->seqno_max());
+    page->close();
 
-#ifdef GCACHE_DETACH_THREAD
-    pthread_t delete_thr_;
-#else
-    if (delete_thr_ != pthread_t(-1)) pthread_join (delete_thr_, NULL);
-#endif /* GCACHE_DETACH_THERAD */
-
-    int err = pthread_create (&delete_thr_, &delete_page_attr_, remove_file,
-                              file_name);
+    /* if there is currently another thread running it will be joined in
+     * this new thread */
+    pthread_t const saved(delete_thr_);
+    int err = pthread_create(&delete_thr_, &delete_page_attr_, discard_page,
+                             new delete_thread_arg(seqno_map_, *page,
+                                                   delete_thr_, debug_));
     if (0 != err)
     {
-        delete_thr_ = pthread_t(-1);
-        gu_throw_system_error(err)
-            << "Failed to create page file deletion thread";
+        delete_thr_ = saved;
+        gu_throw_system_error(err) << "Failed to create page deletion thread";
     }
 
     return true;
 }
 
 /* Deleting pages only from the beginning kinda means that some free pages
- * can be locked in the middle for a while. Leaving it like that for simplicity
- * for now. */
+ * can be locked in the middle for a while. Leaving it like that for
+ * simplicity for now. */
 void
 gcache::PageStore::cleanup ()
 {
@@ -121,6 +164,16 @@ gcache::PageStore::cleanup ()
            pages_.size() > keep_page_ &&
            delete_page())
     {}
+}
+
+void
+gcache::PageStore::wait_page_discard() const
+{
+    if (delete_thr_ != pthread_t(-1))
+    {
+        pthread_join(delete_thr_, NULL);
+        delete_thr_ = pthread_t(-1);
+    }
 }
 
 void
@@ -132,8 +185,8 @@ gcache::PageStore::reset ()
 inline void
 gcache::PageStore::new_page (size_type size)
 {
-    Page* const page(new Page
-                     (this, make_page_name (base_name_, count_), size, debug_));
+    Page* const page(new Page(this, make_page_name(base_name_, count_),
+                              size, debug_));
 
     pages_.push_back (page);
     total_size_ += page->size();
@@ -141,13 +194,16 @@ gcache::PageStore::new_page (size_type size)
     count_++;
 }
 
-gcache::PageStore::PageStore (const std::string& dir_name,
+gcache::PageStore::PageStore (SeqnoMap&          seqno_map,
+                              const std::string& dir_name,
                               size_t             keep_size,
                               size_t             page_size,
                               int                dbg,
                               bool               keep_page)
     :
+    seqno_map_ (seqno_map),
     base_name_ (make_base_name(dir_name)),
+    seqno_locked_(SEQNO_MAX),
     keep_size_ (keep_size),
     page_size_ (page_size),
     keep_page_ (keep_page),
@@ -157,28 +213,15 @@ gcache::PageStore::PageStore (const std::string& dir_name,
     total_size_(0),
     delete_page_attr_(),
     debug_     (dbg & DEBUG)
-#ifndef GCACHE_DETACH_THREAD
     , delete_thr_(pthread_t(-1))
-#endif /* GCACHE_DETACH_THREAD */
 {
     int err = pthread_attr_init (&delete_page_attr_);
 
     if (0 != err)
     {
-        gu_throw_system_error(err) << "Failed to initialize page file deletion "
-                                   << "thread attributes";
+        gu_throw_system_error(err) << "Failed to initialize page file "
+            "deletion thread attributes";
     }
-
-#ifdef GCACHE_DETACH_THREAD
-    err = pthread_attr_setdetachstate (&delete_page_attr_,
-                                       PTHREAD_CREATE_DETACHED);
-    if (0 != err)
-    {
-        pthread_attr_destroy (&delete_page_attr_);
-        gu_throw_system_error(err) << "Failed to set DETACHED attribute to "
-                                   << "page file deletion thread";
-    }
-#endif /* GCACHE_DETACH_THREAD */
 }
 
 gcache::PageStore::~PageStore ()
@@ -186,9 +229,8 @@ gcache::PageStore::~PageStore ()
     try
     {
         while (pages_.size() && delete_page()) {};
-#ifndef GCACHE_DETACH_THREAD
+
         if (delete_thr_ != pthread_t(-1)) pthread_join (delete_thr_, NULL);
-#endif /* GCACHE_DETACH_THREAD */
     }
     catch (gu::Exception& e)
     {
@@ -224,9 +266,7 @@ gcache::PageStore::malloc_new (size_type size)
     }
     catch (gu::Exception& e)
     {
-        log_error << "Cannot create new cache page: "
-                  << e.what();
-        // abort();
+        log_error << "Cannot create new cache page: " << e.what();
     }
 
     return ret;
