@@ -427,8 +427,10 @@ namespace galera
         {
             if (gu_unlikely(purge_seqno != -1))
             {
-                assert(purge_seqno <= last_committed());
-                service_thd_.report_last_committed(purge_seqno);
+                assert(purge_seqno <= commit_monitor_.last_left());
+                assert(purge_seqno <= cert_.get_safe_to_discard_seqno());
+                service_thd_.report_last_committed(
+                    std::min(purge_seqno, last_committed()));
             }
         }
         // Helpers for configuration change processing
