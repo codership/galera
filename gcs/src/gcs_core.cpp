@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2024 Codership Oy <info@codership.com>
  *
  * $Id$
  *
@@ -676,7 +676,7 @@ core_handle_act_msg (gcs_core_t*          core,
                 ret = gcs_group_handle_state_request (group, act);
                 assert (ret <= 0 || ret == act->act.buf_len);
 #ifdef GCS_FOR_GARB
-                if (ret < 0) gu_fatal ("Handling state request failed: %ld",ret);
+                if (ret < 0) gu_fatal ("Handling state request failed: %zd",ret);
                 act->act.buf = NULL;
             }
             else {
@@ -916,7 +916,7 @@ core_handle_comp_msg (gcs_core_t*          const core,
                     assert(act->buf == NULL);
                     assert(act->buf_len == 0);
                     act->type = GCS_ACT_ERROR;
-                    gu_debug("comp msg error in core %ld", -ret);
+                    gu_debug("comp msg error in core %zd", -ret);
                 }
             }
             else {                               // regular non-prim
@@ -926,7 +926,7 @@ core_handle_comp_msg (gcs_core_t*          const core,
             if (GCS_GROUP_NON_PRIMARY == ret) { // no error in comp msg
                 ret = gcs_group_act_conf (group, rcvd, &core->proto_ver);
                 if (ret < 0) {
-                    gu_fatal ("Failed create NON-PRIM CONF action: %ld (%s)",
+                    gu_fatal ("Failed create NON-PRIM CONF action: %zd (%s)",
                               ret, strerror (-ret));
                     assert (0);
                     ret = -ENOTRECOVERABLE;
@@ -948,7 +948,7 @@ core_handle_comp_msg (gcs_core_t*          const core,
         assert(0);
         // fall through
     default:
-        gu_fatal ("Failed to handle component message: %ld (%s)!",
+        gu_fatal ("Failed to handle component message: %zd (%s)!",
                   ret, strerror (-ret));
         assert(0);
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2024 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -697,7 +697,7 @@ state_quorum_remerge (const gcs_state_msg_t* const states[],
     struct candidate* candidates = GU_CALLOC(states_num, struct candidate);
 
     if (!candidates) {
-        gu_error ("Quorum: could not allocate %zd bytes for re-merge check.",
+        gu_error ("Quorum: could not allocate %lu bytes for re-merge check.",
                   states_num * sizeof(struct candidate));
         return NULL;
     }

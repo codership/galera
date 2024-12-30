@@ -22,7 +22,7 @@ namespace gcomm
     {
 
         ck_assert_msg(c.serial_size() == expected_size,
-                      "size = %lu expected = %lu",
+                      "size = %zu expected = %zu",
                       c.serial_size(), expected_size);
         gu::byte_t* buf = new gu::byte_t[expected_size + 7];
         size_t ret;

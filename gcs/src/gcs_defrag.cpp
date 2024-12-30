@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2024 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -59,7 +59,7 @@ gcs_defrag_handle_frag (gcs_defrag_t*         df,
                 /* df->sent_id was aborted halfway and is being taken care of
                  * by the sender thread. Forget about it.
                  * Reinit counters and continue with the new action. */
-                gu_debug("Local action %" PRId64 ", size %ld reset.",
+                gu_debug("Local action %" PRId64 ", size %zu reset.",
                          frg->act_id, frg->act_size);
                 df->frag_no = 0;
                 df->received = 0;

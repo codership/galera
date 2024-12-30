@@ -1,4 +1,4 @@
-// Copyright (C) 2007-2020 Codership Oy <info@codership.com>
+// Copyright (C) 2007-2024 Codership Oy <info@codership.com>
 
 // $Id$
 
@@ -12,7 +12,7 @@ START_TEST (gu_fifo_test)
 {
     gu_fifo_t* fifo;
     long i;
-    size_t* item;
+    long* item;
     long used;
 
     fifo = gu_fifo_create (0, 1);
@@ -31,13 +31,13 @@ START_TEST (gu_fifo_test)
     fifo = gu_fifo_create (FIFO_LENGTH, sizeof(i));
     ck_assert(fifo != NULL);
     ck_assert_msg(gu_fifo_length(fifo) == 0,
-                  "fifo->used is %lu for an empty FIFO",
+                  "fifo->used is %ld for an empty FIFO",
                   gu_fifo_length(fifo));
 
     mark_point();
     gu_fifo_clear(fifo); // clear empty fifo
     ck_assert_msg(gu_fifo_length(fifo) == 0,
-                  "fifo->used is %lu for a cleared FIFO",
+                  "fifo->used is %ld for a cleared FIFO",
                   gu_fifo_length(fifo));
 
     // fill FIFO
@@ -49,13 +49,13 @@ START_TEST (gu_fifo_test)
     }
 
     used = i;
-    ck_assert_msg(gu_fifo_length(fifo) == used, "used is %zu, expected %zu",
+    ck_assert_msg(gu_fifo_length(fifo) == used, "used is %ld, expected %ld",
                   used, gu_fifo_length(fifo));
 
     mark_point();
     gu_fifo_clear(fifo); // clear filled fifo
     ck_assert_msg(gu_fifo_length(fifo) == 0,
-                  "fifo->used is %lu for a cleared FIFO",
+                  "fifo->used is %ld for a cleared FIFO",
                   gu_fifo_length(fifo));
 
     // fill FIFO again
@@ -67,7 +67,7 @@ START_TEST (gu_fifo_test)
     }
 
     used = i;
-    ck_assert_msg(gu_fifo_length(fifo) == used, "used is %zu, expected %zu",
+    ck_assert_msg(gu_fifo_length(fifo) == used, "used is %ld, expected %zu",
                   used, gu_fifo_length(fifo));
 
     // test pop
@@ -75,7 +75,7 @@ START_TEST (gu_fifo_test)
         int err;
         item = gu_fifo_get_head (fifo, &err);
         ck_assert_msg(item != NULL, "could not get item %ld", i);
-        ck_assert_msg(*item == (ulong)i, "got %ld, expected %ld", *item, i);
+        ck_assert_msg(*item == i, "got %ld, expected %ld", *item, i);
         gu_fifo_pop_head (fifo);
     }
 
