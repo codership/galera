@@ -1,4 +1,4 @@
-// Copyright (C) 2012-2020 Codership Oy <info@codership.com>
+// Copyright (C) 2012-2024 Codership Oy <info@codership.com>
 
 /*!
  * Original Bob Jenkins' test implementation:
@@ -187,7 +187,7 @@ START_TEST (gu_spooky_test)
 
         if (res != expected[i])
         {
-            ck_abort_msg("%zu: expected: 0x%.8lX, found: 0x%.8" PRIX32,
+            ck_abort_msg("%zu: expected: 0x%.8" PRIX64 " , found: 0x%.8" PRIX32,
                          i, expected[i], res);
         }
     }

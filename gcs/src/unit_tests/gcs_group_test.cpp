@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2024 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -33,7 +33,7 @@ msg_write (gcs_recv_msg_t* msg,
     ck_assert_msg(0 == ret, "error code: %ld", ret);
     ck_assert(frg->frag != NULL);
     ck_assert_msg(frg->frag_len >= data_len,
-                  "Resulting frag_len %lu is less than required act_len %lu\n"
+                  "Resulting frag_len %zu is less than required act_len %zu\n"
                   "Refactor the test and increase buf_len.",
                   frg->frag_len, data_len);
     memcpy ((void*)frg->frag, data, data_len);

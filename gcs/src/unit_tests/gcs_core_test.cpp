@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2021 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2024 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -36,6 +36,7 @@
  *
  */
 
+#include <inttypes.h> // PRId64
 #define GCS_STATE_MSG_ACCESS
 #include "../gcs_core.hpp"
 #include "../gcs_dummy.hpp"
@@ -697,7 +698,7 @@ CORE_TEST_OWN(bool const enc, int gcs_proto_ver)
     ck_assert(!core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
     ck_assert(!CORE_RECV_ACT (&act_r, act_buf, act_size, GCS_ACT_WRITESET));
     ck_assert_msg(-ENOTCONN == act_r.seqno,
-                  "Expected -ENOTCONN, received %ld (%s)",
+                  "Expected -ENOTCONN, received %" PRId64 " (%s)",
                   act_r.seqno, strerror (-act_r.seqno));
 
     /*
@@ -742,7 +743,7 @@ CORE_TEST_OWN(bool const enc, int gcs_proto_ver)
     ck_assert(!core_test_check_conf(act_r.out, act_r.size, false, 0, 1));
     ck_assert(!CORE_RECV_ACT (&act_r, act_buf, act_size, GCS_ACT_WRITESET));
     ck_assert_msg(-ENOTCONN == act_r.seqno,
-                  "Expected -ENOTCONN, received %ld (%s)",
+                  "Expected -ENOTCONN, received %" PRId64 " (%s)",
                   act_r.seqno, strerror (-act_r.seqno));
 
     /*
@@ -761,7 +762,7 @@ CORE_TEST_OWN(bool const enc, int gcs_proto_ver)
     ck_assert(!CORE_SEND_END (&act_s, act_size));
     ck_assert(!CORE_RECV_ACT (&act_r, act_buf, act_size, GCS_ACT_WRITESET));
     ck_assert_msg(-ERESTART == act_r.seqno,
-                  "Expected -ERESTART, received %ld (%s)",
+                  "Expected -ERESTART, received %" PRId64 " (%s)",
                   act_r.seqno, strerror (-act_r.seqno));
 
     /*
