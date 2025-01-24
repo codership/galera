@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2021 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2024 Codership Oy <info@codership.com>
 //
 
 #include "wsrep_api.h"

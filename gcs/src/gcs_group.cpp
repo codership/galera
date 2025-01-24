@@ -1081,8 +1081,12 @@ gcs_group_handle_vote_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
                  << gtid << ',' << gu::PrintBase<>(code) << ": "
                  << (code ? (data ? data : "(null)") : "Success");
 
-        gcs_node_set_vote (&sender, gtid.seqno(), code,
-                           group->quorum.gcs_proto_ver);
+        {
+            gu::Lock lock(group->memb_mtx_);
+            group->memb_epoch_ = group->act_id_;
+            gcs_node_set_vote (&sender, gtid.seqno(), code,
+                               group->quorum.gcs_proto_ver);
+        }
 
         if (group_recount_votes(*group))
         {
