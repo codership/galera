@@ -583,15 +583,6 @@ void gcomm::GMCast::gmcast_connect(const std::string& remote_addr)
         segment_,
         group_name_);
 
-    // If Server SSL/TLS is used this is already done in server code
-    if (!gu_tls_service)
-    {
-        gu::connection_monitor_connect((wsrep_connection_key_t)tp->id(),
-                                       get_scheme(pnet_, use_ssl_, dynamic_socket_),
-                                       peer->local_addr(),
-                                       remote_addr);
-    }
-
     std::pair<ProtoMap::iterator, bool> ret =
         proto_map_->insert(std::make_pair(tp->id(), peer));
 
@@ -683,15 +674,6 @@ void gcomm::GMCast::handle_established(Proto* est)
              << est->remote_addr();
     // UUID checks are handled during protocol handshake
     assert(est->remote_uuid() != uuid());
-
-    // If Server SSL/TLS is used this is already done in server code
-    if (!gu_tls_service)
-    {
-        gu::connection_monitor_connect((wsrep_connection_key_t)est->socket()->id(),
-                                       get_scheme(pnet_, use_ssl_, dynamic_socket_),
-                                       est->local_addr(),
-                                       est->remote_addr());
-    }
 
     if (is_evicted(est->remote_uuid()))
     {

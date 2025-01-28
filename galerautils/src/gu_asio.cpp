@@ -49,7 +49,7 @@
 #include <fstream>
 #include <mutex>
 
-wsrep_tls_service_v1_t* gu_tls_service(0);
+static wsrep_tls_service_v1_t* gu_tls_service(0);
 
 static wsrep_allowlist_service_v1_t* gu_allowlist_service(0);
 

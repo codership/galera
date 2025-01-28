@@ -98,7 +98,17 @@ public:
         }
     }
 
-    virtual void update_SSL_info(wsrep_connection_key_t id) GALERA_OVERRIDE { }
+    virtual void
+    update_address_info(const std::string& local_addr,
+                        const std::string& remote_addr) GALERA_OVERRIDE
+    {
+        ck_assert_int_eq(address_info_updated, false);
+        address_info_updated = true;
+    }
+
+    virtual void update_SSL_info() GALERA_OVERRIDE {
+        ck_assert(address_info_updated);
+    }
 
     enum op_status next_result;
     int next_error;
@@ -106,6 +116,7 @@ public:
     size_t count_server_handshake_called;
     size_t count_read_called;
     size_t count_write_called;
+    bool address_info_updated{false};
 
 private:
     int fd_;

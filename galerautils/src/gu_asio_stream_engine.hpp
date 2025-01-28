@@ -118,9 +118,16 @@ namespace gu
             bool non_blocking);
 
         /**
+         * Update address information
+         */
+        virtual void update_address_info(const std::string& local_addr,
+                                         const std::string& remote_addr)
+            = 0;
+
+        /**
          * Update SSL/TLS information
          */
-        virtual void update_SSL_info(wsrep_connection_key_t id) = 0;
+        virtual void update_SSL_info() = 0;
 
     protected:
         AsioStreamEngine() { }

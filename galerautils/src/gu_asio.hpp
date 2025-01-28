@@ -28,7 +28,6 @@
 #include <memory>
 #include <string>
 
-extern wsrep_tls_service_v1_t* gu_tls_service;
 namespace gu
 {
     // URI schemes for networking

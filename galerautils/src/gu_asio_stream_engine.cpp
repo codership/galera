@@ -42,7 +42,9 @@ public:
     {
         return success;
     }
-    virtual void shutdown() GALERA_OVERRIDE { }
+    virtual void shutdown() GALERA_OVERRIDE { 
+        gu::connection_monitor_disconnect((wsrep_connection_key_t)this);
+    }
 
     virtual op_result read(void* buf, size_t max_count) GALERA_OVERRIDE
     {
@@ -91,7 +93,15 @@ public:
         return gu::AsioErrorCode(last_error_, gu_asio_system_category);
     }
 
-    virtual void update_SSL_info(wsrep_connection_key_t id) GALERA_OVERRIDE { }
+    virtual void
+    update_address_info(const std::string& local_addr,
+                        const std::string& remote_addr) GALERA_OVERRIDE
+    {
+        gu::connection_monitor_connect((wsrep_connection_key_t)this, scheme(),
+                                       local_addr, remote_addr);
+    }
+
+    virtual void update_SSL_info() GALERA_OVERRIDE {}
 
 private:
     void clear_error() { last_error_ = 0; }
@@ -143,7 +153,12 @@ public:
         GU_ASIO_DEBUG(this << " AsioSslStreamEngine::client_handshake: "
                       << result << " ssl error " << ssl_error
                       << " sys error " << sys_error);
-        return map_status(ssl_error, sys_error, "client_handshake");
+        enum op_status ret = map_status(ssl_error, sys_error, "client_handshake");
+        if (ret == success)
+        {
+            update_SSL_info();
+        }
+        return ret;
     }
 
     virtual enum op_status server_handshake() GALERA_OVERRIDE
@@ -155,7 +170,12 @@ public:
         GU_ASIO_DEBUG(this << " AsioSslStreamEngine::server_handshake: "
                       << result << " ssl error " << ssl_error
                       << " sys error " << sys_error);
-        return map_status(ssl_error, sys_error, "server_handshake");
+        enum op_status ret = map_status(ssl_error, sys_error, "server_handshake");
+        if (ret == success)
+        {
+            update_SSL_info();
+        }
+        return ret;
     }
 
     virtual void shutdown() GALERA_OVERRIDE
@@ -167,6 +187,8 @@ public:
         GU_ASIO_DEBUG(this << " AsioSslStreamEngine::shutdown: "
                       << result << " ssl error " << ssl_error
                       << " sys error " << sys_error);
+        gu::connection_monitor_disconnect((wsrep_connection_key_t)this);
+
     }
 
     virtual op_result read(void* buf, size_t max_count) GALERA_OVERRIDE
@@ -190,7 +212,15 @@ public:
                                  last_verify_error_);
     }
 
-    virtual void update_SSL_info(wsrep_connection_key_t id) GALERA_OVERRIDE
+    virtual void
+    update_address_info(const std::string& local_addr,
+                        const std::string& remote_addr) GALERA_OVERRIDE
+    {
+        gu::connection_monitor_connect((wsrep_connection_key_t)this, scheme(),
+                                       local_addr, remote_addr);
+    }
+
+    virtual void update_SSL_info() GALERA_OVERRIDE
     {
         clear_error();
         std::string cipher;
@@ -207,7 +237,7 @@ public:
             X509_free(ssl_cert);
         }
         version = SSL_get_version(ssl_);
-        gu::connection_monitor_ssl_info((wsrep_connection_key_t)id,
+        gu::connection_monitor_ssl_info((wsrep_connection_key_t)this,
                                         cipher, issuer, subject, version);
     }
 
@@ -480,6 +510,7 @@ public:
                 {
                     engine_.reset();
                     engine_ = std::make_shared<AsioSslStreamEngine>(io_service_, fd_);
+                    engine_->update_address_info(local_addr_, remote_addr_);
                     client_encrypted_message_sent_ = true;
                     client_encrypted_message_sent_ts_ = gu::datetime::Date::monotonic();
                     if (not non_blocking_)
@@ -505,6 +536,7 @@ public:
                         {
                             engine_.reset();
                             engine_ = std::make_shared<AsioTcpStreamEngine>(fd_);
+                            engine_->update_address_info(local_addr_, remote_addr_);
                             tcp_engine_switch = true;
                             break;
                         }
@@ -526,6 +558,7 @@ public:
                 {
                     engine_.reset();
                     engine_ = std::make_shared<AsioTcpStreamEngine>(fd_);
+                    engine_->update_address_info(local_addr_, remote_addr_);
                 }
             }
             timer_check_done_ = true;
@@ -544,6 +577,7 @@ public:
             {
                 engine_.reset();
                 engine_ = std::make_shared<AsioSslStreamEngine>(io_service_, fd_);
+                engine_->update_address_info(local_addr_, remote_addr_);
                 timer_check_done_ = true;
                 return engine_->server_handshake();
             }
@@ -584,9 +618,21 @@ public:
         return engine_->last_error();
     }
 
-    virtual void update_SSL_info(wsrep_connection_key_t id) GALERA_OVERRIDE
+    virtual void
+    update_address_info(const std::string& local_addr,
+                        const std::string& remote_addr) GALERA_OVERRIDE
     {
-        engine_->update_SSL_info(id);
+        local_addr_ = local_addr;
+        remote_addr_ = remote_addr;
+        if (engine_)
+        {
+            engine_->update_address_info(local_addr, remote_addr);
+        }
+    }
+
+    virtual void update_SSL_info() GALERA_OVERRIDE
+    {
+        engine_->update_SSL_info();
     }
 
 private:
@@ -626,6 +672,10 @@ private:
     int fd_;
     gu::AsioIoService& io_service_;
     std::shared_ptr<AsioStreamEngine> engine_;
+    // Local and remote addresses are stored here to be passed to
+    // real engine update_address_info() after the engine is created
+    std::string local_addr_;
+    std::string remote_addr_;
     bool non_blocking_;
     bool have_encrypted_protocol_;
     bool timer_check_done_;
@@ -717,7 +767,14 @@ public:
                                  &stream_);
     }
 
-    virtual void update_SSL_info(wsrep_connection_key_t id) GALERA_OVERRIDE
+    virtual void
+    update_address_info(const std::string& local_addr,
+                        const std::string& remote_addr) GALERA_OVERRIDE
+    {
+        // Done in server code
+    }
+
+    virtual void update_SSL_info() GALERA_OVERRIDE
     {
       // Done in server code
     }
