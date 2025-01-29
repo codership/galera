@@ -188,7 +188,6 @@ public:
                       << result << " ssl error " << ssl_error
                       << " sys error " << sys_error);
         gu::connection_monitor_disconnect((wsrep_connection_key_t)this);
-
     }
 
     virtual op_result read(void* buf, size_t max_count) GALERA_OVERRIDE

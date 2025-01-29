@@ -250,12 +250,12 @@ void gcomm::AsioTcpSocket::close()
 {
     Critical<AsioProtonet> crit(net_);
 
+    log_debug << "close called " << id() << " state: " << state();
     if (state() == S_CLOSED || state() == S_CLOSING) return;
 
-    log_debug << "closing " << id()
-              << " socket " << socket_
-              << " state " << state()
-              << " send_q size " << send_q_.size();
+    log_debug << "closing " << id() << " local_addr: " << local_addr()
+             << " remote_addr: " << remote_addr() << " socket " << socket_
+             << " state " << state() << " send_q size " << send_q_.size();
 
     if (send_q_.empty() == true || state() != S_CONNECTED)
     {
@@ -705,6 +705,9 @@ void gcomm::AsioTcpAcceptor::accept_handler(
 {
     if (!error)
     {
+        /* Set state to CONNECTING to indicate that the socket is ready for use
+         * but has not gone through initial handshake yet. */
+        next_socket_->state_ = gcomm::Socket::S_CONNECTING;
         next_socket_->socket_ = accepted_socket;
         /* Notify upper layer which then calls accept() to acquire ownership. */
         net_.dispatch(id(), Datagram(), ProtoUpMeta(error.value()));
