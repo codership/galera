@@ -8,8 +8,6 @@
 #include <cerrno>
 #include <cassert>
 
-#include <sched.h> // sched_yeild()
-
 namespace gcache
 {
     /*!
@@ -261,10 +259,6 @@ namespace gcache
                          << old_sr << " -> " << seqno_released;
             }
 #endif
-
-            /* if we're doing this loop repeatedly, allow other threads to
-             * run */
-            if (loop) sched_yield();
         }
     }
 
