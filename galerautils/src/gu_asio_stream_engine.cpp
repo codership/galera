@@ -38,11 +38,13 @@ public:
     {
         return success;
     }
+
     virtual enum op_status server_handshake() GALERA_OVERRIDE
     {
         return success;
     }
-    virtual void shutdown() GALERA_OVERRIDE { 
+
+    virtual void shutdown() GALERA_OVERRIDE {
         gu::connection_monitor_disconnect((wsrep_connection_key_t)this);
     }
 
@@ -231,8 +233,18 @@ public:
         X509* ssl_cert = SSL_get_peer_certificate(ssl_);
         if (ssl_cert != nullptr)
         {
-            subject = X509_NAME_oneline(X509_get_subject_name(ssl_cert), 0, 0);
-            issuer = X509_NAME_oneline(X509_get_issuer_name(ssl_cert), 0, 0);
+            char *buf = X509_NAME_oneline(X509_get_subject_name(ssl_cert), 0, 0);
+            if (buf)
+            {
+                subject = buf;
+                free(buf);
+            }
+            buf = X509_NAME_oneline(X509_get_issuer_name(ssl_cert), 0, 0);
+            if (buf)
+            {
+                issuer = buf;
+                free(buf);
+            }
             X509_free(ssl_cert);
         }
         version = SSL_get_version(ssl_);

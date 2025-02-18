@@ -222,7 +222,6 @@ public:
     size_t bytes_written() const { return bytes_written_; }
     const gu::AsioErrorCode& last_error_code() const { return last_error_code_; }
 
-    int get_fd() const { return -1; }
 private:
     std::array<std::string, 2> write_buffer_;
     std::string read_buffer_;
