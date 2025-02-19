@@ -39,9 +39,10 @@ namespace galera
         virtual ssize_t sendv(const WriteSetVector&, size_t,
                               gcs_act_type_t, bool, bool) = 0;
         virtual ssize_t send (const void*, size_t, gcs_act_type_t, bool) = 0;
-        virtual ssize_t replv(const WriteSetVector&,
-                              gcs_action& act, bool) = 0;
-        virtual ssize_t repl (gcs_action& act, bool) = 0;
+        virtual ssize_t replv(const WriteSetVector&, gcs_action& act, bool,
+                              const wsrep_seq_cb_t*)
+            = 0;
+        virtual ssize_t repl(gcs_action& act, bool) = 0;
         virtual void    caused(gu::GTID& gtid,
                                gu::datetime::Date& wait_until) = 0;
         virtual ssize_t schedule() = 0;
@@ -145,10 +146,10 @@ namespace galera
             return gcs_send(conn_, act, act_len, act_type, scheduled);
         }
 
-        ssize_t replv(const WriteSetVector& actv,
-                      struct gcs_action& act, bool scheduled)
+        ssize_t replv(const WriteSetVector& actv, struct gcs_action& act,
+                      bool scheduled, const wsrep_seq_cb_t* seq_cb)
         {
-            return gcs_replv(conn_, &actv[0], &act, scheduled);
+            return gcs_replv(conn_, &actv[0], &act, scheduled, seq_cb);
         }
 
         ssize_t repl(struct gcs_action& act, bool scheduled)
@@ -339,7 +340,7 @@ namespace galera
         { return -ENOSYS; }
 
         ssize_t replv(const WriteSetVector& actv,
-                      gcs_action& act, bool scheduled)
+                      gcs_action& act, bool scheduled, const wsrep_seq_cb_t*)
         {
             ssize_t ret(set_seqnos(act));
 

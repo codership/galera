@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2011-2020 Codership Oy <info@codership.com>
+// Copyright (C) 2011-2024 Codership Oy <info@codership.com>
 //
 
 #include "gu_vlq.hpp"
@@ -149,7 +149,7 @@ START_TEST(test_uleb128_misc)
                                            &buf[0], buf.size(), 0);
         uint32_t val;
         (void)gu::uleb128_decode(&buf[0], buf.size(), 0, val);
-        if (i != val) ck_abort_msg("0x%zx != 0x%x", i, val);
+        if (i != val) ck_abort_msg("0x%" PRIX64 " != 0x%" PRIX32, i, val);
     }
 
 

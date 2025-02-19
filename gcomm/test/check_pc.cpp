@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2024 Codership Oy <info@codership.com>
  */
 
 #include "check_gcomm.hpp"
