@@ -237,13 +237,13 @@ public:
             if (buf)
             {
                 subject = buf;
-                free(buf);
+                OPENSSL_free(buf);
             }
             buf = X509_NAME_oneline(X509_get_issuer_name(ssl_cert), 0, 0);
             if (buf)
             {
                 issuer = buf;
-                free(buf);
+                OPENSSL_free(buf);
             }
             X509_free(ssl_cert);
         }

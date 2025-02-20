@@ -150,7 +150,6 @@ public:
     SocketPtr socket() const { return tp_; }
 
     const std::string& remote_addr() const { return remote_addr_; }
-    const std::string& local_addr() const { return local_addr_; }
     const std::string& mcast_addr() const { return mcast_addr_; }
     const LinkMap& link_map() const { return link_map_; }
 
