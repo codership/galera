@@ -1,4 +1,4 @@
-// Copyright (C) 2010-2019 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2025 Codership Oy <info@codership.com>
 
 // $Id$
 
@@ -12,6 +12,7 @@
 #include "gcache_mem_test.hpp"
 #include "gcache_rb_test.hpp"
 #include "gcache_page_test.hpp"
+#include "gcache_top_test.hpp"
 
 extern "C" {
 #include <check.h>
@@ -25,6 +26,7 @@ static suite_creator_t suites[] =
     gcache_mem_suite,
     gcache_rb_suite,
     gcache_page_suite,
+    gcache_top_suite,
     0
 };
 

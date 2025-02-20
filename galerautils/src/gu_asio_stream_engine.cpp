@@ -490,6 +490,8 @@ public:
         , fd_(fd)
         , io_service_(io_service)
         , engine_(std::make_shared<AsioTcpStreamEngine>(fd_))
+        , local_addr_()
+        , remote_addr_()
         , non_blocking_(non_blocking)
         , have_encrypted_protocol_(encrypted_protocol)
         , timer_check_done_(false)

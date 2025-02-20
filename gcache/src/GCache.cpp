@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2021 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2025 Codership Oy <info@codership.com>
  */
 
 #include "GCache.hpp"
@@ -26,6 +26,7 @@ namespace gcache
         gid            = gu::UUID();
         seqno_max      = SEQNO_NONE;
         seqno_released = SEQNO_NONE;
+        seqno_low_     = SEQNO_NONE;
         seqno_locked   = SEQNO_MAX;
         seqno_locked_count = 0;
 
@@ -67,7 +68,8 @@ namespace gcache
         mem       (params.mem_size(), seqno2ptr, params.debug()),
         rb        (pcb, params.rb_name(), params.rb_size(), seqno2ptr, gid,
                    params.debug(), recover_rb(encrypt_cb, params.recover())),
-        ps        (params.dir_name(),
+        ps        (*this,
+                   params.dir_name(),
                    encrypt_cb,
                    app_ctx,
                    params.keep_pages_size(),
@@ -82,11 +84,13 @@ namespace gcache
         seqno_max     (seqno2ptr.empty() ?
                        SEQNO_NONE : seqno2ptr.index_back()),
         seqno_released(seqno_max),
+        seqno_low_    (SEQNO_NONE),
         seqno_locked  (SEQNO_MAX),
         seqno_locked_count(0),
         encrypt_cache (NULL != encrypt_cb)
 #ifndef NDEBUG
         ,buf_tracker()
+        ,in_dtor(false)
 #endif
     {}
 
@@ -96,6 +100,9 @@ namespace gcache
         log_debug << "\n" << "GCache mallocs : " << mallocs
                   << "\n" << "GCache reallocs: " << reallocs
                   << "\n" << "GCache frees   : " << frees;
+#ifndef NDEBUG
+        in_dtor = true;
+#endif
     }
 
     /*! prints object properties */

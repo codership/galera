@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2020 Codership Oy <info@codership.com>
+# Copyright (C) 2020-2025 Codership Oy <info@codership.com>
 #
 
 add_executable(gcache_tests
@@ -7,6 +7,7 @@ add_executable(gcache_tests
   gcache_mem_test.cpp
   gcache_page_test.cpp
   gcache_rb_test.cpp
+  gcache_top_test.cpp
   gcache_tests.cpp
   )
 

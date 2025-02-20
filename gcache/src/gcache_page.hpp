@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2024 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2025 Codership Oy <info@codership.com>
  */
 
 /*! @file page file class */
@@ -7,6 +7,7 @@
 #ifndef _gcache_page_hpp_
 #define _gcache_page_hpp_
 
+#include "gcache_seqno.hpp"
 #include "gcache_memops.hpp"
 #include "gcache_bh.hpp"
 
@@ -83,20 +84,14 @@ namespace gcache
             assert(bh->store == BUFFER_IN_PAGE);
             assert(bh->ctx == reinterpret_cast<BH_ctx_t>(this));
             assert(BH_is_released(bh));
-            assert (used_ > 0);
+            assert(!closed_);
+            assert(used_ > 0);
+            used_--;
 #ifndef NDEBUG
-            if (debug_) { log_info << name() << " freed " << bh; }
+            if (debug_) { log_info << name() << " freed " << bh << ", used: "
+                                   << used_ << ", mapped: " << mapped_; }
 #endif
-            if (bh->seqno_g <= 0) // ordered buffers get discarded in discard()
-            {
-                used_--;
-#ifndef NDEBUG
-                if (debug_) { log_info << name() << " decremented ref count to "
-                                       << used_; }
-#endif
-                return true;
-            }
-            return false;
+            return (bh->seqno_g <= 0);
         }
 
         void  free    (BufferHeader* bh) { free(bh, NULL); }
@@ -114,8 +109,13 @@ namespace gcache
             assert(bh->store == BUFFER_IN_PAGE);
             assert(bh->ctx == reinterpret_cast<BH_ctx_t>(this));
             assert(BH_is_released(bh)); // will be marked unreleased by caller
+            assert(!closed_); // minimum available seqno must be adjusted
+                              // before closing the page
+            used_++;
 #ifndef NDEBUG
-            if (debug_) { log_info << name() << " repossessed " << bh; }
+            if (debug_) { log_info << name() << " repossessed " << bh
+                                   << ", used: " << used_ << ", mapped: "
+                                   << mapped_; }
 #endif
         }
 
@@ -123,18 +123,19 @@ namespace gcache
 
         void discard (BufferHeader* bh)
         {
+            assert(bh->size > 0);
+            assert(bh->seqno_g != SEQNO_NONE);
+            assert(bh->store == BUFFER_IN_PAGE);
+            assert(bh->ctx == reinterpret_cast<BH_ctx_t>(this));
             assert(BH_is_released(bh));
+            assert(mapped_ > 0 || bh->seqno_g == SEQNO_ILL);
+            mapped_ -= (bh->seqno_g != SEQNO_ILL);
 #ifndef NDEBUG
-            if (debug_) { log_info << name() << " discarded " << bh; }
-#endif
-            assert(bh->seqno_g > 0); /* unordered buffers should be freed() */
-            assert(used_ > 0);
-            used_--;
-#ifndef NDEBUG
-            if (debug_)
-            {
-                log_info << name() << " decremented ref count to " << used_;
-            }
+            if (bh->seqno_g != SEQNO_ILL && 0 == mapped_)
+                assert(seqno_max_ == bh->seqno_g);
+            if (debug_) { log_info << name() << " discarded " << bh
+                                   << ", used: " << used_ << ", mapped: "
+                                   << mapped_; }
 #endif
         }
 
@@ -145,7 +146,7 @@ namespace gcache
                     size_type             size,
                     wsrep_enc_direction_t dir);
 
-        size_t used () const { return used_; }
+        size_t used() const { return used_; }
 
         size_t size() const { return fd_.size(); } /* size on storage */
 
@@ -156,6 +157,30 @@ namespace gcache
         void  seqno_lock(seqno_t) {}
 
         void  seqno_unlock() {}
+
+        void  seqno_assign(seqno_t const seqno)
+        {
+            assert(seqno > 0);
+            assert(used_ > 0); // cannot assign seqno to unused buffer
+            assert(!closed_);  // cannot be closed while used
+            seqno_max_ = std::max(seqno_max_, seqno);
+            mapped_++;
+#ifndef NDEBUG
+            if (debug_) { log_info << name() << " seqno_assign(" << seqno
+                                   << ") seqno_max: " << seqno_max_
+                                   << ", used: " << used_ << ", mapped: "
+                                   << mapped_; }
+#endif
+        }
+
+        seqno_t seqno_max() const { return seqno_max_; }
+
+        void close()
+        {
+            assert(0 == used_);
+            closed_ = true;
+            if (space_ >= sizeof(BufferHeader)) BH_clear(BH_cast(next_));
+        }
 
         /* Drop filesystem cache on the file */
         void drop_fs_cache() const;
@@ -187,11 +212,14 @@ namespace gcache
         gu::MMap           mmap_;
         EncKey const       key_;
         Nonce const        nonce_;
-        void*              ps_;
+        seqno_t            seqno_max_; // highest seqno assigned to buffer
+        void* const        ps_;
         uint8_t*           next_;
         size_t             space_;
-        size_t             used_;
+        size_t             used_;   // allocated - freed buffers
+        size_t             mapped_; // buffers mapped in seqno2ptr map
         int                debug_;
+        bool               closed_; // page not available any more
 
         GU_COMPILE_ASSERT(ALIGNMENT % GU_MIN_ALIGNMENT == 0,
                           page_alignment_is_not_multiple_of_min_alignment);
@@ -201,8 +229,6 @@ namespace gcache
 
         inline const uint8_t*
         start() const { return static_cast<const uint8_t*>(mmap_.ptr); }
-
-        void close(); /* close page for allocation */
 
         Page(const gcache::Page&);
         Page& operator=(const gcache::Page&);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2021 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2025 Codership Oy <info@codership.com>
  */
 
 #ifndef __GCACHE_H__
@@ -27,7 +27,7 @@
 
 namespace gcache
 {
-    class GCache
+    class GCache : public SeqnoMap
     {
     public:
 
@@ -139,13 +139,25 @@ namespace gcache
         void seqno_release (seqno_t seqno);
 
         /*!
+         * Discard (forget) seqnos up to and including seqno
+         */
+        void seqno_discard (const seqno_t& seqno);
+
+        void set_low_limit (const seqno_t& seqno)
+        {
+            assert(mtx.owned() || in_dtor );
+            seqno_low_ = std::max(seqno_low_, seqno);
+        }
+
+        /*!
          * Returns smallest seqno present in history
          */
         seqno_t seqno_min() const
         {
             gu::Lock lock(mtx);
-            if (gu_likely(!seqno2ptr.empty()))
-                return seqno2ptr.index_begin();
+            if (gu_likely(!seqno2ptr.empty()) &&
+                seqno2ptr.index_end() > seqno_low_)
+                return std::max(seqno2ptr.index_begin(), seqno_low_ + 1);
             else
                 return SEQNO_ILL;
         }
@@ -241,6 +253,10 @@ namespace gcache
 
         static size_t const PREAMBLE_LEN;
 
+#ifdef GCACHE_UNIT_TEST
+        const PageStore& page_store()  const { return ps; }
+        const seqno2ptr_t& seqno_map() const { return seqno2ptr; }
+#endif /* GCACHE_UNIT_TEST */
     private:
 
         typedef MemOps::size_type size_type;
@@ -306,6 +322,7 @@ namespace gcache
         seqno_t         seqno_max;
         seqno_t         seqno_released;
 
+        seqno_t         seqno_low_;
         seqno_t         seqno_locked;
         int             seqno_locked_count;
 
@@ -313,6 +330,7 @@ namespace gcache
 
 #ifndef NDEBUG
         std::set<const void*> buf_tracker;
+        bool in_dtor;
 #endif
 
         template <typename T> /* T assumes void* or const void* */
