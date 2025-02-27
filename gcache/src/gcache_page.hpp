@@ -98,12 +98,15 @@ namespace gcache
 
         void  repossess(BufferHeader* bh, const void* ptr)
         {
+#ifndef NDEBUG
             if (ptr)
             {
                 assert(ptr >= mmap_.ptr);
-                assert(static_cast<const uint8_t*>(ptr) + aligned_size(bh->size)
-                       <= next_);
+                auto const bh_ptr(reinterpret_cast<uint8_t*>(ptr2BH(ptr)));
+                auto const next_ptr(bh_ptr + aligned_size(bh->size));
+                assert(next_ptr <= next_);
             }
+#endif
             assert(bh->size >= sizeof(BufferHeader));
             assert(bh->seqno_g >= 0);
             assert(bh->store == BUFFER_IN_PAGE);
