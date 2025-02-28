@@ -1188,7 +1188,8 @@ galera::Certification::append_trx(const TrxHandleSlavePtr& trx)
                       << " trx seqno " << trx->global_seqno();
         }
 
-        if (gu_unlikely((trx->last_seen_seqno() + 1) < trx_map_.begin()->first))
+        if (!trx_map_.empty() &&
+            gu_unlikely((trx->last_seen_seqno() + 1) < trx_map_.begin()->first))
         {
             /* See #733 - for now it is false positive */
             cert_debug
