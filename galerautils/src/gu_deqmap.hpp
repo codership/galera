@@ -206,10 +206,13 @@ public:
     {
         GU_DEQMAP_ASSERT_CONSISTENCY;
 
+        // compute before iterators get invalidated by erase()
+        size_type const diff(last - first);
+
         if (begin() == first)
         {
             base_.erase(first, last);
-            begin_ += last - first;
+            begin_ += diff;
 
             if (!empty() && not_set(front())) // trim front
             {
@@ -222,7 +225,7 @@ public:
         else if (base_.end() == last)
         {
             base_.erase(first, last);
-            end_ -= last - first;
+            end_ -= diff;
 
             if (!empty() && not_set(back())) // trim back
             {
