@@ -42,6 +42,7 @@ option(GALERA_GCS_SM_DEBUG
   "Enable dumping of send monitor state and history" OFF)
 option(GALERA_GU_DEBUG_MUTEX "Enable mutex debug instrumentation" OFF)
 option(GALERA_GU_DBUG_ON "Enable sync point macros (ON for Debug builds)" OFF)
+option(GALERA_GLIBCXX_DEBUG "Enable glibc++ debug instrumentation" OFF)
 
 #
 # Set cmake policies before doing any checks.

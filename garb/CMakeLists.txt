@@ -2,6 +2,10 @@
 # Copyright (C) 2020 Codership Oy <info@codership.com>
 #
 
+# -D_GLIBCXX_DEBUG makes linking with Boost program options
+# library fail, so disable it for garbd.
+remove_definitions(-D_GLIBCXX_DEBUG)
+
 add_executable(garbd
   garb_config.cpp
   garb_logger.cpp

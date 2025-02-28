@@ -45,6 +45,13 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_definitions(-DGU_DBUG_ON)
   # To detect STD library misuse with Debug builds.
   add_definitions(-D_GLIBCXX_ASSERTIONS)
+  # Extra glibc++ debug instrumentation. This cannot be enabled by default
+  # for debug builds since it changes standard library container implementations
+  # and is not compatible with libraries that use standard library containers
+  # in public interfaces (e.g. Boost).
+  if (GALERA_GLIBCXX_DEBUG)
+    add_definitions(-D_GLIBCXX_DEBUG)
+  endif()
 else()
   set(CMAKE_COMMON_FLAGS "${CMAKE_COMMON_FLAGS} -O2")
   # Due to liberal use of assert() in some modules, make sure that
