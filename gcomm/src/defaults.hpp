@@ -19,6 +19,7 @@ namespace gcomm
         static std::string const SocketSendBufSize        ;
         static std::string const GMCastVersion            ;
         static std::string const GMCastTcpPort            ;
+        static std::string const GMCastMCastTTL           ;
         static std::string const GMCastSegment            ;
         static std::string const GMCastTimeWait           ;
         static std::string const GMCastPeerTimeout        ;
@@ -29,11 +30,15 @@ namespace gcomm
         static std::string const EvsSuspectTimeoutMin     ;
         static std::string const EvsInactiveTimeout       ;
         static std::string const EvsInactiveTimeoutMin    ;
-        static std::string const EvsRetransPeriod         ;
-        static std::string const EvsRetransPeriodMin      ;
+        static std::string const EvsKeepalivePeriod       ;
+        static std::string const EvsKeepalivePeriodMin    ;
+        static std::string const EvsCausalKeepalivePeriod ;
         static std::string const EvsJoinRetransPeriod     ;
+        static std::string const EvsJoinRetransPeriodMin  ;
         static std::string const EvsStatsReportPeriod     ;
         static std::string const EvsStatsReportPeriodMin  ;
+        static std::string const EvsDebugLogMask          ;
+        static std::string const EvsInfoLogMask           ;
         static std::string const EvsSendWindow            ;
         static std::string const EvsSendWindowMin         ;
         static std::string const EvsUserSendWindow        ;
@@ -43,6 +48,7 @@ namespace gcomm
         static std::string const EvsDelayedKeepPeriod     ;
         static std::string const EvsAutoEvict             ;
         static std::string const EvsVersion               ;
+        static std::string const EvsUseAggregate          ;
         static std::string const PcAnnounceTimeout        ;
         static std::string const PcChecksum               ;
         static std::string const PcIgnoreQuorum           ;
@@ -53,6 +59,7 @@ namespace gcomm
         static std::string const PcWaitPrimTimeout        ;
         static std::string const PcWeight                 ;
         static std::string const PcRecovery               ;
+        static std::string const PcLinger                 ;
     };
 
     struct Flags
