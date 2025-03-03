@@ -993,7 +993,7 @@ START_TEST(test_proto_leave_n)
         max_view_seq = get_max_view_seq(dn, i + 1, n_nodes);
     }
 
-    gu_trace(check_trace(dn));
+    check_trace(dn);
     for_each(dn.begin(), dn.end(), DeleteObject());
 }
 END_TEST
@@ -1406,7 +1406,7 @@ START_TEST(test_proto_arbitrate)
     dn[2]->set_cvi(ViewId(V_REG, dn[0]->uuid(), view_seq + 1));
     gu_trace(prop.propagate_until_cvi(true));
 
-    gu_trace(check_trace(dn));
+    check_trace(dn);
 
     for_each(dn.begin(), dn.end(), DeleteObject());
 }

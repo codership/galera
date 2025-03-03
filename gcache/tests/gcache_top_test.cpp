@@ -95,12 +95,15 @@ START_TEST(top_level_page_caching) // test that caching in pages work
     ps.wait_page_discard(); // 2nd page should go
     ck_assert_msg(ps.total_pages() == 4,
                   "total_pages %zu (expected 4)", ps.total_pages());
-    ck_assert_msg(sm.empty() == true,
-                  "SM size: %zu, begin: %" PRId64 ", end: %" PRId64
-                  ", front: %p, back: %p"
-                  ,sm.size(), sm.index_begin(), sm.index_end()
-                  ,sm.front(), sm.back()
-        );
+    if (!sm.empty())
+    {
+        ck_assert_msg(sm.empty() == true,
+                      "SM size: %zu, begin: %" PRId64 ", end: %" PRId64
+                      ", front: %p, back: %p"
+                      ,sm.size(), sm.index_begin(), sm.index_end()
+                      ,sm.front(), sm.back()
+            );
+    }
     ck_assert_msg(gc.seqno_min() == -1,
                   "seqno_min: %" PRId64 " (expected -1)", gc.seqno_min());
 

@@ -360,23 +360,18 @@ static void check_traces(const Trace& t1, const Trace& t2)
                                 "trace differ: \n\n" << *i << "\n\n" << *j << "\n\n"
                                 "next views: \n\n" << *i_next << "\n\n" << *j_next;
                     } else {
-                        // if not, then members should be disjoint.
-                        std::map<gcomm::UUID, gcomm::Node> output;
-                        std::set_intersection(i_next->second.view().members().begin(),
-                                              i_next->second.view().members().end(),
-                                              j_next->second.view().members().begin(),
-                                              j_next->second.view().members().end(),
-                                              std::inserter(output,output.begin()));
-                        gcomm_assert(output.size() == 0) << 
-                                "trace differ: \n\n" << *i << "\n\n" << *j << "\n\n"
-                                "next views: \n\n" << *i_next << "\n\n" << *j_next;
+                        // Next trans view may or may not contain same members.
+                        // E.g. if paritioning happens during group reconfiguration,
+                        // one of the partitions may complete the group reconfiguration
+                        // with partitioned members, but the other partition will run
+                        // the reconfiguration protocol again, ending with different
+                        // but overlapping members.
+                        //
+                        // Also, joining members may be different.
+                        //
+                        // We skip the check for now.
                     }
                 }
-                // if previous trans view id is the same.
-                // the reg view should be the same.
-
-                // if previous trans view id is not same.
-                // intersections of joined, left, partitioned sets are empty.
 
                 if (i == t1.view_traces().begin() ||
                     j == t2.view_traces().begin()) continue;
@@ -384,20 +379,32 @@ static void check_traces(const Trace& t1, const Trace& t2)
                 Trace::ViewTraceMap::const_iterator j_prev(j); --j_prev;
 
                 if (i_prev->first == j_prev->first) {
+                    // if previous trans view id is the same.
+                    // the reg view should be the same.
                     gcomm_assert(i->second.view() == j->second.view()) <<
                             "trace differ: \n\n" << *i << "\n\n" << *j << "\n\n"
                             "previous views: \n\n" << *i_prev << "\n\n" << *j_prev;
                 } else {
-                    std::map<gcomm::UUID, gcomm::Node> output;
-                    int joined_size = 0, left_size = 0, part_size = 0;
-                    std::set_intersection(i->second.view().joined().begin(),
-                                          i->second.view().joined().end(),
-                                          j->second.view().joined().begin(),
-                                          j->second.view().joined().end(),
-                                          std::inserter(output, output.begin()));
-                    joined_size = output.size();
-                    output.clear();
+                    // Previous trans view id is not same:
 
+                    // Union of joined sets should match members.
+                    // Note that intersction of joined sets may be non-empty,
+                    // e.g. in case of (1),(2),(3) -> (1, 2, 3)
+                    // the view event for both 1 and 2 will have 3 in joined set.
+                    NodeList joined_union;
+                    size_t left_size = 0, part_size = 0;
+                    std::set_union(i->second.view().joined().begin(),
+                                   i->second.view().joined().end(),
+                                   j->second.view().joined().begin(),
+                                   j->second.view().joined().end(),
+                                   std::inserter(joined_union, joined_union.begin()));
+                    gcomm_assert(i->second.view().members() == joined_union)
+                        << "union of joined sets does not match members: \n\n"
+                        << i->second.view().members() << "\n\n"
+                        << joined_union;
+
+                    // intersections of left, partitioned sets are empty.
+                    NodeList output;
                     std::set_intersection(i->second.view().left().begin(),
                                           i->second.view().left().end(),
                                           j->second.view().left().begin(),
@@ -414,10 +421,17 @@ static void check_traces(const Trace& t1, const Trace& t2)
                     part_size = output.size();
                     output.clear();
 
-                    gcomm_assert(i->second.view().members() == j->second.view().members() &&
-                                 joined_size == 0 && left_size == 0 && part_size == 0) <<
-                            "trace differ: \n\n" << *i << "\n\n" << *j << "\n\n"
-                            "previous views: \n\n" << *i_prev << "\n\n" << *j_prev;
+                    gcomm_assert(
+                        /* members are same */
+                        i->second.view().members() == j->second.view().members()
+                        && left_size == 0 && part_size == 0)
+                        << "trace differ: \n\n"
+                        << *i << "\n\n"
+                        << *j
+                        << "\n\n"
+                           "previous views: \n\n"
+                        << *i_prev << "\n\n"
+                        << *j_prev;
                 }
             }
         }
@@ -437,7 +451,7 @@ public:
         {
             if ((*i)->index() != n->index())
             {
-                gu_trace(check_traces((*i)->trace(), n->trace()));
+                check_traces((*i)->trace(), n->trace());
             }
         }
     }

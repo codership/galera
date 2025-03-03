@@ -119,8 +119,14 @@ namespace gcomm
         Node(SegmentId segment = 0) : segment_(segment)
         { }
         SegmentId segment() const { return segment_; }
-        bool operator==(const Node& cmp) const { return true; }
-        bool operator<(const Node& cmp) const { return true; }
+        bool operator==(const Node& cmp) const
+        {
+            return segment_ == cmp.segment_;
+        }
+        bool operator<(const Node& cmp) const
+        {
+            return segment_ < cmp.segment_;
+        }
         std::ostream& write_stream(std::ostream& os) const
         {
             os << static_cast<int>(segment_);
