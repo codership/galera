@@ -28,10 +28,13 @@ namespace gcache
     {
         write_preamble(false);
 
-        for (seqno2ptr_iter_t i = seqno2ptr_.begin(); i != seqno2ptr_.end(); ++i)
+        for (seqno2ptr_iter_t i = seqno2ptr_.begin(); i != seqno2ptr_.end();)
         {
             if (ptr2BH(*i)->ctx == BH_ctx_t(this)) {
-                seqno2ptr_.erase(i);
+                i = seqno2ptr_.erase(i);
+            }
+            else {
+                ++i;
             }
         }
 
