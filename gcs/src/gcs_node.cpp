@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2025 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -21,7 +21,8 @@ gcs_node_init (gcs_node_t* const node,
                int const gcs_proto_ver,
                int const repl_proto_ver,
                int const appl_proto_ver,
-               gcs_segment_t const segment)
+               gcs_segment_t const segment,
+               bool const stateless)
 {
     assert(strlen(id) > 0);
     assert(strlen(id) < sizeof(node->id));
@@ -40,6 +41,7 @@ gcs_node_init (gcs_node_t* const node,
     node->repl_proto_ver = repl_proto_ver;
     node->appl_proto_ver = appl_proto_ver;
     node->segment        = segment;
+    node->stateless      = stateless;
 }
 
 /*! Move data from one node object to another */
@@ -276,8 +278,8 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
      * subsequent configuration changes. */
     node->bootstrap = false;
 
-    node->arbitrator = (gcs_state_msg_flags (node->state_msg) &
-                        GCS_STATE_ARBITRATOR);
+    node->stateless = (gcs_state_msg_flags (node->state_msg) &
+                       GCS_STATE_STATELESS);
 }
 
 void
@@ -298,5 +300,5 @@ gcs_node_print(std::ostream& os, const gcs_node_t& node)
        << "status:\t " << gcs_node_state_to_str(node.status) << '\n'
        << "segment:  " << int(node.segment) << '\n'
        << "bootstrp: " << (node.bootstrap ? "YES" : "NO") << '\n'
-       << "arbitr: "   << (node.arbitrator ? "YES" : "NO");
+       << "arbitr: "   << (node.stateless ? "YES" : "NO");
 }
