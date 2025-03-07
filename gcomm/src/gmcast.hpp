@@ -205,6 +205,7 @@ namespace gcomm
         bool              prim_view_reached_;
 
         gmcast::ProtoMap*  proto_map_;
+public:
         struct RelayEntry
         {
             gmcast::Proto* proto;
@@ -216,9 +217,24 @@ namespace gcomm
                 return (socket < other.socket);
             }
         };
-        void send(const RelayEntry&, int segment, gcomm::Datagram& dg);
         typedef std::set<RelayEntry> RelaySet;
+        /*
+         * Compute minimal set of proto entries required to reach
+         * maximum set of nonlive peers.
+         *
+         * @param[in,out] proto_set Set of proto entries
+         * @param[in,out] nonlive_uuids Set of nonlive peer UUIDs
+         * @param segment Segment ID
+         *
+         * @return Minimal set of proto entries required to reach
+         */
+        static RelaySet compute_relay_set(std::set<gmcast::Proto*>& proto_set,
+                                          std::set<gcomm::UUID>& nonlive_uuids,
+                                          uint8_t segment);
+
+    private:
         RelaySet relay_set_;
+        void send(const RelayEntry&, int segment, gcomm::Datagram& dg);
 
         typedef std::vector<RelayEntry> Segment;
         typedef std::map<uint8_t, Segment> SegmentMap;

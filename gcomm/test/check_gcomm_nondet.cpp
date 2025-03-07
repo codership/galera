@@ -32,7 +32,7 @@ struct GCommSuite
 
 static GCommSuite suites[] = {
     {"util_nondet", util_nondet_suite},
-    {"gmcast_nondet", gmcast_suite},
+    {"gmcast_nondet", gmcast_nondet_suite},
     {"pc_nondet", pc_nondet_suite},
     {"", 0}
 };

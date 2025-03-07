@@ -1172,6 +1172,33 @@ namespace
     };
 }
 
+gcomm::GMCast::RelaySet
+gcomm::GMCast::compute_relay_set(std::set<Proto*>& proto_set,
+                                 std::set<gcomm::UUID>& nonlive_uuids,
+                                 uint8_t segment)
+{
+    std::set<RelayEntry> relay_set;
+    // find minimal set of proto entries required to reach maximum set
+    // of nonlive peers
+    while (nonlive_uuids.empty() == false && proto_set.empty() == false)
+    {
+        std::set<Proto*>::iterator maxel(
+            std::max_element(proto_set.begin(), proto_set.end(),
+                             CmpUuidCounts(nonlive_uuids, segment)));
+        Proto* p(*maxel);
+        log_debug << "relay set maxel :" << *p << " count: "
+                  << CmpUuidCounts(nonlive_uuids, segment).count(p);
+
+        relay_set.insert(RelayEntry(p, p->socket().get()));
+        const LinkMap& lm(p->link_map());
+        for (LinkMap::const_iterator lm_i(lm.begin()); lm_i != lm.end(); ++lm_i)
+        {
+            nonlive_uuids.erase((*lm_i).uuid());
+        }
+        proto_set.erase(maxel);
+    }
+    return relay_set;
+}
 
 void gcomm::GMCast::check_liveness()
 {
@@ -1284,27 +1311,7 @@ void gcomm::GMCast::check_liveness()
                 proto_set.insert(p);
             }
         }
-        // find minimal set of proto entries required to reach maximum set
-        // of nonlive peers
-        while (nonlive_uuids.empty() == false &&
-               proto_set.empty() == false)
-        {
-            std::set<Proto*>::iterator maxel(
-                std::max_element(proto_set.begin(),
-                                 proto_set.end(), CmpUuidCounts(nonlive_uuids, segment_)));
-            Proto* p(*maxel);
-            log_debug << "relay set maxel :" << *p << " count: "
-                      << CmpUuidCounts(nonlive_uuids, segment_).count(p);
-
-            relay_set_.insert(RelayEntry(p, p->socket().get()));
-            const LinkMap& lm(p->link_map());
-            for (LinkMap::const_iterator lm_i(lm.begin()); lm_i != lm.end();
-                 ++lm_i)
-            {
-                nonlive_uuids.erase((*lm_i).uuid());
-            }
-            proto_set.erase(maxel);
-        }
+        relay_set_ = compute_relay_set(proto_set, nonlive_uuids, segment_);
     }
     else if (relaying_ == true && should_relay == false)
     {
