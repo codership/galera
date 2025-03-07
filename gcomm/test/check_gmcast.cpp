@@ -88,7 +88,7 @@ namespace {
         std::string self_string() const override { return "node1"; }
         /* End of ProtoContext implementation */
 
-        void add_proto(int idx)
+        void add_proto(int idx, uint8_t segment)
         {
             const gcomm::UUID uuid{idx};
             std::string remote_addr{"127.0.0.1:" + std::to_string(idx)};
@@ -100,23 +100,28 @@ namespace {
                                             "127.0.0.1:1" /* local_addr */,
                                             remote_addr /* remote_addr */,
                                             "" /* mcast_addr */,
-                                            0 /* local_segment */,
+                                            segment /* local_segment */,
                                             "test" /* group_name */ };
             proto->wait_handshake();
             gcomm::gmcast::Message
                 handshake_msg{ 0 /* version */,
                               gcomm::gmcast::Message::Type::GMCAST_T_HANDSHAKE,
-                              uuid, uuid, 0 /* segment_id */ };
+                              uuid, uuid, segment /* segment_id */ };
             proto->handle_handshake(handshake_msg);
             ck_assert(proto->state()
                       == gcomm::gmcast::Proto::S_HANDSHAKE_RESPONSE_SENT);
             gcomm::gmcast::Message ok_msg{ 0 /* version */,
                                           gcomm::gmcast::Message::Type::GMCAST_T_OK,
-                                          uuid, 0, "" };
+                                          uuid, segment, "" };
             proto->handle_ok(ok_msg);
             ck_assert(proto->state() == gcomm::gmcast::Proto::S_OK);
             ck_assert(proto->remote_uuid() == uuid);
             proto_set.insert(proto);
+        }
+        /* Add proto with default segment 0 */
+        void add_proto(int idx)
+        {
+            add_proto(idx, 0);
         }
         /* Add link from src to dst. The link is added to the proto with uuid
          * src. */
@@ -210,6 +215,32 @@ START_TEST(test_gmcast_relay_set_same_segment_multiple_paths)
 }
 END_TEST
 
+START_TEST(test_gmcast_relay_set_multiple_segments)
+{
+    log_info << "START test_gmcast_relay_set_multiple_segments";
+
+    RelaySetFixture f;
+
+    f.add_proto(2, 0);
+    f.add_proto(3, 0);
+    f.add_proto(4, 1);
+    f.add_proto(5, 1);
+
+    /* Add links from 2, 3, 4 to 5 */
+    f.add_link(2, 5);
+    f.add_link(3, 5);
+    f.add_link(4, 5);
+
+    f.nonlive_uuids.insert(f.uuid5);
+
+    /* The preferred path is via 4 to 5 as they are in the same segment */
+    auto relay_set
+        = gcomm::GMCast::compute_relay_set(f.proto_set, f.nonlive_uuids, 1);
+    ck_assert(relay_set.size() == 1);
+    ck_assert(relay_set.begin()->proto->remote_uuid() == f.uuid4);
+    ck_assert(f.nonlive_uuids.empty());
+}
+END_TEST
 Suite* gmcast_suite()
 {
     Suite* s = suite_create("gmcast");
@@ -225,6 +256,10 @@ Suite* gmcast_suite()
 
     tc = tcase_create("test_gmcast_relay_set_same_segment_multiple_paths");
     tcase_add_test(tc, test_gmcast_relay_set_same_segment_multiple_paths);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_gmcast_relay_set_multiple_segments");
+    tcase_add_test(tc, test_gmcast_relay_set_multiple_segments);
     suite_add_tcase(s, tc);
 
     return s;
