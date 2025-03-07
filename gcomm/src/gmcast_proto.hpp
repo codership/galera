@@ -14,15 +14,39 @@
 
 namespace gcomm
 {
-    class GMCast;
     namespace gmcast
     {
+        class ProtoContext;
         class Proto;
         class ProtoMap;
         std::ostream& operator<<(std::ostream& os, const Proto& p);
     }
 }
 
+/* Local node context for proto entries */
+struct gcomm::gmcast::ProtoContext
+{
+    virtual ~ProtoContext() = default;
+    /* Return UUID of the local node */
+    virtual const gcomm::UUID& node_uuid() const = 0;
+    /* Return true if the proto entry is owned by the local node */
+    virtual bool is_own(const Proto*) const = 0;
+    /* Blacklist proto entry */
+    virtual void blacklist(const Proto*) = 0;
+    /* Return true if the proto entry is not owned by the local node
+     * and there already is a proto entry with the same remote UUID
+     * but with different address.
+     */
+    virtual bool is_not_own_and_duplicate_exists(const Proto*) const = 0;
+    /* Return true if the proto entry is evicted */
+    virtual bool is_proto_evicted(const Proto*) const = 0;
+    /* Return true if the primary view has been reached */
+    virtual bool prim_view_reached() const = 0;
+    /* Remove viewstate file */
+    virtual void remove_viewstate_file() const = 0;
+    /* Return string of the local node */
+    virtual std::string self_string() const = 0;
+};
 
 class gcomm::gmcast::Proto
 {
@@ -77,7 +101,7 @@ public:
 
 
 
-    Proto (GMCast&            gmcast,
+    Proto (ProtoContext&        context,
            int                version,
            SocketPtr          tp,
            const std::string& local_addr,
@@ -102,7 +126,7 @@ public:
         link_map_         (),
         send_tstamp_      (gu::datetime::Date::monotonic()),
         recv_tstamp_      (gu::datetime::Date::monotonic()),
-        gmcast_           (gmcast)
+        context_          (context)
     { }
 
     ~Proto()
@@ -192,7 +216,7 @@ private:
     LinkMap           link_map_;
     gu::datetime::Date send_tstamp_;
     gu::datetime::Date recv_tstamp_;
-    GMCast&     gmcast_;
+    ProtoContext&     context_;
 };
 
 class gcomm::gmcast::ProtoMap : public Map<const SocketId, Proto*> { };
