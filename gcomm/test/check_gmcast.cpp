@@ -42,19 +42,24 @@ namespace {
 
     struct RelaySetFixture : public gcomm::gmcast::ProtoContext
     {
+        ~RelaySetFixture()
+        {
+            for (auto proto : proto_set)
+            {
+                delete proto;
+            }
+        }
+
         std::set<gcomm::gmcast::Proto*> proto_set{};
         std::set<gcomm::UUID> nonlive_uuids{};
         gcomm::GMCast::RelaySet relay_set{};
 
+        /* Convenience UUIDs */
         const gcomm::UUID uuid1{ 1 };
         const gcomm::UUID uuid2{ 2 };
         const gcomm::UUID uuid3{ 3 };
         const gcomm::UUID uuid4{ 4 };
         const gcomm::UUID uuid5{ 5 };
-        const gcomm::UUID uuid6{ 6 };
-        const gcomm::UUID uuid7{ 7 };
-        const gcomm::UUID uuid8{ 8 };
-        const gcomm::UUID uuid9{ 9 };
 
         /* Begin of ProtoContext implementation */
         /* Uuid1 is the local node */
@@ -233,7 +238,8 @@ START_TEST(test_gmcast_relay_set_multiple_segments)
 
     f.nonlive_uuids.insert(f.uuid5);
 
-    /* The preferred path is via 4 to 5 as they are in the same segment */
+    /* The preferred path is via 4 to 5 as they are in the preferred segment 1
+     */
     auto relay_set
         = gcomm::GMCast::compute_relay_set(f.proto_set, f.nonlive_uuids, 1);
     ck_assert(relay_set.size() == 1);
@@ -241,6 +247,120 @@ START_TEST(test_gmcast_relay_set_multiple_segments)
     ck_assert(f.nonlive_uuids.empty());
 }
 END_TEST
+
+START_TEST(test_gmcast_relay_set_multiple_segments_two)
+{
+    log_info << "START test_gmcast_relay_set_multiple_segments_two";
+
+    RelaySetFixture f;
+
+    f.add_proto(2, 0);
+    f.add_proto(3, 0);
+    f.add_proto(4, 1);
+    f.add_proto(5, 1);
+
+    /* Add links from 2, 3, 4 to 5 */
+    f.add_link(2, 5);
+    f.add_link(3, 5);
+    f.add_link(4, 5);
+
+    /* Make 4 and 5 unreachable from 1. */
+    f.nonlive_uuids.insert(f.uuid4);
+    f.nonlive_uuids.insert(f.uuid5);
+
+    /* The preferred path is via 2 or 3 to 5 as they are in the preferred
+     * segment 1. Node 4 is unreachable from 1. */
+    auto relay_set
+        = gcomm::GMCast::compute_relay_set(f.proto_set, f.nonlive_uuids, 1);
+
+    ck_assert(relay_set.size() == 1);
+    ck_assert(relay_set.begin()->proto->remote_uuid() == f.uuid2 ||
+              relay_set.begin()->proto->remote_uuid() == f.uuid3);
+    ck_assert(f.nonlive_uuids.size() == 1);
+    ck_assert(f.nonlive_uuids.count(f.uuid4) == 1);
+}
+END_TEST
+
+
+START_TEST(test_gmcast_relay_set_tree)
+{
+    log_info << "START test_gmcast_relay_set_tree";
+
+    RelaySetFixture f;
+
+    f.add_proto(2);
+    f.add_proto(3);
+    f.add_proto(4);
+    f.add_proto(5);
+
+    /* Add links from 2 to 4, and from 3 to 5 */
+    f.add_link(2, 4);
+    f.add_link(3, 5);
+
+    /* Make 4 and 5 unreachable from 1. */
+    f.nonlive_uuids.insert(f.uuid4);
+    f.nonlive_uuids.insert(f.uuid5);
+
+    /* Expect a relay_set of size 2. Node 4 is reachable through node 2,
+       and node 5 through node 3. */
+    auto relay_set
+        = gcomm::GMCast::compute_relay_set(f.proto_set, f.nonlive_uuids, 0);
+
+    ck_assert(relay_set.size() == 2);
+    auto node_2 = std::find_if(relay_set.begin(), relay_set.end(),
+                               [&f](const gcomm::GMCast::RelayEntry& entry) {
+                                   return entry.proto->remote_uuid() == f.uuid2;
+                               });
+    ck_assert(node_2 != relay_set.end());
+    auto node_3 = std::find_if(relay_set.begin(), relay_set.end(),
+                               [&f](const gcomm::GMCast::RelayEntry& entry) {
+                                   return entry.proto->remote_uuid() == f.uuid3;
+                               });
+    ck_assert(node_3 != relay_set.end());
+    ck_assert(f.nonlive_uuids.size() == 0);
+}
+END_TEST
+
+START_TEST(test_gmcast_relay_set_tree_with_segments)
+{
+    log_info << "START test_gmcast_relay_set_tree_with_segments";
+
+    RelaySetFixture f;
+
+    f.add_proto(2, 0);
+    f.add_proto(3, 1);
+    f.add_proto(4, 0);
+    f.add_proto(5, 1);
+
+    /* Add links from 2 to 4, and from 3 to 5 */
+    f.add_link(2, 4);
+    f.add_link(3, 5);
+
+    /* Make 4 and 5 unreachable from 1. */
+    f.nonlive_uuids.insert(f.uuid4);
+    f.nonlive_uuids.insert(f.uuid5);
+
+    /* Expect a relay_set of size 2. Node 4 is reachable through node 2,
+       and node 5 through node 3. */
+    auto relay_set
+        = gcomm::GMCast::compute_relay_set(f.proto_set, f.nonlive_uuids, 1);
+
+    ck_assert(relay_set.size() == 2);
+    auto node_2 = std::find_if(relay_set.begin(), relay_set.end(),
+                               [&f](const gcomm::GMCast::RelayEntry& entry) {
+                                   return entry.proto->remote_uuid() == f.uuid2;
+                               });
+    ck_assert(node_2 != relay_set.end());
+    auto node_3 = std::find_if(relay_set.begin(), relay_set.end(),
+                               [&f](const gcomm::GMCast::RelayEntry& entry) {
+                                   return entry.proto->remote_uuid() == f.uuid3;
+                               });
+    ck_assert(node_3 != relay_set.end());
+    ck_assert(f.nonlive_uuids.size() == 0);
+}
+END_TEST
+
+
 Suite* gmcast_suite()
 {
     Suite* s = suite_create("gmcast");
@@ -260,6 +380,18 @@ Suite* gmcast_suite()
 
     tc = tcase_create("test_gmcast_relay_set_multiple_segments");
     tcase_add_test(tc, test_gmcast_relay_set_multiple_segments);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_gmcast_relay_set_multiple_segments_two");
+    tcase_add_test(tc, test_gmcast_relay_set_multiple_segments_two);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_gmcast_relay_set_tree");
+    tcase_add_test(tc, test_gmcast_relay_set_tree);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_gmcast_relay_set_tree_with_segments");
+    tcase_add_test(tc, test_gmcast_relay_set_tree_with_segments);
     suite_add_tcase(s, tc);
 
     return s;

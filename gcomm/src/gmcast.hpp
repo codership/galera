@@ -222,11 +222,15 @@ public:
          *
          * @return Minimal set of proto entries required to reach
          */
-        static RelaySet compute_relay_set(std::set<gmcast::Proto*>& proto_set,
-                                          std::set<gcomm::UUID>& nonlive_uuids,
-                                          uint8_t segment);
-
+        static RelaySet
+        compute_relay_set(const std::set<gmcast::Proto*>& proto_set,
+                          std::set<gcomm::UUID>& nonlive_uuids,
+                          uint8_t segment);
     private:
+        static void
+        populate_relay_set(std::set<gcomm::UUID>& nonlive_uuids,
+                           std::set<gcomm::gmcast::Proto*>& lookup_set,
+                           gcomm::GMCast::RelaySet& relay_set);
         RelaySet relay_set_;
         void send(const RelayEntry&, int segment, gcomm::Datagram& dg);
 
