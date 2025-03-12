@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2025 Codership Oy <info@codership.com>
  */
 
 #include "gmcast_proto.hpp"
@@ -24,14 +24,14 @@ static const std::string gmcast_proto_err_duplicate_uuid("duplicate uuid");
 
 const gcomm::UUID& gcomm::gmcast::Proto::local_uuid() const
 {
-    return gmcast_.uuid();
+    return context_.node_uuid();
 }
 
 std::ostream& gcomm::gmcast::operator<<(std::ostream& os, const Proto& p)
 {
     os << "v="  << p.version_ << ","
        << "hu=" << p.handshake_uuid_ << ","
-       << "lu=" << p.gmcast_.uuid() << ","
+       << "lu=" << p.context_.node_uuid() << ","
        << "ru=" << p.remote_uuid_ << ","
        << "ls=" << static_cast<int>(p.local_segment_) << ","
        << "rs=" << static_cast<int>(p.remote_segment_) << ","
@@ -71,6 +71,8 @@ void gcomm::gmcast::Proto:: set_state(State new_state)
 
     if (!allowed[state_][new_state])
     {
+        /* TODO: Make this a warning and make the proto failed in
+         * release build. */
         gu_throw_fatal << "Invalid state change: " << to_string(state_)
                           << " -> " << to_string(new_state);
     }
@@ -103,7 +105,7 @@ void gcomm::gmcast::Proto::send_handshake()
 {
     handshake_uuid_ = UUID(0, 0);
     Message hs (version_, Message::GMCAST_T_HANDSHAKE, handshake_uuid_,
-                gmcast_.uuid(), local_segment_);
+                context_.node_uuid(), local_segment_);
 
     send_msg(hs, false);
 
@@ -140,21 +142,21 @@ bool gcomm::gmcast::Proto::validate_handshake_uuid()
     //    node to take correct action (abort if it was joining, retry
     //    if its address changed).
     //
-    if (gmcast_.is_own(this))
+    if (context_.is_own(this))
     {
         // Connecting to own address should not get past the first
         // handshake message so we should see here only S_HANDSHAKE_WAIT
         // state.
         assert(state() == S_HANDSHAKE_WAIT);
-        log_info << gmcast_.self_string()
+        log_info << context_.self_string()
                  << " Found matching local endpoint for a connection, "
                  << "blacklisting address " << remote_addr();
-        gmcast_.blacklist(this);
+        context_.blacklist(this);
         set_state(S_FAILED);
         return false;
     }
-    else if (gmcast_.uuid() == remote_uuid() &&
-             gmcast_.prim_view_reached() == false)
+    else if (context_.node_uuid() == remote_uuid() &&
+             context_.prim_view_reached() == false)
     {
         // Direct connection to node with the same UUID, the duplicate
         // UUID should be handled when the first handshake message
@@ -162,14 +164,14 @@ bool gcomm::gmcast::Proto::validate_handshake_uuid()
         assert(state() == S_HANDSHAKE_WAIT);
         // Remove gvwstate.dat, otherwise the same UUID will be
         // used again when the node is restarted.
-        gmcast_.remove_viewstate_file();
+        context_.remove_viewstate_file();
         set_state(S_FAILED);
         gu_throw_fatal
             << "A node with the same UUID already exists in the cluster. "
             << "Removing gvwstate.dat file, this node will generate a new "
             << "UUID when restarted.";
     }
-    else if (gmcast_.is_not_own_and_duplicate_exists(this))
+    else if (context_.is_not_own_and_duplicate_exists(this))
     {
         evict_duplicate_uuid(); // Sets state to failed
         return false;
@@ -200,7 +202,7 @@ void gcomm::gmcast::Proto::handle_handshake(const Message& hs)
 
     Message hsr (version_, Message::GMCAST_T_HANDSHAKE_RESPONSE,
                  handshake_uuid_,
-                 gmcast_.uuid(),
+                 context_.node_uuid(),
                  local_addr_,
                  group_name_,
                  local_segment_);
@@ -223,7 +225,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
             log_info << "handshake failed, my group: '" << group_name_
                      << "', peer group: '" << grp << "'";
             Message failed(version_, Message::GMCAST_T_FAIL,
-                           gmcast_.uuid(), local_segment_,
+                           context_.node_uuid(), local_segment_,
                            gmcast_proto_err_invalid_group);
             send_msg(failed, false);
             set_state(S_FAILED);
@@ -237,7 +239,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
                                   gu::URI(hs.node_address()).get_port());
 
 
-        if (gmcast_.is_evicted(remote_uuid_) == true)
+        if (context_.is_proto_evicted(this) == true)
         {
             log_info << "peer " << remote_uuid_
                      << " from " << remote_addr_
@@ -253,7 +255,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
         }
 
         propagate_remote_ = true;
-        Message ok(version_, Message::GMCAST_T_OK, gmcast_.uuid(),
+        Message ok(version_, Message::GMCAST_T_OK, context_.node_uuid(),
                    local_segment_, "");
         send_msg(ok, false);
         set_state(S_OK);
@@ -263,7 +265,7 @@ void gcomm::gmcast::Proto::handle_handshake_response(const Message& hs)
         log_warn << "Parsing peer address '"
                  << hs.node_address() << "' failed: " << e.what();
         Message nok (version_, Message::GMCAST_T_FAIL,
-                     gmcast_.uuid(), local_segment_,
+                     context_.node_uuid(), local_segment_,
                      "invalid node address");
         send_msg (nok, false);
         set_state(S_FAILED);
@@ -290,7 +292,7 @@ void gcomm::gmcast::Proto::handle_failed(const Message& hs)
     {
         // otherwise node use the uuid in view state file.
         // which is probably still in other nodes evict list.
-        gmcast_.remove_viewstate_file();
+        context_.remove_viewstate_file();
         emit_evicted_event();
         gu_throw_fatal
             << "this node has been evicted out of the cluster, "
@@ -298,7 +300,7 @@ void gcomm::gmcast::Proto::handle_failed(const Message& hs)
     }
     else if (hs.error() == gmcast_proto_err_duplicate_uuid)
     {
-        if (gmcast_.prim_view_reached())
+        if (context_.prim_view_reached())
         {
             log_info << "Received duplicate UUID error from other node "
                      << "while in primary component. This may mean that "
@@ -309,7 +311,7 @@ void gcomm::gmcast::Proto::handle_failed(const Message& hs)
         {
             // Remove gvwstate.dat, otherwise the same UUID will be
             // used again when the node is restarted.
-            gmcast_.remove_viewstate_file();
+            context_.remove_viewstate_file();
             gu_throw_fatal
                 << "A node with the same UUID already exists in the cluster. "
                 << "Removing gvwstate.dat file, this node will generate a new "
@@ -347,7 +349,7 @@ void gcomm::gmcast::Proto::handle_topology_change(const Message& msg)
 void gcomm::gmcast::Proto::handle_keepalive(const Message& msg)
 {
     log_debug << "keepalive: " << *this;
-    Message ok(version_, Message::GMCAST_T_OK, gmcast_.uuid(), local_segment_, "");
+    Message ok(version_, Message::GMCAST_T_OK, context_.node_uuid(), local_segment_, "");
     send_msg(ok, true);
 }
 
@@ -365,7 +367,7 @@ void gcomm::gmcast::Proto::send_topology_change(LinkMap& um)
                            Node(LinkMap::value(i).addr())));
     }
 
-    Message msg(version_, Message::GMCAST_T_TOPOLOGY_CHANGE, gmcast_.uuid(),
+    Message msg(version_, Message::GMCAST_T_TOPOLOGY_CHANGE, context_.node_uuid(),
                 group_name_, nl);
 
     send_msg(msg, false);
@@ -376,14 +378,14 @@ void gcomm::gmcast::Proto::send_keepalive()
 {
     log_debug << "sending keepalive: " << *this;
     Message msg(version_, Message::GMCAST_T_KEEPALIVE,
-                gmcast_.uuid(), local_segment_, "");
+                context_.node_uuid(), local_segment_, "");
     send_msg(msg, true);
 }
 
 void gcomm::gmcast::Proto::evict()
 {
     Message failed(version_, Message::GMCAST_T_FAIL,
-                   gmcast_.uuid(), local_segment_, gmcast_proto_err_evicted);
+                   context_.node_uuid(), local_segment_, gmcast_proto_err_evicted);
     send_msg(failed, false);
     set_state(S_FAILED);
 }
@@ -391,7 +393,7 @@ void gcomm::gmcast::Proto::evict()
 void gcomm::gmcast::Proto::evict_duplicate_uuid()
 {
     Message failed(version_, Message::GMCAST_T_FAIL,
-                   gmcast_.uuid(), local_segment_,
+                   context_.node_uuid(), local_segment_,
                    gmcast_proto_err_duplicate_uuid);
     send_msg(failed, false);
     set_state(S_FAILED);

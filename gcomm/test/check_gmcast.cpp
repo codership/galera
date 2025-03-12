@@ -1,524 +1,398 @@
 /*
- * Copyright (C) 2009-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2025 Codership Oy <info@galeracluster.com>
  */
 
 #include "check_gcomm.hpp"
-#include "gcomm/protostack.hpp"
-#include "gcomm/conf.hpp"
 
 #include "gmcast.hpp"
-#include "gmcast_message.hpp"
-
-#include "gu_asio.hpp" // gu::ssl_register_params()
-
-using namespace std;
-using namespace gcomm;
-using namespace gcomm::gmcast;
-using namespace gu::datetime;
-using gu::byte_t;
-using gu::Buffer;
 
 #include <check.h>
 
-// Note: Multicast test(s) not run by default.
-static bool test_multicast(false);
-string mcast_param("gmcast.mcast_addr=239.192.0.11&gmcast.mcast_port=4567");
-
-
-START_TEST(test_gmcast_multicast)
-{
-
-    string uri1("gmcast://?gmcast.group=test&gmcast.mcast_addr=239.192.0.11");
-    gu::Config conf;
-    gu::ssl_register_params(conf);
-    gcomm::Conf::register_params(conf);
-    unique_ptr<Protonet> pnet(Protonet::create(conf));
-    Transport* gm1(Transport::create(*pnet, uri1));
-
-    gm1->connect();
-    gm1->close();
-
-    delete gm1;
-}
-END_TEST
-
-
-START_TEST(test_gmcast_w_user_messages)
-{
-    class User : public Toplay
+namespace {
+    struct FakeSocket : public gcomm::Socket
     {
-        Transport* tp_;
-        size_t recvd_;
-        Protostack pstack_;
-        explicit User(const User&);
-        void operator=(User&);
-
-    public:
-
-        User(Protonet& pnet,
-             const std::string& listen_addr,
-             const std::string& remote_addr) :
-            Toplay(pnet.conf()),
-            tp_(0),
-            recvd_(0),
-            pstack_()
+        void connect(const gu::URI& uri) override {}
+        void close() override {}
+        void set_option(const std::string& key, const std::string& val) override
         {
-            string uri("gmcast://");
-            uri += remote_addr; // != 0 ? remote_addr : "";
-            uri += "?";
-            uri += "tcp.non_blocking=1";
-            uri += "&";
-            uri += "gmcast.group=testgrp";
-            uri += "&gmcast.time_wait=PT0.5S";
-            if (test_multicast == true)
-            {
-                uri += "&" + mcast_param;
-            }
-            uri += "&gmcast.listen_addr=tcp://";
-            uri += listen_addr;
-
-            tp_ = Transport::create(pnet, uri);
         }
-
-        ~User()
+        int send(int segment, const gcomm::Datagram& dg) override { return 0; }
+        void async_receive() override {}
+        size_t mtu() const override { return 1024; }
+        std::string remote_addr() const override { return "127.0.0.1:2"; }
+        std::string local_addr() const override { return "127.0.0.1:1"; }
+        gcomm::Socket::State state() const override
         {
-            delete tp_;
+            return gcomm::Socket::S_CONNECTED;
         }
-
-        void start(const std::string& peer = "")
+        gcomm::SocketId id() const override
         {
-            if (peer == "")
-            {
-                tp_->connect();
-            }
-            else
-            {
-                tp_->connect(peer);
-            }
-            pstack_.push_proto(tp_);
-            pstack_.push_proto(this);
+            return reinterpret_cast<gcomm::SocketId>(this);
         }
-
-
-        void stop()
+        gcomm::SocketStats stats() const override
         {
-            pstack_.pop_proto(this);
-            pstack_.pop_proto(tp_);
-            tp_->close();
+            return gcomm::SocketStats();
         }
-
-        void handle_timer()
+        FakeSocket()
+            : Socket(gu::URI("tcp://127.0.0.1:1"))
         {
-            byte_t buf[16];
-            memset(buf, 0xa5, sizeof(buf));
-
-            Datagram dg(Buffer(buf, buf + sizeof(buf)));
-
-            send_down(dg, ProtoDownMeta());
         }
-
-        void handle_up(const void* cid, const Datagram& rb,
-                       const ProtoUpMeta& um)
-        {
-            if (rb.len() < rb.offset() + 16)
-            {
-                gu_throw_fatal << "offset error";
-            }
-            char buf[16];
-            memset(buf, 0xa5, sizeof(buf));
-            // cppcheck-suppress uninitstring
-            if (memcmp(buf, &rb.payload()[0] + rb.offset(), 16) != 0)
-            {
-                gu_throw_fatal << "content mismatch";
-            }
-            recvd_++;
-        }
-
-        size_t recvd() const
-        {
-            return recvd_;
-        }
-
-        void set_recvd(size_t val)
-        {
-            recvd_ = val;
-        }
-
-        Protostack& pstack() { return pstack_; }
-
-        std::string listen_addr() const
-        {
-            return tp_->listen_addr();
-        }
+        ~FakeSocket() override = default;
     };
 
-    log_info << "START";
-    gu::Config conf;
-    gu::ssl_register_params(conf);
-    gcomm::Conf::register_params(conf);
-    mark_point();
-    unique_ptr<Protonet> pnet(Protonet::create(conf));
-    mark_point();
-    User u1(*pnet, "127.0.0.1:0", "");
-    pnet->insert(&u1.pstack());
-
-    log_info << "u1 start";
-    u1.start();
-
-    pnet->event_loop(Sec/10);
-
-    ck_assert(u1.recvd() == 0);
-
-    log_info << "u2 start";
-    User u2(*pnet, "127.0.0.1:0",
-            u1.listen_addr().erase(0, strlen("tcp://")));
-    pnet->insert(&u2.pstack());
-
-    u2.start();
-
-    while (u1.recvd() <= 50 || u2.recvd() <= 50)
+    struct RelaySetFixture : public gcomm::gmcast::ProtoContext
     {
-        u1.handle_timer();
-        u2.handle_timer();
-        pnet->event_loop(Sec/10);
-    }
+        ~RelaySetFixture()
+        {
+            for (auto proto : proto_set)
+            {
+                delete proto;
+            }
+        }
 
-    log_info << "u3 start";
-    User u3(*pnet, "127.0.0.1:0",
-            u2.listen_addr().erase(0, strlen("tcp://")));
-    pnet->insert(&u3.pstack());
-    u3.start();
+        std::set<gcomm::gmcast::Proto*> proto_set{};
+        std::set<gcomm::UUID> nonlive_uuids{};
+        gcomm::GMCast::RelaySet relay_set{};
 
-    while (u3.recvd() <= 50)
-    {
-        u1.handle_timer();
-        u2.handle_timer();
-        pnet->event_loop(Sec/10);
-    }
+        /* Convenience UUIDs */
+        const gcomm::UUID uuid1{ 1 };
+        const gcomm::UUID uuid2{ 2 };
+        const gcomm::UUID uuid3{ 3 };
+        const gcomm::UUID uuid4{ 4 };
+        const gcomm::UUID uuid5{ 5 };
 
-    log_info << "u4 start";
-    User u4(*pnet, "127.0.0.1:0",
-            u2.listen_addr().erase(0, strlen("tcp://")));
-    pnet->insert(&u4.pstack());
-    u4.start();
+        /* Begin of ProtoContext implementation */
+        /* Uuid1 is the local node */
+        const gcomm::UUID& node_uuid() const override { return uuid1; }
+        bool is_own(const gcomm::gmcast::Proto* proto) const override
+        {
+            return proto->remote_uuid() == node_uuid();
+        }
+        void blacklist(const gcomm::gmcast::Proto* proto) override {
+            gu_throw_fatal << "Not implemented";
+        }
+        bool is_not_own_and_duplicate_exists(
+            const gcomm::gmcast::Proto*) const override
+        {
+            return false;
+        }
+        bool is_proto_evicted(const gcomm::gmcast::Proto* proto) const override
+        {
+            gu_throw_fatal << "Not implemented";
+            return false;
+        }
+        bool prim_view_reached() const override
+        {
+            gu_throw_fatal << "Not implemented";
+            return false;
+        }
+        void remove_viewstate_file() const override
+        {
+            gu_throw_fatal << "Not implemented";
+        }
+        std::string self_string() const override { return "node1"; }
+        /* End of ProtoContext implementation */
 
-    while (u4.recvd() <= 50)
-    {
-        u1.handle_timer();
-        u2.handle_timer();
-        pnet->event_loop(Sec/10);
-    }
+        void add_proto(int idx, uint8_t segment)
+        {
+            const gcomm::UUID uuid{idx};
+            std::string remote_addr{"127.0.0.1:" + std::to_string(idx)};
+            auto proto
+                = new gcomm::gmcast::Proto{ *this /* context */,
+                                            0 /* version */,
+                                            std::make_shared<
+                                                FakeSocket>() /* socket */,
+                                            "127.0.0.1:1" /* local_addr */,
+                                            remote_addr /* remote_addr */,
+                                            "" /* mcast_addr */,
+                                            segment /* local_segment */,
+                                            "test" /* group_name */ };
+            proto->wait_handshake();
+            gcomm::gmcast::Message
+                handshake_msg{ 0 /* version */,
+                              gcomm::gmcast::Message::Type::GMCAST_T_HANDSHAKE,
+                              uuid, uuid, segment /* segment_id */ };
+            proto->handle_handshake(handshake_msg);
+            ck_assert(proto->state()
+                      == gcomm::gmcast::Proto::S_HANDSHAKE_RESPONSE_SENT);
+            gcomm::gmcast::Message ok_msg{ 0 /* version */,
+                                          gcomm::gmcast::Message::Type::GMCAST_T_OK,
+                                          uuid, segment, "" };
+            proto->handle_ok(ok_msg);
+            ck_assert(proto->state() == gcomm::gmcast::Proto::S_OK);
+            ck_assert(proto->remote_uuid() == uuid);
+            proto_set.insert(proto);
+        }
+        /* Add proto with default segment 0 */
+        void add_proto(int idx)
+        {
+            add_proto(idx, 0);
+        }
+        /* Add link from src to dst. The link is added to the proto with uuid
+         * src. */
+        void add_link(int src, int dst)
+        {
+            auto src_proto = std::find_if(proto_set.begin(), proto_set.end(),
+                                           [src](const gcomm::gmcast::Proto* p) {
+                                               return p->remote_uuid() == gcomm::UUID(src);
+                                           });
+            auto dst_proto = std::find_if(proto_set.begin(), proto_set.end(),
+                                           [dst](const gcomm::gmcast::Proto* p) {
+                                               return p->remote_uuid() == gcomm::UUID(dst);
+                                           });
+            ck_assert(src_proto != proto_set.end());
+            ck_assert(dst_proto != proto_set.end());
 
-    log_info << "u1 stop";
-    u1.stop();
-    pnet->erase(&u1.pstack());
+            gcomm::gmcast::Message::NodeList nl;
+            nl.insert(std::make_pair(gcomm::UUID(dst),
+                                     gcomm::gmcast::Node("127.0.0.1:" + std::to_string(dst))));
+            gcomm::gmcast::Message msg{ 0 /* version */,
+                                        gcomm::gmcast::Message::Type::GMCAST_T_TOPOLOGY_CHANGE,
+                                        (*src_proto)->remote_uuid(),
+                                        "test" /* group_name */,
+                                        nl };
+            (*src_proto)->handle_topology_change(msg);
+        }
 
-    pnet->event_loop(3*Sec);
+};
+} /* namespace */
 
-    log_info << "u1 start";
-    pnet->insert(&u1.pstack());
-    u1.start(u2.listen_addr());
-
-    u1.set_recvd(0);
-    u2.set_recvd(0);
-    u3.set_recvd(0);
-    u4.set_recvd(0);
-
-    for (size_t i(0); i < 30; ++i)
-    {
-        u1.handle_timer();
-        u2.handle_timer();
-        pnet->event_loop(Sec/10);
-    }
-
-    ck_assert(u1.recvd() != 0);
-    ck_assert(u2.recvd() != 0);
-    ck_assert(u3.recvd() != 0);
-    ck_assert(u4.recvd() != 0);
-
-    pnet->erase(&u4.pstack());
-    pnet->erase(&u3.pstack());
-    pnet->erase(&u2.pstack());
-    pnet->erase(&u1.pstack());
-
-    u1.stop();
-    u2.stop();
-    u3.stop();
-    u4.stop();
-
-    pnet->event_loop(0);
-
-}
-END_TEST
-
-
-// not run by default, hard coded port
-START_TEST(test_gmcast_auto_addr)
+START_TEST(test_gmcast_empty_relay_set)
 {
-    log_info << "START";
-    gu::Config conf;
-    gu::ssl_register_params(conf);
-    gcomm::Conf::register_params(conf);
-    unique_ptr<Protonet> pnet(Protonet::create(conf));
-    Transport* tp1 = Transport::create(*pnet, "gmcast://?gmcast.group=test");
-    Transport* tp2 = Transport::create(*pnet, "gmcast://127.0.0.1:4567"
-              "?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:10002");
+    log_info << "START test_gmcast_empty_relay_set";
 
-    pnet->insert(&tp1->pstack());
-    pnet->insert(&tp2->pstack());
+    RelaySetFixture f;
+    gcomm::GMCast::RelaySet relay_set
+        = gcomm::GMCast::compute_relay_set(f.proto_set, f.nonlive_uuids, 0);
 
-    tp1->connect();
-    tp2->connect();
-
-    pnet->event_loop(Sec);
-
-    pnet->erase(&tp2->pstack());
-    pnet->erase(&tp1->pstack());
-
-    tp1->close();
-    tp2->close();
-
-    delete tp1;
-    delete tp2;
-
-    pnet->event_loop(0);
-
+    ck_assert(relay_set.empty());
 }
 END_TEST
 
-
-
-START_TEST(test_gmcast_forget)
+START_TEST(test_gmcast_relay_set_same_segment)
 {
-    gu_conf_self_tstamp_on();
-    log_info << "START";
-    gu::Config conf;
-    gu::ssl_register_params(conf);
-    gcomm::Conf::register_params(conf);
-    unique_ptr<Protonet> pnet(Protonet::create(conf));
-    Transport* tp1 = Transport::create(*pnet, "gmcast://"
-                    "?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0");
-    pnet->insert(&tp1->pstack());
-    tp1->connect();
+    log_info << "START test_gmcast_relay_set_same_segment";
 
-    Transport* tp2 = Transport::create(*pnet,
-                                       std::string("gmcast://")
-                                       + tp1->listen_addr().erase(
-                                           0, strlen("tcp://"))
-                  + "?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0");
-    Transport* tp3 = Transport::create(*pnet,
-                                       std::string("gmcast://")
-                                       + tp1->listen_addr().erase(
-                                           0, strlen("tcp://"))
-                  + "?gmcast.group=test&gmcast.listen_addr=tcp://127.0.0.1:0");
+    RelaySetFixture f;
+    f.add_proto(2);
+    f.add_proto(3);
+    f.add_proto(4);
+    f.add_proto(5);
 
+    /* Add link from 3 to 2 so that 2 is reachable via 3 */
+    f.add_link(3, 2);
 
-    pnet->insert(&tp2->pstack());
-    pnet->insert(&tp3->pstack());
+    /* No direct link from 1 to 2 */
+    f.nonlive_uuids.insert(f.uuid2);
 
-    tp2->connect();
-    tp3->connect();
-
-    pnet->event_loop(Sec);
-
-    UUID uuid1 = tp1->uuid();
-
-    tp1->close();
-    tp2->close(uuid1);
-    tp3->close(uuid1);
-    pnet->event_loop(10*Sec);
-    tp1->connect();
-    // @todo Implement this using User class above and verify that
-    // tp2 and tp3 communicate with each other but now with tp1
-    log_info << "####";
-    pnet->event_loop(Sec);
-
-    pnet->erase(&tp3->pstack());
-    pnet->erase(&tp2->pstack());
-    pnet->erase(&tp1->pstack());
-
-    tp1->close();
-    tp2->close();
-    tp3->close();
-    delete tp1;
-    delete tp2;
-    delete tp3;
-
-    pnet->event_loop(0);
-
+    auto relay_set
+        = gcomm::GMCast::compute_relay_set(f.proto_set, f.nonlive_uuids, 0);
+    ck_assert(relay_set.size() == 1);
+    ck_assert(relay_set.begin()->proto->remote_uuid() == f.uuid3);
+    ck_assert(f.nonlive_uuids.empty());
 }
 END_TEST
 
-
-// not run by default, hard coded port
-START_TEST(test_trac_380)
+START_TEST(test_gmcast_relay_set_same_segment_multiple_paths)
 {
-    gu_conf_self_tstamp_on();
-    log_info << "START (test_trac_380)";
-    gu::Config conf;
-    gu::ssl_register_params(conf);
-    gcomm::Conf::register_params(conf);
-    std::unique_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
+    log_info << "START test_gmcast_relay_set_same_segment_multiple_paths";
 
-    // caused either assertion or exception
-    gcomm::Transport* tp1(gcomm::Transport::create(
-                              *pnet,
-                              "gmcast://127.0.0.1:4567?"
-                              "gmcast.group=test"));
-    pnet->insert(&tp1->pstack());
-    tp1->connect();
-    try
-    {
-        pnet->event_loop(Sec);
-    }
-    catch (gu::Exception& e)
-    {
-        ck_assert_msg(e.get_errno() == EINVAL,
-                      "unexpected errno: %d, cause %s",
-                      e.get_errno(), e.what());
-    }
-    pnet->erase(&tp1->pstack());
-    tp1->close();
-    delete tp1;
-    pnet->event_loop(0);
+    RelaySetFixture f;
+    f.add_proto(2);
+    f.add_proto(3);
+    f.add_proto(4);
+    f.add_proto(5);
+
+    /* Add links from 2, 3, 4 to 5 */
+    f.add_link(2, 5);
+    f.add_link(3, 5);
+    f.add_link(4, 5);
+
+    f.nonlive_uuids.insert(f.uuid5);
+
+    auto relay_set
+        = gcomm::GMCast::compute_relay_set(f.proto_set, f.nonlive_uuids, 0);
+    ck_assert(relay_set.size() == 1);
+    ck_assert(relay_set.begin()->proto->remote_uuid() == f.uuid2
+              || relay_set.begin()->proto->remote_uuid() == f.uuid3
+              || relay_set.begin()->proto->remote_uuid() == f.uuid4);
+    ck_assert(f.nonlive_uuids.empty());
 }
 END_TEST
 
-
-START_TEST(test_trac_828)
+START_TEST(test_gmcast_relay_set_multiple_segments)
 {
-    gu_conf_self_tstamp_on();
-    log_info << "START (test_trac_828)";
-    gu::Config conf;
-    gu::ssl_register_params(conf);
-    gcomm::Conf::register_params(conf);
-    std::unique_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
+    log_info << "START test_gmcast_relay_set_multiple_segments";
 
-    // If the bug is present, this will throw because of own address being
-    // in address list.
-    try
-    {
-        Transport* tp(gcomm::Transport::create(
-                          *pnet,
-                          "gmcast://127.0.0.1:4567?"
-                          "gmcast.group=test&"
-                          "gmcast.listen_addr=tcp://127.0.0.1:4567"));
-        delete tp;
-    }
-    catch (gu::Exception& e)
-    {
-        ck_abort_msg("test_trac_828, expcetion thrown because of having own "
-                     "address in address list");
-    }
+    RelaySetFixture f;
+
+    f.add_proto(2, 0);
+    f.add_proto(3, 0);
+    f.add_proto(4, 1);
+    f.add_proto(5, 1);
+
+    /* Add links from 2, 3, 4 to 5 */
+    f.add_link(2, 5);
+    f.add_link(3, 5);
+    f.add_link(4, 5);
+
+    f.nonlive_uuids.insert(f.uuid5);
+
+    /* The preferred path is via 4 to 5 as they are in the preferred segment 1
+     */
+    auto relay_set
+        = gcomm::GMCast::compute_relay_set(f.proto_set, f.nonlive_uuids, 1);
+    ck_assert(relay_set.size() == 1);
+    ck_assert(relay_set.begin()->proto->remote_uuid() == f.uuid4);
+    ck_assert(f.nonlive_uuids.empty());
 }
 END_TEST
 
-START_TEST(test_gmcast_ipv6)
+START_TEST(test_gmcast_relay_set_multiple_segments_two)
 {
-    log_info << "START test_gmcast_ipv6";
-    gu::Config conf;
-    gu::ssl_register_params(conf);
-    gcomm::Conf::register_params(conf);
-    conf.set("base_host", "ip6-localhost");
-    gu_log_max_level = GU_LOG_DEBUG;
-    std::unique_ptr<gcomm::Protonet> pnet(gcomm::Protonet::create(conf));
+    log_info << "START test_gmcast_relay_set_multiple_segments_two";
 
-    // Without scheme
-    {
-        std::unique_ptr<Transport> tp(gcomm::Transport::create(
-                                        *pnet,
-                                        "gmcast://[::1]:4567?"
-                                        "gmcast.group=test&"
-                                        "gmcast.listen_addr=tcp://[::1]:4567"));
-        tp->connect();
-        tp->close();
-    }
+    RelaySetFixture f;
 
-    {
-        std::unique_ptr<Transport> tp(gcomm::Transport::create(
-                                        *pnet,
-                                        "gmcast://ip6-localhost:4567?"
-                                        "gmcast.group=test&"
-                                        "gmcast.listen_addr=tcp://ip6-localhost:4567"));
-        tp->connect();
-        tp->close();
-    }
+    f.add_proto(2, 0);
+    f.add_proto(3, 0);
+    f.add_proto(4, 1);
+    f.add_proto(5, 1);
 
-    {
-        std::unique_ptr<Transport> tp(gcomm::Transport::create(
-                                        *pnet,
-                                        "gmcast://[::1]?"
-                                        "gmcast.group=test&"
-                                        "gmcast.listen_addr=tcp://[::1]"));
-        tp->connect();
-        tp->close();
-    }
+    /* Add links from 2, 3, 4 to 5 */
+    f.add_link(2, 5);
+    f.add_link(3, 5);
+    f.add_link(4, 5);
 
-    {
-        std::unique_ptr<Transport> tp(gcomm::Transport::create(
-                                        *pnet,
-                                        "gmcast://ip6-localhost?"
-                                        "gmcast.group=test&"
-                                        "gmcast.listen_addr=tcp://ip6-localhost"));
-        tp->connect();
-        tp->close();
-    }
-    {
-        gcomm::Protolay::sync_param_cb_t spcb;
-        std::unique_ptr<Transport> tp(gcomm::Transport::create(
-                                        *pnet,
-                                        "gmcast://ip6-localhost?"
-                                        "gmcast.group=test&"
-                                        "gmcast.listen_addr=tcp://[2001:db8:10:9464::233]:4567"));
-        log_info << tp->configured_listen_addr();
-        log_info << conf;
-        ck_assert(tp->configured_listen_addr() == "tcp://[2001:db8:10:9464::233]:4567");
-    }
-    log_info << "END test_gmcast_ipv6";
+    /* Make 4 and 5 unreachable from 1. */
+    f.nonlive_uuids.insert(f.uuid4);
+    f.nonlive_uuids.insert(f.uuid5);
+
+    /* The preferred path is via 2 or 3 to 5 as they are in the preferred
+     * segment 1. Node 4 is unreachable from 1. */
+    auto relay_set
+        = gcomm::GMCast::compute_relay_set(f.proto_set, f.nonlive_uuids, 1);
+
+    ck_assert(relay_set.size() == 1);
+    ck_assert(relay_set.begin()->proto->remote_uuid() == f.uuid2 ||
+              relay_set.begin()->proto->remote_uuid() == f.uuid3);
+    ck_assert(f.nonlive_uuids.size() == 1);
+    ck_assert(f.nonlive_uuids.count(f.uuid4) == 1);
 }
 END_TEST
+
+
+START_TEST(test_gmcast_relay_set_tree)
+{
+    log_info << "START test_gmcast_relay_set_tree";
+
+    RelaySetFixture f;
+
+    f.add_proto(2);
+    f.add_proto(3);
+    f.add_proto(4);
+    f.add_proto(5);
+
+    /* Add links from 2 to 4, and from 3 to 5 */
+    f.add_link(2, 4);
+    f.add_link(3, 5);
+
+    /* Make 4 and 5 unreachable from 1. */
+    f.nonlive_uuids.insert(f.uuid4);
+    f.nonlive_uuids.insert(f.uuid5);
+
+    /* Expect a relay_set of size 2. Node 4 is reachable through node 2,
+       and node 5 through node 3. */
+    auto relay_set
+        = gcomm::GMCast::compute_relay_set(f.proto_set, f.nonlive_uuids, 0);
+
+    ck_assert(relay_set.size() == 2);
+    auto node_2 = std::find_if(relay_set.begin(), relay_set.end(),
+                               [&f](const gcomm::GMCast::RelayEntry& entry) {
+                                   return entry.proto->remote_uuid() == f.uuid2;
+                               });
+    ck_assert(node_2 != relay_set.end());
+    auto node_3 = std::find_if(relay_set.begin(), relay_set.end(),
+                               [&f](const gcomm::GMCast::RelayEntry& entry) {
+                                   return entry.proto->remote_uuid() == f.uuid3;
+                               });
+    ck_assert(node_3 != relay_set.end());
+    ck_assert(f.nonlive_uuids.size() == 0);
+}
+END_TEST
+
+START_TEST(test_gmcast_relay_set_tree_with_segments)
+{
+    log_info << "START test_gmcast_relay_set_tree_with_segments";
+
+    RelaySetFixture f;
+
+    f.add_proto(2, 0);
+    f.add_proto(3, 1);
+    f.add_proto(4, 0);
+    f.add_proto(5, 1);
+
+    /* Add links from 2 to 4, and from 3 to 5 */
+    f.add_link(2, 4);
+    f.add_link(3, 5);
+
+    /* Make 4 and 5 unreachable from 1. */
+    f.nonlive_uuids.insert(f.uuid4);
+    f.nonlive_uuids.insert(f.uuid5);
+
+    /* Expect a relay_set of size 2. Node 4 is reachable through node 2,
+       and node 5 through node 3. */
+    auto relay_set
+        = gcomm::GMCast::compute_relay_set(f.proto_set, f.nonlive_uuids, 1);
+
+    ck_assert(relay_set.size() == 2);
+    auto node_2 = std::find_if(relay_set.begin(), relay_set.end(),
+                               [&f](const gcomm::GMCast::RelayEntry& entry) {
+                                   return entry.proto->remote_uuid() == f.uuid2;
+                               });
+    ck_assert(node_2 != relay_set.end());
+    auto node_3 = std::find_if(relay_set.begin(), relay_set.end(),
+                               [&f](const gcomm::GMCast::RelayEntry& entry) {
+                                   return entry.proto->remote_uuid() == f.uuid3;
+                               });
+    ck_assert(node_3 != relay_set.end());
+    ck_assert(f.nonlive_uuids.size() == 0);
+}
+END_TEST
+
 
 Suite* gmcast_suite()
 {
-
     Suite* s = suite_create("gmcast");
     TCase* tc;
 
-    if (test_multicast == true)
-    {
-        tc = tcase_create("test_gmcast_multicast");
-        tcase_add_test(tc, test_gmcast_multicast);
-        suite_add_tcase(s, tc);
-    }
-
-    tc = tcase_create("test_gmcast_w_user_messages");
-    tcase_add_test(tc, test_gmcast_w_user_messages);
-    tcase_set_timeout(tc, 30);
+    tc = tcase_create("test_gmcast_empty_relay_set");
+    tcase_add_test(tc, test_gmcast_empty_relay_set);
     suite_add_tcase(s, tc);
 
-    // not run by default, hard coded port
-    tc = tcase_create("test_gmcast_auto_addr");
-    tcase_add_test(tc, test_gmcast_auto_addr);
+    tc = tcase_create("test_gmcast_relay_set_same_segment");
+    tcase_add_test(tc, test_gmcast_relay_set_same_segment);
     suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_gmcast_forget");
-    tcase_add_test(tc, test_gmcast_forget);
-    tcase_set_timeout(tc, 20);
+    tc = tcase_create("test_gmcast_relay_set_same_segment_multiple_paths");
+    tcase_add_test(tc, test_gmcast_relay_set_same_segment_multiple_paths);
     suite_add_tcase(s, tc);
 
-    // not run by default, hard coded port
-    tc = tcase_create("test_trac_380");
-    tcase_add_test(tc, test_trac_380);
+    tc = tcase_create("test_gmcast_relay_set_multiple_segments");
+    tcase_add_test(tc, test_gmcast_relay_set_multiple_segments);
     suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_trac_828");
-    tcase_add_test(tc, test_trac_828);
+    tc = tcase_create("test_gmcast_relay_set_multiple_segments_two");
+    tcase_add_test(tc, test_gmcast_relay_set_multiple_segments_two);
     suite_add_tcase(s, tc);
 
-    tc = tcase_create("test_gmcast_ipv6");
-    tcase_add_test(tc, test_gmcast_ipv6);
+    tc = tcase_create("test_gmcast_relay_set_tree");
+    tcase_add_test(tc, test_gmcast_relay_set_tree);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_gmcast_relay_set_tree_with_segments");
+    tcase_add_test(tc, test_gmcast_relay_set_tree_with_segments);
     suite_add_tcase(s, tc);
 
     return s;
-
 }
