@@ -42,7 +42,14 @@ public:
     {
         return success;
     }
-    virtual void shutdown() GALERA_OVERRIDE { }
+
+    virtual void shutdown() GALERA_OVERRIDE
+    {
+        /* Note that we shut down the socket only for writes. This
+         * is to keep the socket alive for reads until the peer closes
+         * the connection. */
+        ::shutdown(fd_, SHUT_WR);
+    }
 
     virtual op_result read(void* buf, size_t max_count) GALERA_OVERRIDE
     {
@@ -294,8 +301,18 @@ private:
             last_verify_error_ = SSL_get_verify_result(ssl_);
             return error;
         }
+        case SSL_ERROR_ZERO_RETURN:
+        {
+            last_error_ = 0;
+            last_error_category_ = &gu_asio_ssl_category;
+            last_verify_error_ = SSL_get_verify_result(ssl_);
+            return eof;
         }
+        }
+        log_warn << "Unhandled SSL error " << ssl_error;
         assert(0);
+        last_error_ = sys_error;
+        last_error_category_ = &gu_asio_ssl_category;
         return error;
     }
 

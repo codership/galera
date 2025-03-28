@@ -747,9 +747,9 @@ void gu::AsioIoService::poll_one()
     impl_->native().poll_one();
 }
 
-void gu::AsioIoService::run()
+size_t gu::AsioIoService::run()
 {
-    impl_->native().run();
+    return impl_->native().run();
 }
 
 void gu::AsioIoService::post(std::function<void()> fun)

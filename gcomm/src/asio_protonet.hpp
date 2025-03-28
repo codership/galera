@@ -28,7 +28,7 @@ public:
 
     AsioProtonet(gu::Config& conf, int version = 0);
     ~AsioProtonet();
-    void event_loop(const gu::datetime::Period& p);
+    size_t event_loop(const gu::datetime::Period& p);
     void dispatch(const SocketId&,
                   const Datagram&,
                   const ProtoUpMeta&);
@@ -42,6 +42,8 @@ public:
     std::string get_ssl_password() const;
 
 private:
+
+    bool timer_expired_;
 
     class TimerHandler : public gu::AsioSteadyTimerHandler
                        , public std::enable_shared_from_this<TimerHandler>

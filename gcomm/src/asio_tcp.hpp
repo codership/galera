@@ -80,6 +80,7 @@ private:
         last_queued_tstamp_ = last_delivered_tstamp_ = now;
     }
     void cancel_deferred_close_timer();
+    void become_closed();
 
     AsioProtonet&                             net_;
     std::shared_ptr<gu::AsioSocket>           socket_;

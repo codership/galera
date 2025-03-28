@@ -374,6 +374,11 @@ namespace gu
         virtual bool is_open() const = 0;
 
         /**
+         * Shutdown the socket.
+         */
+        virtual void shutdown() = 0;
+
+        /**
          * Close the socket.
          */
         virtual void close() = 0;
@@ -602,6 +607,7 @@ namespace gu
         AsioAcceptor& operator=(const AsioAcceptor&) = delete;
         virtual ~AsioAcceptor() { }
         virtual void open(const gu::URI& uri) = 0;
+        virtual bool is_open() const = 0;
         virtual void listen(const gu::URI& uri) = 0;
         virtual void close() = 0;
         virtual void async_accept(const std::shared_ptr<AsioAcceptorHandler>&,
@@ -676,8 +682,10 @@ namespace gu
 
         /**
          * Run until IO service is stopped or runs out of work.
+         *
+         * @return Number of events processed.
          */
-        void run();
+        size_t run();
 
         /**
          * Post a function for execution. The function will be invoked

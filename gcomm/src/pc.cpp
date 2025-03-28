@@ -186,18 +186,25 @@ void gcomm::PC::close(bool force)
     else
     {
         log_debug << "PC/EVS Proto leaving";
+        auto start_time = gu::datetime::Date::monotonic();
         pc_->close();
         evs_->close();
 
-        gu::datetime::Date wait_until(
-            gu::datetime::Date::monotonic() + linger_);
+        auto wait_until = start_time + linger_;
 
         do
         {
-            pnet().event_loop(gu::datetime::Sec/2);
-        }
-        while (evs_->state()         != evs::Proto::S_CLOSED &&
-               gu::datetime::Date::monotonic() <  wait_until);
+            /* Loop in 10ms intervals and check if EVS is closed.
+             * Keep the interval short, event loop does not terminate
+             * even if it runs out of work because of the timer. */
+            pnet().event_loop(gu::datetime::Sec / 100);
+        } while (evs_->state() != evs::Proto::S_CLOSED
+                 && gu::datetime::Date::monotonic() < wait_until);
+
+        auto evs_termination_time = gu::datetime::Date::monotonic();
+        log_debug << "EVS termination took "
+                  << evs_termination_time - start_time << " left in state "
+                  << evs::Proto::to_string(evs_->state());
 
         if (evs_->state() != evs::Proto::S_CLOSED)
         {
@@ -210,6 +217,23 @@ void gcomm::PC::close(bool force)
         }
 
         gmcast_->close();
+
+        wait_until = gu::datetime::Date::monotonic() + gu::datetime::Sec;
+        while (gu::datetime::Date::monotonic() < wait_until)
+        {
+            /* Loop in 10ms intervals to process unsent messages.
+             * If no message were processed during that time, it likely
+             * means that all the connections have been closed or that the
+             * receiving side is not able to process messages fast enough.
+             */
+            size_t count = pnet().event_loop(gu::datetime::Sec / 100);
+            if (count == 0)
+            {
+                break;
+            }
+        }
+        auto stop_time = gu::datetime::Date::monotonic();
+        log_debug << "PC close took " << stop_time - start_time;
     }
     pnet().erase(&pstack_);
     pstack_.pop_proto(this);
