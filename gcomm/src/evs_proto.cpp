@@ -1925,15 +1925,6 @@ void gcomm::evs::Proto::send_join(bool handle)
 void gcomm::evs::Proto::send_leave(bool handle)
 {
     gcomm_assert(state() == S_LEAVING);
-
-    // If no messages have been sent, generate one dummy to
-    // trigger message acknowledgement mechanism
-    if (last_sent_ == -1 && output_.empty() == true)
-    {
-        Datagram wb;
-        gu_trace(send_user(wb, 0xff, O_DROP, -1, -1));
-    }
-
     /* Move all pending messages from output to input map */
     while (output_.empty() == false)
     {
@@ -4424,7 +4415,7 @@ void gcomm::evs::Proto::handle_join(const JoinMessage& msg, NodeMap::iterator ii
 
     Node& inst(NodeMap::value(ii));
 
-    evs_log_debug(D_JOIN_MSGS) << " " << msg;
+    evs_log_debug(D_JOIN_MSGS) << "handle_join " << msg;
     if (state() == S_LEAVING)
     {
         if (msg.source_view_id() == current_view_.id())
@@ -4679,7 +4670,7 @@ void gcomm::evs::Proto::handle_leave(const LeaveMessage& msg,
     assert(state() != S_CLOSED && state() != S_JOINING);
 
     Node& node(NodeMap::value(ii));
-    evs_log_debug(D_LEAVE_MSGS) << "leave message " << msg;
+    evs_log_debug(D_LEAVE_MSGS) << "handle_leave " << msg;
 
     // Leave messages must be always handled. They carry aru_seq information
     // which is used to retrasmit missing messages.

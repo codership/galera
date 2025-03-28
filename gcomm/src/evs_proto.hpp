@@ -325,6 +325,13 @@ public:
         log_debug << self_string() << " closing in state " << state();
         if (state() != S_GATHER && state() != S_INSTALL)
         {
+            /* Leave message does not consume sequence number. Send a dummy
+             * message to trigger message acknowledgement mechanism. This is a
+             * small overhead but speeds up the leave process.*/
+            if (state() == S_OPERATIONAL) {
+                Datagram wb;
+                gu_trace(send_user(wb, 0xff, O_DROP, -1, -1));
+            }
             gu_trace(shift_to(S_LEAVING));
             gu_trace(send_leave());
             pending_leave_ = false;

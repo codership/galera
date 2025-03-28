@@ -25,12 +25,33 @@ gcomm::evs::operator<<(std::ostream& os, const gcomm::evs::MessageNode& node)
     return os;
 }
 
+static const char* const msg_type_str[] = {
+    "NONE",
+    "USER",
+    "DELEGATE",
+    "GAP",
+    "JOIN",
+    "INSTALL",
+    "LEAVE",
+    "DELAYED_LIST"
+};
+
+static const char* msg_type_to_str(gcomm::evs::Message::Type type)
+{
+    if (type < gcomm::evs::Message::EVS_T_NONE
+        || type > gcomm::evs::Message::EVS_T_DELAYED_LIST)
+    {
+        return "UNKNOWN";
+    }
+    return msg_type_str[static_cast<int>(type)];
+}
+
 std::ostream&
 gcomm::evs::operator<<(std::ostream& os, const gcomm::evs::Message& msg)
 {
     os << "{";
     os << "v=" << static_cast<int>(msg.version()) << ",";
-    os << "t=" << msg.type() << ",";
+    os << "t=" << msg_type_to_str(msg.type()) << ",";
     os << "ut=" << static_cast<int>(msg.user_type()) << ",";
     os << "o=" << msg.order() << ",";
     os << "s=" << msg.seq() << ",";
