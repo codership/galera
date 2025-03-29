@@ -22,7 +22,7 @@
 #define GCS_STATE_FREP       0x01 // group representative
 #define GCS_STATE_FCLA       0x02 // count last applied (for JOINED node)
 #define GCS_STATE_FBOOTSTRAP 0x04 // part of prim bootstrap process
-#define GCS_STATE_STATELESS  0x08 // arbitrator or otherwise stateless node
+#define GCS_STATE_FSTATELESS 0x08 // arbitrator or otherwise stateless node
 
 #ifdef GCS_STATE_MSG_ACCESS
 typedef struct gcs_state_msg

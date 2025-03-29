@@ -1374,7 +1374,7 @@ group_node_is_stateful (const gcs_group_t* group, const gcs_node_t* node)
         return strcmp (node->name, GCS_ARBITRATOR_NAME);
     }
     else {
-        return ((gcs_node_flags(node) & GCS_STATE_STATELESS) == 0);
+        return (!node->stateless);
     }
 }
 
@@ -2126,7 +2126,7 @@ group_get_node_state (const gcs_group_t* const group, long const node_idx)
     if (0 == node_idx)            flags |= GCS_STATE_FREP;
     if (node->count_last_applied) flags |= GCS_STATE_FCLA;
     if (node->bootstrap)          flags |= GCS_STATE_FBOOTSTRAP;
-    if (node->stateless)          flags |= GCS_STATE_STATELESS;
+    if (node->stateless)          flags |= GCS_STATE_FSTATELESS;
 #ifdef GCS_FOR_GARB
     int64_t const cached = GCS_SEQNO_ILL;
 #else

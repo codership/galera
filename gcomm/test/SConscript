@@ -18,6 +18,7 @@ gcomm_check = env.Program(target = 'check_gcomm',
                           source = Split('''
                               check_fair_send_queue.cpp
                               check_gcomm.cpp
+                              check_gmcast.cpp
                               check_trace.cpp
                               check_types.cpp
                               check_util.cpp
@@ -35,7 +36,7 @@ Import('deterministic_tests all_tests')
 check_gcomm_nondet = env.Program(target = "check_gcomm_nondet",
                                  source = [
                                      "check_gcomm_nondet.cpp",
-                                     "check_gmcast.cpp",
+                                     "check_gmcast_nondet.cpp",
                                      "check_pc_nondet.cpp",
                                      "check_util_nondet.cpp"
                                  ])

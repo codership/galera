@@ -279,7 +279,7 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
     node->bootstrap = false;
 
     node->stateless = (gcs_state_msg_flags (node->state_msg) &
-                       GCS_STATE_STATELESS);
+                       GCS_STATE_FSTATELESS);
 }
 
 void
