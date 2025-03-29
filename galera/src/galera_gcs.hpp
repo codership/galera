@@ -66,6 +66,8 @@ namespace galera
         virtual void    get_status(gu::Status&) const = 0;
         virtual void    get_membership(wsrep_allocator_cb        alloc,
                                        struct wsrep_membership** memb) const =0;
+        virtual void    get_membership(wsrep_allocator_cb        alloc,
+                                       struct wsrep_membership_v2** memb) const =0;
         /*! @throws NotFound */
         virtual void    param_set (const std::string& key,
                                    const std::string& value) = 0;
@@ -250,6 +252,12 @@ namespace galera
             gcs_get_membership(conn_, alloc, memb);
         }
 
+        void get_membership(wsrep_allocator_cb alloc,
+                            struct wsrep_membership_v2** memb) const
+        {
+            gcs_get_membership(conn_, alloc, memb);
+        }
+
         void param_set (const std::string& key, const std::string& value)
         {
             long ret = gcs_param_set (conn_, key.c_str(), value.c_str());
@@ -427,6 +435,12 @@ namespace galera
 
         void get_membership(wsrep_allocator_cb        alloc,
                             struct wsrep_membership** memb) const
+        {
+            *memb = 0;
+        }
+
+        void get_membership(wsrep_allocator_cb        alloc,
+                            struct wsrep_membership_v2** memb) const
         {
             *memb = 0;
         }

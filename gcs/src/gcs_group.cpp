@@ -2115,18 +2115,25 @@ gcs_group_act_conf (gcs_group_t*         group,
     return rcvd->act.buf_len;
 }
 
-// for future use in fake state exchange (in unit tests et.al. See #237, #238)
-static gcs_state_msg_t*
-group_get_node_state (const gcs_group_t* const group, long const node_idx)
+static uint8_t
+group_node_flags(const gcs_node_t* const node, int const node_idx)
 {
-    const gcs_node_t* const node = &group->nodes[node_idx];
-
-    uint8_t flags = 0;
-
+    uint8_t flags(0);
     if (0 == node_idx)            flags |= GCS_STATE_FREP;
     if (node->count_last_applied) flags |= GCS_STATE_FCLA;
     if (node->bootstrap)          flags |= GCS_STATE_FBOOTSTRAP;
     if (node->stateless)          flags |= GCS_STATE_FSTATELESS;
+    return flags;
+}
+
+// for future use in fake state exchange (in unit tests et.al. See #237, #238)
+static gcs_state_msg_t*
+group_get_node_state (const gcs_group_t* const group, int const node_idx)
+{
+    const gcs_node_t* const node = &group->nodes[node_idx];
+
+    uint8_t flags(group_node_flags(node, node_idx));
+
 #ifdef GCS_FOR_GARB
     int64_t const cached = GCS_SEQNO_ILL;
 #else
@@ -2208,10 +2215,34 @@ gcs_group_get_status (const gcs_group_t* group, gu::Status& status)
     status.insert("desync_count", gu::to_string(desync_count));
 }
 
+static void
+group_membership_set_flags(struct wsrep_member_info_ext&,
+                           uint8_t)
+{}
+
+static void
+group_membership_set_flags(struct wsrep_member_info_ext_v2& mn,
+                           uint8_t const gcs_flags)
+{
+    uint8_t wsrep_flags(0);
+
+    if (gcs_flags & GCS_STATE_FREP)
+        wsrep_flags |= WSREP_MEMBER_FLAGS_REP;
+    if (gcs_flags & GCS_STATE_FCLA)
+        wsrep_flags |= WSREP_MEMBER_FLAGS_CLA;
+    if (gcs_flags & GCS_STATE_FBOOTSTRAP)
+        wsrep_flags |= WSREP_MEMBER_FLAGS_BOOTSTRAP;
+    if (gcs_flags & GCS_STATE_FSTATELESS)
+        wsrep_flags |= WSREP_MEMBER_FLAGS_STATELESS;
+
+    mn.flags = wsrep_flags;
+}
+
+template <typename M>
 void
-gcs_group_get_membership(const gcs_group_t&        group,
-                         wsrep_allocator_cb const  alloc,
-                         struct wsrep_membership** memb)
+group_get_membership(const gcs_group_t&       group,
+                     wsrep_allocator_cb const alloc,
+                     M** memb)
 {
     if (!alloc)
     {
@@ -2221,10 +2252,9 @@ gcs_group_get_membership(const gcs_group_t&        group,
     gu::Lock lock(group.memb_mtx_);
 
     size_t const memb_size
-        (sizeof(struct wsrep_membership) +
-         (group.num - 1)*sizeof(struct wsrep_member_info_ext));
+        (sizeof(M) + (group.num - 1)*sizeof(decltype((*memb)->members[0])));
 
-    *memb = static_cast<struct wsrep_membership*>(alloc(memb_size));
+    *memb = static_cast<M*>(alloc(memb_size));
 
     if (!*memb)
     {
@@ -2234,7 +2264,7 @@ gcs_group_get_membership(const gcs_group_t&        group,
 
     ::memset(*memb, 0, memb_size);
 
-    struct wsrep_membership& m(**memb);
+    M& m(**memb);
 
     m.group_uuid = group.group_uuid;
     m.updated = group.memb_epoch_;
@@ -2258,7 +2288,7 @@ gcs_group_get_membership(const gcs_group_t&        group,
 
     for (size_t i(0); i < m.num; ++i)
     {
-        struct wsrep_member_info_ext& mn(m.members[i]);
+        auto& mn(m.members[i]);
         const struct gcs_node& gn(group.nodes[i]);
 
         gu_uuid_t uuid;
@@ -2293,5 +2323,24 @@ gcs_group_get_membership(const gcs_group_t&        group,
         case GCS_NODE_STATE_MAX:
             mn.status = WSREP_MEMBER_ERROR;
         }
+
+        uint8_t const gcs_flags(group_node_flags(&group.nodes[i], i));
+        group_membership_set_flags(mn, gcs_flags);
     }
+}
+
+void
+gcs_group_get_membership(const gcs_group_t&        group,
+                         wsrep_allocator_cb const  alloc,
+                         struct wsrep_membership** memb)
+{
+    group_get_membership(group, alloc, memb);
+}
+
+void
+gcs_group_get_membership(const gcs_group_t&           group,
+                         wsrep_allocator_cb const     alloc,
+                         struct wsrep_membership_v2** memb)
+{
+    group_get_membership(group, alloc, memb);
 }

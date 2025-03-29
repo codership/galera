@@ -2500,6 +2500,13 @@ void gcs_get_membership(const gcs_conn_t* const   conn,
     gcs_core_get_membership(conn->core, alloc, memb);
 }
 
+void gcs_get_membership(const gcs_conn_t* const   conn,
+                        wsrep_allocator_cb const  alloc,
+                        struct wsrep_membership_v2** memb)
+{
+    gcs_core_get_membership(conn->core, alloc, memb);
+}
+
 static long
 _set_fc_limit (gcs_conn_t* conn, const char* value)
 {

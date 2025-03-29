@@ -295,9 +295,13 @@ gcs_group_param_set(gcs_group_t& group,
 extern void
 gcs_group_get_status(const gcs_group_t* group, gu::Status& status);
 
-extern void
+void
 gcs_group_get_membership(const gcs_group_t& group,
                          wsrep_allocator_cb alloc,
                          struct wsrep_membership** memb);
+void
+gcs_group_get_membership(const gcs_group_t& group,
+                         wsrep_allocator_cb alloc,
+                         struct wsrep_membership_v2** memb);
 
 #endif /* _gcs_group_h_ */
