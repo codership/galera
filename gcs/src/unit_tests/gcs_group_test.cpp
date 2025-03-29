@@ -811,7 +811,7 @@ test_gcs_group_find_donor(bool const a)
         bool const stateless(arbitr == i && group.stateless);
         gcs_node_init(&nodes[i], NULL, name, name,
                       "", 0, 0, 0, i > joiner ? 1 : 0, stateless);
-        uint8_t const flags(nodes[i].stateless ? GCS_STATE_STATELESS : 0);
+        uint8_t const flags(nodes[i].stateless ? GCS_STATE_FSTATELESS : 0);
         ck_assert(stateless == (flags != 0));
         nodes[i].status = GCS_NODE_STATE_SYNCED;
         nodes[i].state_msg = gcs_state_msg_create(
