@@ -83,6 +83,14 @@ catch (const asio::system_error& e)
     return false;
 }
 
+void gu::AsioStreamReact::shutdown()
+{
+    if (not (in_progress_ & shutdown_in_progress) && engine_)
+    {
+        engine_->shutdown();
+        in_progress_ |= shutdown_in_progress;
+    }
+}
 
 void gu::AsioStreamReact::close() try
 {
@@ -837,15 +845,6 @@ void gu::AsioStreamReact::set_non_blocking(bool val)
     }
 }
 
-void gu::AsioStreamReact::shutdown()
-{
-    if (not (in_progress_ & shutdown_in_progress) && engine_)
-    {
-        engine_->shutdown();
-        in_progress_ |= shutdown_in_progress;
-    }
-}
-
 std::string gu::AsioStreamReact::debug_print() const
 {
     std::ostringstream oss;
@@ -877,6 +876,11 @@ void gu::AsioAcceptorReact::open(const gu::URI& uri) try
 catch (const asio::system_error& e)
 {
     gu_throw_system_error(e.code().value()) << "Failed to open acceptor: " << e.what();
+}
+
+bool gu::AsioAcceptorReact::is_open() const
+{
+    return acceptor_.is_open();
 }
 
 

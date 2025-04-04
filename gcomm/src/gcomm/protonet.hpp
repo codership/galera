@@ -87,7 +87,10 @@ public:
     //
     // @param p Period to run event_loop(), negative value means forever
     //
-    virtual void event_loop(const gu::datetime::Period& p) = 0;
+    // @return Number of events processed, excluding the timer event used to
+    //         interrupt the loop
+    //
+    virtual size_t event_loop(const gu::datetime::Period& p) = 0;
 
     //!
     // Iterate over Protostacks and handle timers

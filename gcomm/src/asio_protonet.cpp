@@ -23,6 +23,7 @@
 gcomm::AsioProtonet::AsioProtonet(gu::Config& conf, int version)
     :
     gcomm::Protonet(conf, "asio", version),
+    timer_expired_(false),
     mutex_(),
     poll_until_(gu::datetime::Date::max()),
     io_service_(conf),
@@ -89,7 +90,7 @@ gu::datetime::Period handle_timers_helper(gcomm::Protonet&            pnet,
 }
 
 
-void gcomm::AsioProtonet::event_loop(const gu::datetime::Period& period)
+size_t gcomm::AsioProtonet::event_loop(const gu::datetime::Period& period)
 {
     io_service_.reset();
     poll_until_ = gu::datetime::Date::monotonic() + period;
@@ -98,9 +99,12 @@ void gcomm::AsioProtonet::event_loop(const gu::datetime::Period& period)
     // Use microsecond precision to avoid
     // "the resulting duration is not exactly representable"
     // static assertion with GCC 4.4.
+    timer_expired_ = false;
     timer_.expires_from_now(std::chrono::microseconds(p.get_nsecs()/1000));
     timer_.async_wait(timer_handler_);
-    io_service_.run();
+    size_t count = io_service_.run();
+    timer_.cancel();
+    return timer_expired_ ? count - 1 : count;
 }
 
 
@@ -124,20 +128,11 @@ void gcomm::AsioProtonet::interrupt()
 
 void gcomm::AsioProtonet::handle_wait(const gu::AsioErrorCode& ec)
 {
-    gu::datetime::Date now(gu::datetime::Date::monotonic());
-    const gu::datetime::Period p(handle_timers_helper(*this, poll_until_ - now));
-    using std::rel_ops::operator>=;
-    if (not ec && poll_until_ >= now)
+    if (ec)
     {
-        // Use microsecond precision to avoid
-        // "the resulting duration is not exactly representable"
-        // static assertion with GCC 4.4.
-        timer_.expires_from_now(std::chrono::microseconds(p.get_nsecs()/1000));
-        timer_.async_wait(timer_handler_);
+        return;
     }
-    else
-    {
-        io_service_.stop();
-    }
+    timer_expired_ = true;
+    io_service_.stop();
 }
 
