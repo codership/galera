@@ -15,6 +15,8 @@ if (NOT Boost_FOUND)
 else()
   include_directories(${Boost_INCLUDE_DIRS})
   message(STATUS "Found Boost program options library: ${Boost_PROGRAM_OPTIONS_LIBRARY}")
+  message(STATUS "Found Boost filesystem library: ${Boost_FILESYSTEM_LIBRARY}")
+  message(STATUS "Found Boost system library: ${Boost_SYSTEM_LIBRARY}")
 endif()
 
 # Use nanosecond time precision
