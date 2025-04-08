@@ -1,9 +1,9 @@
 #
-# Copyright (C) 2020 Codership Oy <info@codership.com>
+# Copyright (C) 2025 Codership Oy <info@codership.com>
 #
 
 message(STATUS "CMake version ${CMAKE_VERSION}")
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8...4.0)
 project(galera-enterprise-4)
 
 include(CheckCCompilerFlag)
