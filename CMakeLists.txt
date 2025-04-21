@@ -3,7 +3,7 @@
 #
 
 message(STATUS "CMake version ${CMAKE_VERSION}")
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8...4.0)
 project(galera-4)
 
 include(CheckCCompilerFlag)
