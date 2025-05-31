@@ -145,6 +145,30 @@ START_TEST(gcs_memb_test_465E)
 END_TEST
 
 static void
+membership_check_flags(const struct wsrep_membership*,
+                       int,    // member index
+                       bool,   // REP flag present
+                       bool,   // CLA flag present
+                       bool,   // BOOTSTRAP flag present
+                       bool)   // STATELESS flag present
+{}
+
+static void
+membership_check_flags(const struct wsrep_membership_v2* const m,
+                       int  const n,   // member index
+                       bool const r,   // REP flag present
+                       bool const c,   // CLA flag present
+                       bool const b,   // BOOTSTRAP flag present
+                       bool const s)   // STATELESS flag present
+{
+    ck_assert(((m->members[n].flags & WSREP_MEMBER_FLAGS_REP) != 0) == r);
+    ck_assert(((m->members[n].flags & WSREP_MEMBER_FLAGS_CLA) != 0) == c);
+    ck_assert(((m->members[n].flags & WSREP_MEMBER_FLAGS_BOOTSTRAP) != 0) == b);
+    ck_assert(((m->members[n].flags & WSREP_MEMBER_FLAGS_STATELESS) != 0) == s);
+}
+
+template <typename M>
+static void
 membership_service_test(bool const enc)
 {
     struct gt_group group;
@@ -157,7 +181,7 @@ membership_service_test(bool const enc)
      * 2 - JOINED
      */
 
-    struct wsrep_membership *m0(NULL), *m1(NULL), *m2(NULL);
+    M *m0(NULL), *m1(NULL), *m2(NULL);
     struct gcs_group* const g0(nodes[0].group.group());
     struct gcs_group* const g1(nodes[1].group.group());
     struct gcs_group* const g2(nodes[2].group.group());
@@ -174,8 +198,8 @@ membership_service_test(bool const enc)
 
     ck_assert(3 == m0->num);
 
-    size_t const m_size(sizeof(struct wsrep_membership) +
-                        (m0->num - 1)*sizeof(struct wsrep_member_info_ext));
+    size_t const info_size(sizeof(decltype(m0->members[0])));
+    size_t const m_size(sizeof(M) + (m0->num - 1)*info_size);
 
     ck_assert(0 == ::memcmp(m0, m1, m_size));
     ck_assert(0 == ::memcmp(m1, m2, m_size));
@@ -190,6 +214,10 @@ membership_service_test(bool const enc)
     ck_assert(m0->members[1].status == WSREP_MEMBER_UNDEFINED);
     ck_assert(m0->members[2].status == WSREP_MEMBER_JOINED);
 
+    membership_check_flags(m0, 0, true, true, false, false);
+    membership_check_flags(m0, 1, false, false, false, false);
+    membership_check_flags(m0, 2, false, false, false, false);
+
     ::free(m0);
     ::free(m1);
     ::free(m2);
@@ -202,6 +230,10 @@ membership_service_test(bool const enc)
     ck_assert(m0->members[0].status == WSREP_MEMBER_DONOR);
     ck_assert(m0->members[1].status == WSREP_MEMBER_JOINER);
     ck_assert(m0->members[2].status == WSREP_MEMBER_JOINED);
+
+    membership_check_flags(m0, 0, true, true, false, false);
+    membership_check_flags(m0, 1, false, false, false, false);
+    membership_check_flags(m0, 2, false, false, false, false);
 
     ::free(m0);
 
@@ -225,6 +257,10 @@ membership_service_test(bool const enc)
     ck_assert(m0->members[1].status == WSREP_MEMBER_SYNCED);
     ck_assert(m0->members[2].status == WSREP_MEMBER_JOINED);
 
+    membership_check_flags(m0, 0, true, true, false, false);
+    membership_check_flags(m0, 1, false, true, false, false);
+    membership_check_flags(m0, 2, false, false, false, false);
+
     ::free(m0);
 
     shutdown_cluster(group);
@@ -232,13 +268,19 @@ membership_service_test(bool const enc)
 
 START_TEST(gcs_membership_service_test)
 {
-    membership_service_test(false);
+    membership_service_test<struct wsrep_membership>(false);
 }
 END_TEST
 
 START_TEST(gcs_membership_service_testE)
 {
-    membership_service_test(true);
+    membership_service_test<struct wsrep_membership>(true);
+}
+END_TEST
+
+START_TEST(gcs_membership_service_v2_testE)
+{
+    membership_service_test<struct wsrep_membership_v2>(true);
 }
 END_TEST
 
@@ -256,6 +298,7 @@ Suite *gcs_memb_suite(void)
     suite_add_tcase (suite, tcase);
     tcase_add_test  (tcase, gcs_membership_service_test);
     tcase_add_test  (tcase, gcs_membership_service_testE);
+    tcase_add_test  (tcase, gcs_membership_service_v2_testE);
 
     return suite;
 }

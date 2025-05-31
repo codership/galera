@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2022 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2025 Codership Oy <info@codership.com>
  */
 
 /*! @file page file class implementation */
@@ -95,22 +95,25 @@ gcache::Page::drop_fs_cache() const
 #endif
 }
 
-gcache::Page::Page (void*              ps,
+gcache::Page::Page (void* const        ps,
                     const std::string& name,
                     const EncKey&      key,
                     const Nonce&       nonce,
-                    size_t size,
-                    int dbg)
+                    size_t const       size,
+                    int const          dbg)
     :
     fd_   (name, aligned_size(size), true, false),
     mmap_ (fd_),
     key_  (key),
     nonce_(nonce),
+    seqno_max_(SEQNO_NONE),
     ps_   (ps),
     next_ (start()),
     space_(mmap_.size),
-    used_ (0),
-    debug_(dbg)
+    used_(0),
+    mapped_(0),
+    debug_(dbg),
+    closed_(false)
 {
     size_type const nonce_size(Page::aligned_size(nonce_.write(next_, space_)));
     next_  += nonce_size;
@@ -120,20 +123,14 @@ gcache::Page::Page (void*              ps,
              << " bytes";
 }
 
-void
-gcache::Page::close()
-{
-    // write empty header to signify end of chain for subsequent recovery
-    if (space_ >= sizeof(BufferHeader)) BH_clear(BH_cast(next_));
-}
-
 void*
 gcache::Page::malloc (size_type size)
 {
     Limits::assert_size(size);
+
     size_type const alloc_size(aligned_size(size));
 
-    if (alloc_size <= space_)
+    if (size <= space_ && !closed_)
     {
         void* ret = next_;
         space_ -= alloc_size;
@@ -141,20 +138,23 @@ gcache::Page::malloc (size_type size)
         used_++;
 
 #ifndef NDEBUG
-        assert (next_ <= start() + mmap_.size);
         if (debug_)
         {
             const void* const ptr(static_cast<BufferHeader*>(ret) + 1);
             log_info << name() << " allocd ptr: " << ptr
                      << ", size: " << size << '/' << alloc_size;
-            log_info << name() << " incremented ref count to " << used_;
+            log_info << name() << " incremented counters used: "
+                     << used_ << ", mapped: " << mapped_;
         }
+
+        assert (next_ <= start() + mmap_.size);
+        assert (next_ <= static_cast<uint8_t*>(mmap_.ptr) + mmap_.size);
+
 #endif
         return ret;
     }
     else
     {
-        close(); // this page will not be used any more.
         log_debug << "Failed to allocate " << size << " bytes, space left: "
                   << space_ << " bytes, total allocated: "
                   << next_ - static_cast<uint8_t*>(mmap_.ptr);
@@ -180,7 +180,7 @@ gcache::Page::realloc (void*     const ptr,
     assert(p > start());
     assert(p < next_);
 
-    if (p + old_size == next_)
+    if (p + old_size == next_ && !closed_)
     {
         /* last buffer can shrink/expand */
         diff_type const diff_size(new_size - old_size);
@@ -264,8 +264,8 @@ gcache::Page::xcrypt(wsrep_encrypt_cb_t    const encrypt_cb,
 
 void gcache::Page::print(std::ostream& os) const
 {
-    os << "page file: " << name() << ", size: " << size() << ", used bufs: "
-       << used_;
+    os << "name: " << name() << ", size: " << size() << ", used: " << used()
+       << ", mapped: " << mapped_ << ", seqno_max: " << seqno_max();
 
 #if 0 // disabling until figuring out support for encrypted files
       // most likely this functionality needs to be moved up to PageStorage class

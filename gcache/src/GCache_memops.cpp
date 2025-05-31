@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2022 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2025 Codership Oy <info@codership.com>
  */
 
 #include "GCache.hpp"
@@ -245,6 +245,9 @@ namespace gcache
         case BUFFER_IN_MEM:  mem.free (bh); break;
         case BUFFER_IN_RB:   rb.free  (bh); break;
         case BUFFER_IN_PAGE: ps.free  (bh, ptr); break;
+        default:
+            log_fatal << "Memory corruption: unrecognized store: " << bh->store;
+            abort();
         }
 
         rb.assert_size_free();
@@ -257,6 +260,9 @@ namespace gcache
         {
             gu::Lock lock(mtx);
             BufferHeader* const bh(get_BH(ptr));
+            /* free() should not be used on ordered buffers,
+             * GCache::seqno_release() should be used instead */
+            assert(bh->seqno_g <= 0);
 #ifndef NDEBUG
             assert(bh->store == BUFFER_IN_PAGE || !encrypt_cache);
             if (params.debug()) { log_info << "GCache::free() " << bh; }

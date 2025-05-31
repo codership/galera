@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2016-2025 Codership Oy <info@codership.com>
  */
 
 #ifndef __GCACHE_SEQNO__
@@ -19,6 +19,18 @@ namespace gcache
                                     __attribute__((unused))
 #endif
                                     = std::numeric_limits<seqno_t>::max();
+    /* Protected interface to seqno map */
+    class SeqnoMap
+    {
+    public:
+        /* Discards all seqnos upto and including seqno */
+        virtual void seqno_discard(const seqno_t& seqno) = 0;
+        /* Set low limit on available senqos to > seqno
+         * (global lock should be held while it is called) */
+        virtual void set_low_limit(const seqno_t& seqno) = 0;
+
+        virtual ~SeqnoMap() {}
+    }; /* SeqnoMap */
 
 } /* namespace gcache */
 

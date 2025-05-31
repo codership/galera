@@ -3555,9 +3555,10 @@ galera::ReplicatorSMM::abort()
     gu_abort();
 }
 
+template <typename M>
 wsrep_status_t
-galera::ReplicatorSMM::get_membership(wsrep_allocator_cb const  alloc,
-                                      struct wsrep_membership** memb) const
+galera::ReplicatorSMM::get_membership_tmpl(wsrep_allocator_cb const alloc,
+                                           M**                      memb) const
 {
     gu::Lock lock(closing_mutex_);
 
@@ -3570,4 +3571,18 @@ galera::ReplicatorSMM::get_membership(wsrep_allocator_cb const  alloc,
     {
         gu_throw_error(EBADFD) << "Replicator connection closed";
     }
+}
+
+wsrep_status_t
+galera::ReplicatorSMM::get_membership(wsrep_allocator_cb const  alloc,
+                                      struct wsrep_membership** memb) const
+{
+    return get_membership_tmpl(alloc, memb);
+}
+
+wsrep_status_t
+galera::ReplicatorSMM::get_membership(wsrep_allocator_cb const  alloc,
+                                      struct wsrep_membership_v2** memb) const
+{
+    return get_membership_tmpl(alloc, memb);
 }

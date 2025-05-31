@@ -264,7 +264,7 @@ START_TEST(iterators_insert)
     ck_assert(m.size() == 6);
     ck_assert(*b == 1);
 
-    m.insert(m.end(), 6); // single insert in the end
+    m.push_back(6); // single insert in the end
     /* here we have -1, 1, 1, 4, 5, 5, 6 */
 
     ck_assert(m.size() == 7);
@@ -275,7 +275,7 @@ START_TEST(iterators_insert)
     ck_assert(m.index_back()  == Map::index_type(5));
     ck_assert(m[m.index_back()] == 6);
 
-    ++b;
+    b = m.begin() + 3;
     ck_assert(*b == 4);
     ck_assert(m.index(b) == 2);
     *b = 2; // assignment via iterator

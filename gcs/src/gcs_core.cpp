@@ -1720,6 +1720,14 @@ void gcs_core_get_membership(const gcs_core_t* const   core,
     gcs_group_get_membership(core->group, alloc, memb);
 }
 
+void gcs_core_get_membership(const gcs_core_t* const   core,
+                             wsrep_allocator_cb const  alloc,
+                             struct wsrep_membership_v2** memb)
+{
+    gcs_group_get_membership(core->group, alloc, memb);
+}
+
+
 void gcs_core_get_protocols(gcs_core_t* core, int& appl, int& repl, int& gcs)
 {
     core->group.get_protocols(appl, repl, gcs);

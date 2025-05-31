@@ -98,12 +98,25 @@ public:
         }
     }
 
+    virtual void
+    update_address_info(const std::string& local_addr,
+                        const std::string& remote_addr) GALERA_OVERRIDE
+    {
+        ck_assert_int_eq(address_info_updated, false);
+        address_info_updated = true;
+    }
+
+    virtual void update_SSL_info() GALERA_OVERRIDE {
+        ck_assert(address_info_updated);
+    }
+
     enum op_status next_result;
     int next_error;
     size_t count_client_handshake_called;
     size_t count_server_handshake_called;
     size_t count_read_called;
     size_t count_write_called;
+    bool address_info_updated{false};
 
 private:
     int fd_;
@@ -208,6 +221,7 @@ public:
     }
     size_t bytes_written() const { return bytes_written_; }
     const gu::AsioErrorCode& last_error_code() const { return last_error_code_; }
+
 private:
     std::array<std::string, 2> write_buffer_;
     std::string read_buffer_;

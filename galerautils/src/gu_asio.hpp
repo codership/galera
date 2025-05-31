@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2014-2024 Codership Oy <info@codership.com>
+// Copyright (C) 2014-2025 Codership Oy <info@codership.com>
 //
 
 
@@ -17,6 +17,7 @@
 #include "wsrep_tls_service.h"
 #include "wsrep_allowlist_service.h"
 #include "wsrep_node_isolation.h"
+#include "wsrep_connection_monitor_service.h"
 
 #include <netinet/tcp.h> // tcp_info
 
@@ -390,6 +391,11 @@ namespace gu
         virtual bool is_open() const = 0;
 
         /**
+         * Shutdown the socket.
+         */
+        virtual void shutdown() = 0;
+
+        /**
          * Close the socket.
          */
         virtual void close() = 0;
@@ -618,6 +624,7 @@ namespace gu
         AsioAcceptor& operator=(const AsioAcceptor&) = delete;
         virtual ~AsioAcceptor() { }
         virtual void open(const gu::URI& uri) = 0;
+        virtual bool is_open() const = 0;
         virtual void listen(const gu::URI& uri) = 0;
         virtual void close() = 0;
         virtual void async_accept(const std::shared_ptr<AsioAcceptorHandler>&,
@@ -692,8 +699,10 @@ namespace gu
 
         /**
          * Run until IO service is stopped or runs out of work.
+         *
+         * @return Number of events processed.
          */
-        void run();
+        size_t run();
 
         /**
          * Post a function for execution. The function will be invoked
@@ -808,6 +817,22 @@ namespace gu
     extern std::atomic<enum wsrep_node_isolation_mode>
         gu_asio_node_isolation_mode;
 
+    /* Init/deinit global connection monitoring service hooks */
+    int init_connection_monitor_service_v1(wsrep_connection_monitor_service_v1_t*);
+    void deinit_connection_monitor_service_v1();
+    /* Connection monitor connect callback */
+    void connection_monitor_connect(wsrep_connection_key_t id,
+                                    const std::string& scheme,
+                                    const std::string& local_addr,
+                                    const std::string& remote_addr);
+    /* Connection monitor disconnect callback */
+    void connection_monitor_disconnect(wsrep_connection_key_t id);
+    /* Connection monitor ssl info callback */
+    void connection_monitor_ssl_info(wsrep_connection_key_t id,
+                                     const std::string& cipher,
+                                     const std::string& issuer,
+                                     const std::string& subject,
+                                     const std::string& version);
 }
 
 #endif // GU_ASIO_HPP

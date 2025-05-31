@@ -23,6 +23,7 @@
 #include "gu_event_service.hpp"
 #include "wsrep_config_service.h"
 #include "wsrep_node_isolation.h"
+#include "wsrep_connection_monitor_service.h"
 
 #include <cassert>
 
@@ -1666,6 +1667,16 @@ static wsrep_t galera_str = {
 extern "C"
 int wsrep_loader(wsrep_t *hptr);
 
+extern "C"
+int wsrep_init_connection_monitor_service_v1(wsrep_connection_monitor_service_v1_t *connection_monitor_service)
+{
+    return gu::init_connection_monitor_service_v1(connection_monitor_service);
+}
+
+extern "C" void wsrep_deinit_connection_monitor_service_v1()
+{
+    gu::deinit_connection_monitor_service_v1();
+}
 
 extern "C"
 int wsrep_loader(wsrep_t *hptr)
@@ -1709,7 +1720,68 @@ extern "C" void wsrep_deinit_tls_service_v1()
     gu::deinit_tls_service_v1();
 }
 
+template <typename M>
+static wsrep_status_t
+get_membership(wsrep_t* const           gh,
+               wsrep_allocator_cb const alloc,
+               M**                      memb)
+{
+    assert(gh != 0);
+    assert(gh->ctx != 0);
+
+    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
+
+    try
+    {
+        return repl->get_membership(alloc, memb);
+    }
+    catch (std::exception& e)
+    {
+        log_error << e.what();
+        return WSREP_NODE_FAIL;
+    }
+}
+
+static wsrep_status_t
+get_membership_v1(wsrep_t* const            gh,
+                  wsrep_allocator_cb const  alloc,
+                  struct wsrep_membership** memb)
+{
+    return get_membership(gh, alloc, memb);
+}
+
+static wsrep_status_t
+get_membership_v2(wsrep_t* const            gh,
+                  wsrep_allocator_cb const  alloc,
+                  struct wsrep_membership_v2** memb)
+{
+    return get_membership(gh, alloc, memb);
+}
+
 extern "C"
+wsrep_status_t wsrep_init_membership_service_v1(
+    struct wsrep_membership_service_v1 *membership_service)
+{
+    membership_service->get_membership = get_membership_v1;
+    return WSREP_OK;
+}
+
+extern "C" void wsrep_deinit_membership_service_v1()
+{
+}
+
+extern "C"
+wsrep_status_t wsrep_init_membership_service_v2(
+    struct wsrep_membership_service_v2 *membership_service)
+{
+    membership_service->get_membership = get_membership_v2;
+    return WSREP_OK;
+}
+
+extern "C" void wsrep_deinit_membership_service_v2()
+{
+}
+
 int wsrep_init_allowlist_service_v1(wsrep_allowlist_service_v1_t *allowlist_service)
 {
     return gu::init_allowlist_service_v1(allowlist_service);
@@ -1920,18 +1992,6 @@ get_membership(wsrep_t* const            gh,
         log_error << e.what();
         return WSREP_NODE_FAIL;
     }
-}
-
-extern "C"
-wsrep_status_t wsrep_init_membership_service_v1(
-    struct wsrep_membership_service_v1 *membership_service)
-{
-    membership_service->get_membership = get_membership;
-    return WSREP_OK;
-}
-
-extern "C" void wsrep_deinit_membership_service_v1()
-{
 }
 
 /*

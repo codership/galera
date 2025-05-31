@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2025 Codership Oy <info@codership.com>
  */
 
 #include "gmcast.hpp"
@@ -546,7 +546,6 @@ void gcomm::GMCast::gmcast_accept()
     }
     log_debug << "handshake sent";
 }
-
 
 void gcomm::GMCast::gmcast_connect(const std::string& remote_addr)
 {
@@ -1133,11 +1132,9 @@ namespace
     class CmpUuidCounts
     {
     public:
-        CmpUuidCounts(const std::set<gcomm::UUID>& uuids,
-                      gcomm::SegmentId preferred_segment)
+        CmpUuidCounts(const std::set<gcomm::UUID>& uuids)
             :
-            uuids_(uuids),
-            preferred_segment_(preferred_segment)
+            uuids_(uuids)
         { }
 
         size_t count(const gcomm::gmcast::Proto* p) const
@@ -1162,19 +1159,97 @@ namespace
         bool operator()(const gcomm::gmcast::Proto* a,
                         const gcomm::gmcast::Proto* b) const
         {
-            size_t ac(count(a));
-            size_t bc(count(b));
-            // if counts are equal, prefer peer from the same segment
-            return (ac < bc ||
-                    (ac == bc && a->remote_segment() != preferred_segment_));
+            const size_t ac = count(a);
+            const size_t bc = count(b);
+            return (ac < bc);
         }
 
     private:
         const std::set<gcomm::UUID>& uuids_;
-        gcomm::SegmentId preferred_segment_;
     };
 }
 
+gcomm::GMCast::RelaySet
+gcomm::GMCast::compute_relay_set(const std::set<Proto*>& proto_set,
+                                 std::set<gcomm::UUID>& nonlive_uuids,
+                                 uint8_t segment)
+{
+    std::set<RelayEntry> relay_set;
+
+    /* Primary set: nodes in the same segment that are not in the
+     * nonlive_uuids set. */
+    std::set<Proto*> primary_set;
+    std::copy_if(proto_set.begin(), proto_set.end(),
+                 std::inserter(primary_set, primary_set.end()),
+                 [segment, &nonlive_uuids](Proto* p)
+                 {
+                     return p->remote_segment() == segment
+                            && nonlive_uuids.count(p->remote_uuid()) == 0;
+                 });
+
+    populate_relay_set(nonlive_uuids, primary_set, relay_set);
+    if (not nonlive_uuids.empty())
+    {
+        /* Secondary set: nodes in other segments that are not in the
+         * nonlive_uuids set. */
+        std::set<Proto*> secondary_set;
+        std::copy_if(proto_set.begin(), proto_set.end(),
+                     std::inserter(secondary_set, secondary_set.end()),
+                     [segment, &nonlive_uuids](Proto* p)
+                     {
+                         return p->remote_segment() != segment
+                                && nonlive_uuids.count(p->remote_uuid()) == 0;
+                     });
+
+        populate_relay_set(nonlive_uuids, secondary_set, relay_set);
+    }
+    return relay_set;
+}
+
+void gcomm::GMCast::populate_relay_set(
+    std::set<gcomm::UUID>& nonlive_uuids,
+    std::set<gcomm::gmcast::Proto*>& lookup_set,
+    gcomm::GMCast::RelaySet& relay_set)
+{
+    while (nonlive_uuids.empty() == false && lookup_set.empty() == false)
+    {
+        const auto maxel
+            = std::max_element(lookup_set.begin(), lookup_set.end(),
+                               CmpUuidCounts(nonlive_uuids));
+        Proto* p = *maxel;
+        log_debug << "relay set maxel :" << *p
+                  << " count: " << CmpUuidCounts(nonlive_uuids).count(p);
+
+        bool link_found = false;
+        const LinkMap& lm = p->link_map();
+        /* Check if any of the links provide reachability to a node in
+         * the nonlive_uuids set. */
+        for (const auto& link : lm)
+        {
+            if (nonlive_uuids.erase(link.uuid()) > 0)
+            {
+                link_found = true;
+            }
+        }
+
+        /* Only add link if it provides reachability to a node in the
+         * nonlive_uuids set. */
+        if (link_found)
+        {
+            relay_set.insert(RelayEntry(p, p->socket().get()));
+            lookup_set.erase(maxel);
+        }
+        else
+        {
+            /* As links were not found, max_element must have returned a
+             * link with zero connections to nonlive_uuids. Therefore
+             * there are no candidates left to improve the reachability
+             * and the loop can be terminated. */
+            assert(CmpUuidCounts(nonlive_uuids).count(p) == 0);
+            break;
+        }
+    }
+}
 
 void gcomm::GMCast::check_liveness()
 {
@@ -1287,27 +1362,7 @@ void gcomm::GMCast::check_liveness()
                 proto_set.insert(p);
             }
         }
-        // find minimal set of proto entries required to reach maximum set
-        // of nonlive peers
-        while (nonlive_uuids.empty() == false &&
-               proto_set.empty() == false)
-        {
-            std::set<Proto*>::iterator maxel(
-                std::max_element(proto_set.begin(),
-                                 proto_set.end(), CmpUuidCounts(nonlive_uuids, segment_)));
-            Proto* p(*maxel);
-            log_debug << "relay set maxel :" << *p << " count: "
-                      << CmpUuidCounts(nonlive_uuids, segment_).count(p);
-
-            relay_set_.insert(RelayEntry(p, p->socket().get()));
-            const LinkMap& lm(p->link_map());
-            for (LinkMap::const_iterator lm_i(lm.begin()); lm_i != lm.end();
-                 ++lm_i)
-            {
-                nonlive_uuids.erase((*lm_i).uuid());
-            }
-            proto_set.erase(maxel);
-        }
+        relay_set_ = compute_relay_set(proto_set, nonlive_uuids, segment_);
     }
     else if (relaying_ == true && should_relay == false)
     {

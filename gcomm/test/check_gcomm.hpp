@@ -25,6 +25,8 @@ Suite* concurrent_suite();
 Suite* tcp_suite();
 /* Tests for GMcast transport */
 Suite* gmcast_suite();
+/* Tests for GMcast nondeterministic transport */
+Suite* gmcast_nondet_suite();
 /* Tests for EVS transport */
 Suite* evs_suite();
 /* Better evs suite */

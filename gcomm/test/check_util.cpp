@@ -6,6 +6,7 @@
 #include "gcomm/protonet.hpp"
 #include "gcomm/datagram.hpp"
 #include "gcomm/conf.hpp"
+#include "gcomm/uuid.hpp"
 
 #include "check_gcomm.hpp"
 
@@ -179,6 +180,32 @@ START_TEST(test_view_state)
 }
 END_TEST
 
+/* With -D_GLIBCXX_DEBUG, std::set_intersection() asserts if the
+ * ranges are not irreflexive. */
+START_TEST(test_set_intersection_irreflexive_assertion)
+{
+    View view1;
+    View view2;
+    UUID uuid(NULL, 0);
+    view1.add_joined(uuid, 0);
+    view2.add_joined(uuid, 0);
+
+    ck_assert(view1.joined().begin() != view1.joined().end());
+    const auto joined_begin11 = *view1.joined().begin();
+    const auto joined_begin12 = *view1.joined().begin();
+    ck_assert(!(joined_begin11 < joined_begin12));
+    ck_assert(!(*view1.joined().begin() < *view1.joined().begin()));
+    ck_assert(view2.joined().begin() != view2.joined().end());
+    ck_assert(!(*view2.joined().begin() < *view2.joined().begin()));
+
+    std::map<UUID, Node> intersection;
+    std::set_intersection(view1.joined().begin(), view1.joined().end(),
+                          view2.joined().begin(), view2.joined().end(),
+                          std::inserter(intersection, intersection.begin()));
+    ck_assert(intersection.size() == 1);
+    ck_assert(intersection.begin()->first == uuid);
+}
+END_TEST
 
 Suite* util_suite()
 {
@@ -191,6 +218,10 @@ Suite* util_suite()
 
     tc = tcase_create("test_view_state");
     tcase_add_test(tc, test_view_state);
+    suite_add_tcase(s, tc);
+
+    tc = tcase_create("test_set_intersection_irreflexive_assertion");
+    tcase_add_test(tc, test_set_intersection_irreflexive_assertion);
     suite_add_tcase(s, tc);
 
     return s;

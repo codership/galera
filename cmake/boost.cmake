@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2020 Codership Oy <info@codership.com>
+# Copyright (C) 2025 Codership Oy <info@codership.com>
 #
 
 set(Boost_USE_MULTITHREAD ON)
@@ -14,7 +14,9 @@ if (NOT Boost_FOUND)
   message(FATAL_ERROR "Could not find BOOST components")
 else()
   include_directories(${Boost_INCLUDE_DIRS})
-  message(STATUS ${Boost_PROGRAM_OPTIONS_LIBRARIES})
+  message(STATUS "Found Boost program options library: ${Boost_PROGRAM_OPTIONS_LIBRARY}")
+  message(STATUS "Found Boost filesystem library: ${Boost_FILESYSTEM_LIBRARY}")
+  message(STATUS "Found Boost system library: ${Boost_SYSTEM_LIBRARY}")
 endif()
 
 # Use nanosecond time precision

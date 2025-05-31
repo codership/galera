@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2025 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -23,11 +23,16 @@
 #include <cinttypes>
 #include <limits>
 
+std::string const GCS_STATELESS_KEY("gcs.stateless");
+bool        const GCS_STATELESS_DEFAULT(false);
 std::string const GCS_VOTE_POLICY_KEY("gcs.vote_policy");
 uint8_t     const GCS_VOTE_POLICY_DEFAULT(0);
 
 void gcs_group::register_params(gu::Config& cnf)
 {
+    cnf.add(GCS_STATELESS_KEY,
+            gu::Config::Flag::read_only |
+            gu::Config::Flag::type_bool);
     cnf.add(GCS_VOTE_POLICY_KEY,
             gu::Config::Flag::read_only |
             gu::Config::Flag::type_integer);
@@ -41,6 +46,11 @@ const char* gcs_group_state_str[GCS_GROUP_STATE_MAX] =
     "PRIMARY"
 };
 
+static bool
+group_conf_stateless_flag(gu::Config& cnf)
+{
+    return cnf.get(GCS_STATELESS_KEY, GCS_STATELESS_DEFAULT);
+}
 
 uint8_t gcs_group_conf_to_vote_policy(gu::Config& cnf)
 {
@@ -84,6 +94,7 @@ gcs_group::gcs_group(gu::Config&  cnf,
     vote_history  (),
     vote_policy   (gcs_group_conf_to_vote_policy(cnf)),
     frag_reset    (true), // just in case
+    stateless     (group_conf_stateless_flag(cnf)),
     nodes         (NULL),
     prim_uuid     (GU_UUID_NIL),
     prim_seqno    (GCS_SEQNO_ILL),
@@ -141,13 +152,14 @@ group_nodes_init (const gcs_group_t* group, const gcs_comp_msg_t* comp)
 
             if (my_idx != i) {
                 gcs_node_init (&ret[i], group->cache, memb->id,
-                               NULL, NULL, -1, -1, -1, memb->segment);
+                               NULL, NULL, -1, -1, -1, memb->segment, false);
             }
             else { // this node
                 gcs_node_init (&ret[i], group->cache, memb->id,
                                group->my_name, group->my_address,
                                group->gcs_proto_ver, group->repl_proto_ver,
-                               group->appl_proto_ver, memb->segment);
+                               group->appl_proto_ver, memb->segment,
+                               group->stateless);
             }
             assert(ret[i].last_applied == GCS_SEQNO_NIL);
         }
@@ -214,18 +226,18 @@ group_nodes_reset (gcs_group_t* group)
 }
 
 /*! @return false
- *  if the node is arbitrator and must not be counted in commit cut */
+ *  if the node is stateless and must not be counted in commit cut */
 static inline bool
-group_count_arbitrator(const gcs_group_t& group, const gcs_node_t& node)
+group_count_stateless(const gcs_group_t& group, const gcs_node_t& node)
 {
-    return (!(group.quorum.gcs_proto_ver > 0 && node.arbitrator));
+    return (!(group.quorum.gcs_proto_ver > 0 && node.stateless));
 }
 
 /*! @return true if the node should be counted in commit cut calculations */
 static inline bool
 group_count_last_applied(const gcs_group_t& group, const gcs_node_t& node)
 {
-    return (node.count_last_applied && group_count_arbitrator(group, node));
+    return (node.count_last_applied && group_count_stateless(group, node));
 }
 
 /* Find node with the smallest last_applied */
@@ -896,7 +908,7 @@ gcs_group_handle_last_msg (gcs_group_t* group, const gcs_recv_msg_t* msg)
 static inline bool
 group_count_votes(const gcs_node_t& node)
 {
-    return (node.count_last_applied && !node.arbitrator);
+    return (node.count_last_applied && !node.stateless);
 }
 
 /* true if last vote was updated, false if not */
@@ -1325,7 +1337,7 @@ gcs_group_handle_sync_msg  (gcs_group_t* group, const gcs_recv_msg_t* msg)
         group->memb_epoch_ = group->act_id_;
 
         sender->status = GCS_NODE_STATE_SYNCED;
-        sender->count_last_applied = group_count_arbitrator(*group, *sender);
+        sender->count_last_applied = group_count_stateless(*group, *sender);
 
         group_redo_last_applied (group); //from now on this node must be counted
 
@@ -1362,7 +1374,7 @@ group_node_is_stateful (const gcs_group_t* group, const gcs_node_t* node)
         return strcmp (node->name, GCS_ARBITRATOR_NAME);
     }
     else {
-        return ((gcs_node_flags(node) & GCS_STATE_ARBITRATOR) == 0);
+        return (!node->stateless);
     }
 }
 
@@ -1382,7 +1394,9 @@ group_find_node_by_state (const gcs_group_t* const group,
 
         gcs_node_t* node = &group->nodes[idx];
 
-        if (node->status >= status && group_node_is_stateful (group, node))
+        if (!group_node_is_stateful(group, node)) continue;
+
+        if (node->status >= status)
         {
             donor = idx; /* potential donor */
         }
@@ -1418,6 +1432,9 @@ group_find_node_by_name (const gcs_group_t* const group, int const joiner_idx,
 
     for (idx = 0; idx < group->num; idx++) {
         gcs_node_t* node = &group->nodes[idx];
+
+        if (!group_node_is_stateful(group, node)) continue;
+
         if (!strncmp(node->name, name, name_len)) {
             if (joiner_idx == idx) {
                 return -EHOSTDOWN;
@@ -2098,20 +2115,26 @@ gcs_group_act_conf (gcs_group_t*         group,
     return rcvd->act.buf_len;
 }
 
-// for future use in fake state exchange (in unit tests et.al. See #237, #238)
-static gcs_state_msg_t*
-group_get_node_state (const gcs_group_t* const group, long const node_idx)
+static uint8_t
+group_node_flags(const gcs_node_t* const node, int const node_idx)
 {
-    const gcs_node_t* const node = &group->nodes[node_idx];
-
-    uint8_t flags = 0;
-
+    uint8_t flags(0);
     if (0 == node_idx)            flags |= GCS_STATE_FREP;
     if (node->count_last_applied) flags |= GCS_STATE_FCLA;
     if (node->bootstrap)          flags |= GCS_STATE_FBOOTSTRAP;
-#ifdef GCS_FOR_GARB
-    flags |= GCS_STATE_ARBITRATOR;
+    if (node->stateless)          flags |= GCS_STATE_FSTATELESS;
+    return flags;
+}
 
+// for future use in fake state exchange (in unit tests et.al. See #237, #238)
+static gcs_state_msg_t*
+group_get_node_state (const gcs_group_t* const group, int const node_idx)
+{
+    const gcs_node_t* const node = &group->nodes[node_idx];
+
+    uint8_t flags(group_node_flags(node, node_idx));
+
+#ifdef GCS_FOR_GARB
     int64_t const cached = GCS_SEQNO_ILL;
 #else
     int64_t const cached = /* group->cache check is needed for unit tests */
@@ -2164,6 +2187,12 @@ gcs_group_param_set(gcs_group_t& group,
             "cluster.";
     }
 
+    if (GCS_STATELESS_KEY == key)
+    {
+        gu_throw_error(ENOTSUP) << "Setting '" << key << "' in runtime may "
+            "have unintended consequences and is currently not supported.";
+    }
+
     return 1;
 }
 
@@ -2187,10 +2216,34 @@ int gcs_group_get_status (const gcs_group_t* group, gu::Status& status)
     return 0;
 }
 
+static void
+group_membership_set_flags(struct wsrep_member_info_ext&,
+                           uint8_t)
+{}
+
+static void
+group_membership_set_flags(struct wsrep_member_info_ext_v2& mn,
+                           uint8_t const gcs_flags)
+{
+    uint8_t wsrep_flags(0);
+
+    if (gcs_flags & GCS_STATE_FREP)
+        wsrep_flags |= WSREP_MEMBER_FLAGS_REP;
+    if (gcs_flags & GCS_STATE_FCLA)
+        wsrep_flags |= WSREP_MEMBER_FLAGS_CLA;
+    if (gcs_flags & GCS_STATE_FBOOTSTRAP)
+        wsrep_flags |= WSREP_MEMBER_FLAGS_BOOTSTRAP;
+    if (gcs_flags & GCS_STATE_FSTATELESS)
+        wsrep_flags |= WSREP_MEMBER_FLAGS_STATELESS;
+
+    mn.flags = wsrep_flags;
+}
+
+template <typename M>
 void
-gcs_group_get_membership(const gcs_group_t&        group,
-                         wsrep_allocator_cb const  alloc,
-                         struct wsrep_membership** memb)
+group_get_membership(const gcs_group_t&       group,
+                     wsrep_allocator_cb const alloc,
+                     M** memb)
 {
     if (!alloc)
     {
@@ -2200,10 +2253,9 @@ gcs_group_get_membership(const gcs_group_t&        group,
     gu::Lock lock(group.memb_mtx_);
 
     size_t const memb_size
-        (sizeof(struct wsrep_membership) +
-         (group.num - 1)*sizeof(struct wsrep_member_info_ext));
+        (sizeof(M) + (group.num - 1)*sizeof(decltype((*memb)->members[0])));
 
-    *memb = static_cast<struct wsrep_membership*>(alloc(memb_size));
+    *memb = static_cast<M*>(alloc(memb_size));
 
     if (!*memb)
     {
@@ -2213,7 +2265,7 @@ gcs_group_get_membership(const gcs_group_t&        group,
 
     ::memset(*memb, 0, memb_size);
 
-    struct wsrep_membership& m(**memb);
+    M& m(**memb);
 
     m.group_uuid = group.group_uuid;
     m.updated = group.memb_epoch_;
@@ -2237,7 +2289,7 @@ gcs_group_get_membership(const gcs_group_t&        group,
 
     for (size_t i(0); i < m.num; ++i)
     {
-        struct wsrep_member_info_ext& mn(m.members[i]);
+        auto& mn(m.members[i]);
         const struct gcs_node& gn(group.nodes[i]);
 
         gu_uuid_t uuid;
@@ -2272,7 +2324,26 @@ gcs_group_get_membership(const gcs_group_t&        group,
         case GCS_NODE_STATE_MAX:
             mn.status = WSREP_MEMBER_ERROR;
         }
+
+        uint8_t const gcs_flags(group_node_flags(&group.nodes[i], i));
+        group_membership_set_flags(mn, gcs_flags);
     }
+}
+
+void
+gcs_group_get_membership(const gcs_group_t&        group,
+                         wsrep_allocator_cb const  alloc,
+                         struct wsrep_membership** memb)
+{
+    group_get_membership(group, alloc, memb);
+}
+
+void
+gcs_group_get_membership(const gcs_group_t&           group,
+                         wsrep_allocator_cb const     alloc,
+                         struct wsrep_membership_v2** memb)
+{
+    group_get_membership(group, alloc, memb);
 }
 int gcs_group_fetch_pfs_info(const gcs_group_t*  group,
                              wsrep_node_info_t** nodes_arg,

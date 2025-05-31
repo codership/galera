@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2025 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -23,6 +23,7 @@
 
 #include "gu_config.hpp"
 
+extern std::string const GCS_STATELESS_KEY;
 extern std::string const GCS_VOTE_POLICY_KEY;
 extern uint8_t gcs_group_conf_to_vote_policy(gu::Config& cnf);
 
@@ -74,6 +75,7 @@ typedef struct gcs_group
     VoteHistory   vote_history; // history of group votes
     uint8_t       vote_policy;
     bool          frag_reset;   // indicate that fragmentation was reset
+    bool          stateless;
     gcs_node_t*   nodes;        // array of node contexts
 
     /* values from the last primary component */
@@ -294,10 +296,14 @@ gcs_group_param_set(gcs_group_t& group,
 extern int
 gcs_group_get_status(const gcs_group_t* group, gu::Status& status);
 
-extern void
+void
 gcs_group_get_membership(const gcs_group_t& group,
                          wsrep_allocator_cb alloc,
                          struct wsrep_membership** memb);
+void
+gcs_group_get_membership(const gcs_group_t& group,
+                         wsrep_allocator_cb alloc,
+                         struct wsrep_membership_v2** memb);
 
 extern int
 gcs_group_fetch_pfs_info(const gcs_group_t*  group,

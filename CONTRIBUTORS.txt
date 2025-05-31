@@ -22,6 +22,7 @@ Authors from Codership Oy:
  * Daniele Sciascia <daniele.sciascia@galeracluster.com>, Codership Oy
  * Philip Stoev <philip.stoev@galeracluster.com>, Codership Oy
  * Mario Karuza <mario.karuza@galeracluster.com>, Codership Oy
+ * Jan Lindström <jan.lindstrom@galeracluster.com>, Codership Oy
  [Codership employees, add name and email/username above this line, but leave this line intact]
 
 Other contributors:

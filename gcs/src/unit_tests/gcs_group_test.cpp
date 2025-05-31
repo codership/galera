@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2024 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2025 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -45,10 +45,10 @@ msg_write (gcs_recv_msg_t* msg,
     msg->type       = type;
 }
 
-static long
+static gcs_group_state_t
 new_component (gcs_group_t* group, const gcs_comp_msg_t* comp)
 {
-    long ret = gcs_group_handle_comp_msg (group, comp);
+    gcs_group_state_t const ret(gcs_group_handle_comp_msg (group, comp));
     // modelling real state exchange is really tedious here, just fake it
     group->state = GCS_GROUP_PRIMARY;
     return ret;
@@ -735,11 +735,52 @@ START_TEST(gcs_group_last_applied_v5)
 }
 END_TEST
 
-START_TEST(test_gcs_group_find_donor)
+// Test that setting stateless flag works
+static void
+test_stateless_flag(bool const f)
 {
     gu::Config cnf;
     gcs_group::register_params(cnf);
+    cnf.set(GCS_STATELESS_KEY, f ? "true" : "false");
+    gcs_group_t group(cnf, NULL, "", "", 5, 11, 7);
+    ck_assert(f == group.stateless);
+
+    gcs_comp_msg_t* const msg(gcs_comp_msg_new(true, false, 0, 1, 0));
+    ck_assert(nullptr != msg);
+    int const m(gcs_comp_msg_add(msg, LOCALHOST, 0));
+    ck_assert(0 == m);
+    gcs_group_state_t const ret(new_component(&group, msg));
+    ck_assert(ret >= 0);
+
+    ck_assert(f == group.nodes[0].stateless);
+
+    gcs_comp_msg_delete(msg);
+}
+
+START_TEST(test_stateless_flag_false)
+{
+    test_stateless_flag(false);
+}
+END_TEST
+
+START_TEST(test_stateless_flag_true)
+{
+    test_stateless_flag(true);
+}
+END_TEST
+
+// Test donor selection algorithm based on
+// - smallest cached seqno (to avoid SST)
+// - segment affinity
+// - stateless flag
+static void
+test_gcs_group_find_donor(bool const a)
+{
+    gu::Config cnf;
+    gcs_group::register_params(cnf);
+    cnf.set(GCS_STATELESS_KEY, a ? "true" : "false");
     gcs_group_t group(cnf, NULL, "", "", 0, 0, 0);
+    ck_assert(a == group.stateless);
     const char* s_group_uuid = "0d0d0d0d-0d0d-0d0d-0d0d-0d0d0d0d0d0d";
     gu_uuid_scan(s_group_uuid, strlen(s_group_uuid), &group.group_uuid);
 
@@ -762,14 +803,18 @@ START_TEST(test_gcs_group_find_donor)
     const gcs_seqno_t seqnos[] = {90, 95, 105, 100, 90, 95, 105};
     gcs_node_t* nodes = group.nodes;
     const int joiner = 3;
+    const int arbitr = 0;
 
     for(int i = 0; i < number; i++)
     {
         uint8_t const vp(gcs_group_conf_to_vote_policy(cnf));
         char name[32];
         snprintf(name, sizeof(name), "home%d", i);
+        bool const stateless(arbitr == i && group.stateless);
         gcs_node_init(&nodes[i], NULL, name, name,
-                      "", 0, 0, 0, i > joiner ? 1 : 0);
+                      "", 0, 0, 0, i > joiner ? 1 : 0, stateless);
+        uint8_t const flags(nodes[i].stateless ? GCS_STATE_FSTATELESS : 0);
+        ck_assert(stateless == (flags != 0));
         nodes[i].status = GCS_NODE_STATE_SYNCED;
         nodes[i].state_msg = gcs_state_msg_create(
             &GU_UUID_NIL, &GU_UUID_NIL, &GU_UUID_NIL,
@@ -778,9 +823,12 @@ START_TEST(test_gcs_group_find_donor)
             GCS_NODE_STATE_SYNCED, GCS_NODE_STATE_SYNCED,
             "", "",
             0, 0, 0, 0, 0, 0,
-            0, 0);
+            0, flags);
     }
+    ck_assert(nodes[arbitr].stateless == a);
 
+    group.quorum.version = 3; // minimum quorum version for stateless flag
+                              // to have effect
     group.quorum.act_id = 0; // in safe range.
     ck_assert(group.quorum.gcs_proto_ver == -1);
     ck_assert(group.gcs_proto_ver == 0);
@@ -808,7 +856,10 @@ START_TEST(test_gcs_group_find_donor)
     // handle dangling comma.
     donor = gcs_group_find_donor(&group, sv, joiner, SARGS("home3,"),
                                  empty_gtid);
-    ck_assert(donor == 0);
+    int expect_donor(a ? 1 : arbitr);
+    ck_assert_msg(donor == expect_donor,
+                  "stateless: %d, expected donor: %d, result donor: %d",
+                  a, expect_donor, donor);
 
     // ========== ist ==========
     // by name.
@@ -839,6 +890,17 @@ START_TEST(test_gcs_group_find_donor)
     nodes[2].status = GCS_NODE_STATE_SYNCED;
 #undef SARGS
 }
+
+START_TEST(test_gcs_group_find_donor_stateful)
+{
+    test_gcs_group_find_donor(false);
+}
+END_TEST
+
+START_TEST(test_gcs_group_find_donor_stateless)
+{
+    test_gcs_group_find_donor(true);
+}
 END_TEST
 
 Suite *gcs_group_suite(void)
@@ -855,7 +917,10 @@ Suite *gcs_group_suite(void)
     tcase_add_test  (tcase, gcs_group_last_applied_v3);
     tcase_add_test  (tcase, gcs_group_last_applied_v4);
     tcase_add_test  (tcase, gcs_group_last_applied_v5);
-    tcase_add_test  (tcase, test_gcs_group_find_donor);
+    tcase_add_test  (tcase, test_stateless_flag_false);
+    tcase_add_test  (tcase, test_stateless_flag_true);
+    tcase_add_test  (tcase, test_gcs_group_find_donor_stateful);
+    tcase_add_test  (tcase, test_gcs_group_find_donor_stateless);
 
     return suite;
 }

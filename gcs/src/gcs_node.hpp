@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2020 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2025 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -50,7 +50,7 @@ struct gcs_node
     gcs_segment_t    segment;
     bool             count_last_applied; // should it be counted
     bool             bootstrap; // is part of prim comp bootstrap process
-    bool             arbitrator;
+    bool             stateless;
 };
 typedef struct gcs_node gcs_node_t;
 
@@ -64,7 +64,8 @@ gcs_node_init (gcs_node_t* node,
                int         gcs_proto_ver,
                int         repl_proto_ver,
                int         appl_proto_ver,
-               gcs_segment_t segment);
+               gcs_segment_t segment,
+               bool        stateless);
 
 /*! Move data from one node object to another */
 extern void

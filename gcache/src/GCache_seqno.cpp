@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2024 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2025 Codership Oy <info@codership.com>
  */
 
 #include "gcache_bh.hpp"
@@ -7,8 +7,6 @@
 
 #include <cerrno>
 #include <cassert>
-
-#include <sched.h> // sched_yeild()
 
 namespace gcache
 {
@@ -107,6 +105,7 @@ namespace gcache
         bh->seqno_g = seqno_g;
         bh->flags  |= (BUFFER_SKIPPED * skip);
         bh->type    = type;
+        if (BUFFER_IN_PAGE == bh->store) ps.seqno_assign(bh, seqno_g);
     }
 
     /*!
@@ -185,19 +184,17 @@ namespace gcache
         {
             gu::Lock lock(mtx);
 
+#ifndef NDEBUG
             if (seqno < seqno_released || seqno >= seqno_locked)
             {
-#ifndef NDEBUG
                 if (params.debug())
                 {
                     log_info << "GCache::seqno_release(" << seqno
                              << "): seqno_released: " << seqno_released
-                             << ", seqno_locked: " << seqno_locked
-                             << ": exiting.";
+                             << ", seqno_locked: " << seqno_locked;
                 }
-#endif
-                break;
             }
+#endif
 
             seqno_t idx(seqno2ptr.upper_bound(seqno_released));
 
@@ -223,9 +220,8 @@ namespace gcache
             old_gap = new_gap;
 
             seqno_t const start  (idx - 1);
-            seqno_t const max_end(std::min(seqno, seqno_locked - 1));
-            seqno_t const end    (max_end - start >= 2*batch_size ?
-                                  start + batch_size : max_end);
+            seqno_t const end    (seqno - start >= 2*batch_size ?
+                                  start + batch_size : seqno);
 #ifndef NDEBUG
             if (params.debug())
             {
@@ -286,13 +282,45 @@ namespace gcache
                          << old_sr << " -> " << seqno_released;
             }
 #endif
-            /* if we're doing this loop repeatedly, allow other threads to run*/
-            if (loop) sched_yield();
+        }
+    }
+
+    void GCache::seqno_discard(const seqno_t& seqno)
+    {
+#ifndef NDEBUG
+        if (params.debug())
+        {
+            log_info << "GCache::seqno_discard(" << seqno
+                     << ") index_begin: " << seqno2ptr.index_begin();
+        }
+#endif
+
+        /* Gradually discard seqnos in reasonsbly sized batches */
+        while (true)
+        {
+            static int const batch_size(1024);
+            gu::Lock lock(mtx);
+
+            assert(seqno <= seqno_low_);
+
+            if (seqno2ptr.empty()) break;
+
+            seqno_t const s_min(seqno2ptr.index_begin());
+
+            if (s_min > seqno) break;
+
+            // can't discard unassigned seqno
+            assert(seqno_low_ <= seqno2ptr.index_end());
+
+            seqno_t const s_max(std::min(s_min + batch_size, seqno));
+
+            discard_seqno(s_max);
         }
     }
 
     /*!
-     * Move lock to a given seqno. Throw gu::NotFound if seqno is not in cache.
+     * Move lock to a given seqno. Throw gu::NotFound if seqno is not in
+     * cache.
      * @throws NotFound
      */
     void GCache::seqno_lock (seqno_t const seqno_g)
@@ -304,6 +332,7 @@ namespace gcache
         assert(SEQNO_MAX == seqno_locked || seqno_locked_count > 0);
         assert(0   == seqno_locked_count || seqno_locked < SEQNO_MAX);
 
+        if (seqno_g <= seqno_low_) throw gu::NotFound();
         seqno2ptr.at(seqno_g); /* check that the element exists */
 
         seqno_locked_count++;

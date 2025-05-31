@@ -74,7 +74,7 @@ gcomm::AsioTcpSocket::AsioTcpSocket(AsioProtonet& net, const gu::URI& uri)
     state_       (S_CLOSED),
     deferred_close_timer_()
 {
-    log_debug << "ctor for " << id();
+    log_debug << "ctor for " << id() << " uri " << uri;
 }
 
 gcomm::AsioTcpSocket::AsioTcpSocket(AsioProtonet& net,
@@ -92,7 +92,7 @@ gcomm::AsioTcpSocket::AsioTcpSocket(AsioProtonet& net,
     state_       (S_CLOSED),
     deferred_close_timer_()
 {
-    log_debug << "ctor for " << id();
+    log_debug << "ctor for " << id() << " uri " << uri;
 }
 
 gcomm::AsioTcpSocket::~AsioTcpSocket()
@@ -250,25 +250,32 @@ void gcomm::AsioTcpSocket::close()
 {
     Critical<AsioProtonet> crit(net_);
 
+    log_debug << "close called " << id() << " state: " << state();
     if (state() == S_CLOSED || state() == S_CLOSING) return;
 
-    log_debug << "closing " << id()
-              << " socket " << socket_
-              << " state " << state()
-              << " send_q size " << send_q_.size();
+    log_debug << "closing " << id() << " local_addr: " << local_addr()
+             << " remote_addr: " << remote_addr() << " socket " << socket_
+             << " state " << state() << " send_q size " << send_q_.size();
 
-    if (send_q_.empty() == true || state() != S_CONNECTED)
+    if (state() == S_CONNECTED)
     {
-        socket_->close();
-        state_ = S_CLOSED;
+        state_ = S_CLOSING;
+        auto timer = std::make_shared<DeferredCloseTimer>(
+            net_.io_service_, shared_from_this());
+        deferred_close_timer_ = timer;
+        timer->start();
+        /* Shut down if there are no more messages to send. The actual closing
+         * of socket happens when either read or write handler gets called with
+         * error. */
+        if (send_q_.empty())
+        {
+            socket_->shutdown();
+        }
     }
     else
     {
-        state_ = S_CLOSING;
-        auto timer(std::make_shared<DeferredCloseTimer>(
-                       net_.io_service_, shared_from_this()));
-        deferred_close_timer_ = timer;
-        timer->start();
+        state_ = S_CLOSED;
+        socket_->close();
     }
 }
 
@@ -364,20 +371,14 @@ void gcomm::AsioTcpSocket::write_handler(gu::AsioSocket& socket,
             else if (state_ == S_CLOSING)
             {
                 log_debug << "deferred close of " << id();
-                socket_->close();
-                // deferred_close_timer_->cancel();
-                cancel_deferred_close_timer();
-                state_ = S_CLOSED;
+                become_closed();
             }
         }
     }
     else if (state_ == S_CLOSING)
     {
         log_debug << "deferred close of " << id() << " error " << ec;
-        socket_->close();
-        // deferred_close_timer_->cancel();
-        cancel_deferred_close_timer();
-        state_ = S_CLOSED;
+        become_closed();
     }
     else
     {
@@ -486,6 +487,11 @@ void gcomm::AsioTcpSocket::read_handler(gu::AsioSocket& socket,
             log_warn << "read_handler(): " << ec.message() << " ("
                      << gu::extra_error_info(ec) << ")";
         }
+        if (state() == S_CLOSING)
+        {
+            log_debug << "read handler for " << id() << " closing";
+            become_closed();
+        }
         FAILED_HANDLER(ec);
         return;
     }
@@ -573,13 +579,6 @@ size_t gcomm::AsioTcpSocket::read_completion_condition(
     Critical<AsioProtonet> crit(net_);
     if (ec)
     {
-        if (not gu::is_verbose_error(ec))
-        {
-            log_warn << "read_completion_condition(): "
-                     << ec.message() << " ("
-                     << gu::extra_error_info(ec) << ")";
-        }
-        FAILED_HANDLER(ec);
         return 0;
     }
 
@@ -655,6 +654,13 @@ void gcomm::AsioTcpSocket::cancel_deferred_close_timer()
     if (timer) timer->cancel();
 }
 
+void gcomm::AsioTcpSocket::become_closed()
+{
+    socket_->close();
+    cancel_deferred_close_timer();
+    state_ = S_CLOSED;
+}
+
 gcomm::SocketStats gcomm::AsioTcpSocket::stats() const
 {
     SocketStats ret;
@@ -705,14 +711,20 @@ void gcomm::AsioTcpAcceptor::accept_handler(
 {
     if (!error)
     {
+        /* Set state to CONNECTING to indicate that the socket is ready for use
+         * but has not gone through initial handshake yet. */
+        next_socket_->state_ = gcomm::Socket::S_CONNECTING;
         next_socket_->socket_ = accepted_socket;
         /* Notify upper layer which then calls accept() to acquire ownership. */
         net_.dispatch(id(), Datagram(), ProtoUpMeta(error.value()));
         assert(not next_socket_);
     }
-    acceptor_->async_accept(
-        shared_from_this(),
-        next_socket_ = std::make_shared<AsioTcpSocket>(net_, uri_, nullptr));
+    if (acceptor_->is_open())
+    {
+        acceptor_->async_accept(
+            shared_from_this(),
+            next_socket_ = std::make_shared<AsioTcpSocket>(net_, uri_, nullptr));
+    }
 }
 
 void gcomm::AsioTcpAcceptor::set_buf_sizes()

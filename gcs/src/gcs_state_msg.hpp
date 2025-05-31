@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2019 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2025 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -22,7 +22,7 @@
 #define GCS_STATE_FREP       0x01 // group representative
 #define GCS_STATE_FCLA       0x02 // count last applied (for JOINED node)
 #define GCS_STATE_FBOOTSTRAP 0x04 // part of prim bootstrap process
-#define GCS_STATE_ARBITRATOR 0x08 // arbitrator or otherwise incomplete node
+#define GCS_STATE_FSTATELESS 0x08 // arbitrator or otherwise stateless node
 
 #ifdef GCS_STATE_MSG_ACCESS
 typedef struct gcs_state_msg

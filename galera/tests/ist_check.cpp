@@ -516,7 +516,7 @@ static void store_trx(gcache::GCache* const gcache,
         assert (wsi.pa_range()  == pa_range);
 
         gcache->seqno_assign(ptr, i, GCS_ACT_WRITESET, (i - pa_range) <= 0);
-        gcache->free(ptr);
+        gcache->seqno_release(i);
     }
 }
 
@@ -543,7 +543,7 @@ static void store_cc(gcache::GCache* const gcache,
     free(tmp);
 
     gcache->seqno_assign(cc_ptr, i, GCS_ACT_CCHANGE, i > 0);
-    gcache->free(cc_ptr);
+    gcache->seqno_release(i);
 }
 
 void log_test_name(int const v, bool const send_enc, bool const recv_enc)

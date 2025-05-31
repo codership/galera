@@ -32,7 +32,7 @@ namespace gcomm
         class Message;
     }
 
-    class GMCast : public Transport
+    class GMCast : public Transport, public gmcast::ProtoContext
     {
     public:
 
@@ -90,12 +90,6 @@ namespace gcomm
         {
             return pnet_.mtu() - (4 + UUID::serial_size());
         }
-
-        void remove_viewstate_file() const
-        {
-            ViewState::remove_file(conf_);
-        }
-
     private:
 
         GMCast (const GMCast&);
@@ -205,6 +199,7 @@ namespace gcomm
         bool              prim_view_reached_;
 
         gmcast::ProtoMap*  proto_map_;
+public:
         struct RelayEntry
         {
             gmcast::Proto* proto;
@@ -216,9 +211,28 @@ namespace gcomm
                 return (socket < other.socket);
             }
         };
-        void send(const RelayEntry&, int segment, gcomm::Datagram& dg);
         typedef std::set<RelayEntry> RelaySet;
+        /*
+         * Compute minimal set of proto entries required to reach
+         * maximum set of nonlive peers.
+         *
+         * @param[in,out] proto_set Set of proto entries
+         * @param[in,out] nonlive_uuids Set of nonlive peer UUIDs
+         * @param segment Segment ID
+         *
+         * @return Minimal set of proto entries required to reach
+         */
+        static RelaySet
+        compute_relay_set(const std::set<gmcast::Proto*>& proto_set,
+                          std::set<gcomm::UUID>& nonlive_uuids,
+                          uint8_t segment);
+    private:
+        static void
+        populate_relay_set(std::set<gcomm::UUID>& nonlive_uuids,
+                           std::set<gcomm::gmcast::Proto*>& lookup_set,
+                           gcomm::GMCast::RelaySet& relay_set);
         RelaySet relay_set_;
+        void send(const RelayEntry&, int segment, gcomm::Datagram& dg);
 
         typedef std::vector<RelayEntry> Segment;
         typedef std::map<uint8_t, Segment> SegmentMap;
@@ -232,9 +246,9 @@ namespace gcomm
         gu::datetime::Date next_check_;
         gu::datetime::Date handle_timers();
 
-        // Grant Proto access to private helper methods.
-        friend class gcomm::gmcast::Proto;
-
+        /* Begin of ProtoContext implementation */
+        /* Return UUID of the local node */
+        const gcomm::UUID& node_uuid() const override { return my_uuid_; }
         /*
          * Checks if the proto is a remote connection point for
          * locally originated connection. The proto
@@ -246,7 +260,7 @@ namespace gcomm
          * @return True if matching entry was found and blacklisted,
          *         false otherwise.
          */
-        bool is_own(const gmcast::Proto *proto) const;
+        bool is_own(const gmcast::Proto *proto) const override;
 
         /*
          * Add a proto entry to blacklist. After calling this reconnect
@@ -255,7 +269,7 @@ namespace gcomm
          *
          * @param proto Proto entry to be blacklisted.
          */
-        void blacklist(const gmcast::Proto* proto);
+        void blacklist(const gmcast::Proto* proto) override;
 
         /*
          * Check if the proto entry is not originated from own
@@ -267,12 +281,30 @@ namespace gcomm
          * endpoint identity is known.
          *
          */
-        bool is_not_own_and_duplicate_exists(const gmcast::Proto* proto) const;
+        bool is_not_own_and_duplicate_exists(const gmcast::Proto* proto) const override;
 
+        bool is_proto_evicted(const gmcast::Proto* proto) const override {
+            return is_evicted(proto->remote_uuid());
+        }
         /**
          * Return boolean denoting if the primary view has been reached.
          */
-        bool prim_view_reached() const { return prim_view_reached_; }
+        bool prim_view_reached() const override { return prim_view_reached_; }
+
+        /* Remove viewstate file */
+        void remove_viewstate_file() const override
+        {
+            ViewState::remove_file(conf_);
+        }
+
+        /* Return string of the local node */
+        std::string self_string() const override
+        {
+            std::ostringstream os;
+            os << '(' << my_uuid_ << ", '" << listen_addr_ << "')";
+            return os.str();
+        }
+        /* End of ProtoContext implementation */
 
         // Erase ProtoMap entry in a safe way so that all lookup lists
         // become properly updated.
@@ -309,13 +341,6 @@ namespace gcomm
 
         void set_initial_addr(const gu::URI&);
         void add_or_del_addr(const std::string&);
-
-        std::string self_string() const
-        {
-            std::ostringstream os;
-            os << '(' << my_uuid_ << ", '" << listen_addr_ << "')";
-            return os.str();
-        }
 
         friend std::ostream& operator<<(std::ostream&, const AddrEntry&);
     };

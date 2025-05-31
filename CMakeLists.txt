@@ -1,9 +1,9 @@
 #
-# Copyright (C) 2020 Codership Oy <info@codership.com>
+# Copyright (C) 2025 Codership Oy <info@codership.com>
 #
 
 message(STATUS "CMake version ${CMAKE_VERSION}")
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 2.8...4.0)
 project(galera-4)
 
 include(CheckCCompilerFlag)
@@ -43,6 +43,7 @@ option(GALERA_GCS_SM_DEBUG
   "Enable dumping of send monitor state and history" OFF)
 option(GALERA_GU_DEBUG_MUTEX "Enable mutex debug instrumentation" OFF)
 option(GALERA_GU_DBUG_ON "Enable sync point macros (ON for Debug builds)" OFF)
+option(GALERA_GLIBCXX_DEBUG "Enable glibc++ debug instrumentation" OFF)
 
 #
 # Set cmake policies before doing any checks.

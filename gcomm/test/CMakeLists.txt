@@ -5,6 +5,7 @@
 add_executable(check_gcomm
   check_fair_send_queue.cpp
   check_gcomm.cpp
+  check_gmcast.cpp
   check_trace.cpp
   check_types.cpp
   check_util.cpp
@@ -37,7 +38,7 @@ add_test(
 
 add_executable(check_gcomm_nondet
   check_gcomm_nondet.cpp
-  check_gmcast.cpp
+  check_gmcast_nondet.cpp
   check_pc_nondet.cpp
   check_util_nondet.cpp)
 

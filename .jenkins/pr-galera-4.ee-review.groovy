@@ -16,7 +16,7 @@ pipeline {
           }
           echo sh(script: 'env|sort', returnStdout: true)
 
-          build job: 'pr-galera-4.x-smoke-test', wait: true,
+          build job: 'pr-galera-4.ee-smoke-test', wait: true,
                   parameters: [ string(name: 'GALERA_BRANCH', value: env.ghprbActualCommit )]
         }
       }
@@ -25,7 +25,7 @@ pipeline {
     stage ('Build') {
       steps {
         script {
-          def bintarJob = build job: 'pr-build-galera-4.x-mysql-8.0-v26', wait: true,
+          def bintarJob = build job: 'pr-build-galera-4.ee-mysql-8.0-v26-ee', wait: true,
             parameters: [
               string(name: 'GALERA_BRANCH', value: env.ghprbActualCommit ),
               string(name: 'MYSQL_BRANCH', value: env.MYSQL_BRANCH)
@@ -39,13 +39,13 @@ pipeline {
       parallel {
         stage ('MTR') {
           steps {
-            build job: 'pr-mtr-galera-4.x-mysql-8.0-v26', wait: true,
+            build job: 'pr-mtr-galera-4.ee-mysql-8.0-v26-ee', wait: true,
               parameters: [ string(name: 'BUILD_SELECTOR', value: env.BINTAR_JOB) ]
           }
         }
         stage ('GcTest') {
           steps {
-            build job: 'pr-sssc-galera-4.x-mysql-8.0-v26', wait: true,
+            build job: 'pr-sssc-galera-4.ee-mysql-8.0-v26-ee', wait: true,
               parameters: [ string(name: 'BUILD_SELECTOR', value: env.BINTAR_JOB) ]
           }
         }

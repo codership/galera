@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2024 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2025 Codership Oy <info@codership.com>
  */
 
 /*! @file page store class */
@@ -27,7 +27,8 @@ namespace gcache
 
         static int  const DEBUG = 4; // debug flag
 
-        PageStore (const std::string& dir_name,
+        PageStore (SeqnoMap&          seqno_map,
+                   const std::string& dir_name,
                    wsrep_encrypt_cb_t encrypt_cb,
                    void*              app_ctx,
                    size_t             keep_size,
@@ -51,7 +52,21 @@ namespace gcache
 
         void  free    (BufferHeader* bh, const void* ptr)
         {
-            release<false>(bh, ptr);
+            assert(BH_is_released(bh));
+            assert(ptr || !encrypt_cb_);
+
+            Page* page(static_cast<Page*>(BH_ctx(bh)));
+
+            bool const dis(page->free(bh, ptr));
+
+            if (encrypt_cb_)
+            {
+                PlainMap::iterator const i(find_plaintext(ptr));
+                drop_plaintext(i, ptr, true);
+                if (dis) discard_plaintext(i);
+            }
+
+            if (0 == page->used() && pages_.front() == page) cleanup();
         }
         void  free    (BufferHeader* bh) { free(bh, NULL); }
 
@@ -74,7 +89,13 @@ namespace gcache
 
         void  discard (BufferHeader* bh, const void* ptr)
         {
-            release<true>(bh, ptr);
+            assert(BH_is_released(bh));
+            assert(ptr || !encrypt_cb_);
+
+            Page* page(static_cast<Page*>(BH_ctx(bh)));
+
+            page->discard(bh);
+            if (encrypt_cb_) discard_plaintext(find_plaintext(ptr));
         }
         void  discard (BufferHeader* bh) { discard(bh, NULL); }
 
@@ -82,9 +103,22 @@ namespace gcache
 
         void  reset();
 
-        void  seqno_lock(seqno_t) {}
+        void  seqno_assign(BufferHeader* bh, seqno_t s)
+        {
+            static_cast<Page*>(BH_ctx(bh))->seqno_assign(s);
+        }
 
-        void  seqno_unlock() {}
+        void  seqno_lock(seqno_t s)
+        {
+            assert(s < seqno_locked_);
+            seqno_locked_ = s;
+        }
+
+        void  seqno_unlock()
+        {
+            seqno_locked_ = SEQNO_MAX;
+            cleanup();
+        }
 
         void  set_enc_key(const Page::EncKey& key);
 
@@ -103,6 +137,13 @@ namespace gcache
         size_t count()       const { return count_;        }
         size_t total_pages() const { return pages_.size(); }
         size_t total_size()  const { return total_size_;   }
+        size_t keep_size()   const { return keep_size_;    }
+        size_t keep_page()   const { return keep_page_;    }
+        size_t page_size()   const { return page_size_;    }
+
+#ifdef GCACHE_PAGE_STORE_UNIT_TEST
+        void   wait_page_discard() const;
+#endif /* GCACHE_PAGE_STORE_UNIT_TEST */
 
         void meta(const void* const ptr, std::ostream& os)
         {
@@ -130,12 +171,14 @@ namespace gcache
 
         typedef std::pair<const void*, Plain> PlainMapEntry;
 
+        SeqnoMap&         seqno_map_;
         std::string const base_name_; /* /.../.../gcache.page. */
         wsrep_encrypt_cb_t const encrypt_cb_;
         void* const       app_ctx_;   /* context for encryption callback */
         Page::EncKey      enc_key_;   /* current key */
         Page::Nonce       nonce_;     /* current nonce */
-        size_t            keep_size_; /* how much pages to keep after freeing */
+        seqno_t           seqno_locked_;
+        size_t            keep_size_; /* how much pages to keep after freeing*/
         size_t            page_size_; /* min size of the individual page */
         size_t            keep_plaintext_size_; /* max plaintext to keep */
         size_t            count_;     /* page counter to make unique file name */
@@ -147,9 +190,7 @@ namespace gcache
         PlainMap          enc2plain_;
         size_t            plaintext_size_; /* how much plaintext allocated */
         pthread_attr_t    delete_page_attr_;
-#ifndef GCACHE_DETACH_THREAD
-        pthread_t         delete_thr_;
-#endif /* GCACHE_DETACH_THREAD */
+        mutable pthread_t delete_thr_;
         int               debug_;
         bool        const keep_page_; /* whether to keep the last page */
 
@@ -160,6 +201,9 @@ namespace gcache
 
         // cleans up extra pages.
         void cleanup     ();
+#ifndef GCACHE_PAGE_STORE_UNIT_TEST
+        void wait_page_discard() const;
+#endif /* !GCACHE_PAGE_STORE_UNIT_TEST */
 
         void* malloc_new (size_type size);
 
@@ -178,34 +222,6 @@ namespace gcache
             assert(NULL  == p.ptx_);
 #endif
             enc2plain_.erase(i);
-        }
-
-        template <bool Discard> void
-        release(BufferHeader* bh, const void* ptr)
-        {
-            assert(BH_is_released(bh));
-            assert(ptr || !encrypt_cb_);
-
-            Page* page(static_cast<Page*>(BH_ctx(bh)));
-
-            if (Discard)
-            {
-                page->discard(bh);
-                if (encrypt_cb_) discard_plaintext(find_plaintext(ptr));
-            }
-            else
-            {
-                bool const dis(page->free(bh, ptr));
-
-                if (encrypt_cb_)
-                {
-                    PlainMap::iterator const i(find_plaintext(ptr));
-                    drop_plaintext(i, ptr, true);
-                    if (dis) discard_plaintext(i);
-                }
-            }
-
-            if (0 == page->used()) cleanup();
         }
 
         Plain& bh2Plain(BufferHeader* bh)

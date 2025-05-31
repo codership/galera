@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2020-2024 Codership Oy <info@codership.com>
+// Copyright (C) 2020-2025 Codership Oy <info@codership.com>
 //
 
 #define GU_ASIO_IMPL
@@ -83,6 +83,14 @@ catch (const asio::system_error& e)
     return false;
 }
 
+void gu::AsioStreamReact::shutdown()
+{
+    if (not (in_progress_ & shutdown_in_progress) && engine_)
+    {
+        engine_->shutdown();
+        in_progress_ |= shutdown_in_progress;
+    }
+}
 
 void gu::AsioStreamReact::close() try
 {
@@ -91,6 +99,7 @@ void gu::AsioStreamReact::close() try
     {
         GU_ASIO_DEBUG(debug_print() << "Socket not open on close");
     }
+
     socket_.close();
 }
 // Catch all the possible exceptions here, not only asio ones.
@@ -198,6 +207,8 @@ void gu::AsioStreamReact::connect(const gu::URI& uri) try
     socket_.connect(resolve_result->endpoint());
     connected_ = true;
     prepare_engine(false);
+    assign_addresses();
+
     auto result(engine_->client_handshake());
     switch (result)
     {
@@ -389,6 +400,7 @@ void gu::AsioStreamReact::connect_handler(
     set_socket_options(socket_);
     prepare_engine(true);
     assign_addresses();
+
     GU_ASIO_DEBUG(debug_print()
                   << " AsioStreamReact::connect_handler: init handshake");
     auto result(engine_->client_handshake());
@@ -683,6 +695,7 @@ void gu::AsioStreamReact::assign_addresses()
         engine_->scheme(),
         ::escape_addr(socket_.remote_endpoint().address()),
         gu::to_string(socket_.remote_endpoint().port()));
+    engine_->update_address_info(local_addr_, remote_addr_);
 }
 
 void gu::AsioStreamReact::prepare_engine(bool non_blocking)
@@ -832,15 +845,6 @@ void gu::AsioStreamReact::set_non_blocking(bool val)
     }
 }
 
-void gu::AsioStreamReact::shutdown()
-{
-    if (not (in_progress_ & shutdown_in_progress) && engine_)
-    {
-        engine_->shutdown();
-        in_progress_ |= shutdown_in_progress;
-    }
-}
-
 std::string gu::AsioStreamReact::debug_print() const
 {
     std::ostringstream oss;
@@ -872,6 +876,11 @@ void gu::AsioAcceptorReact::open(const gu::URI& uri) try
 catch (const asio::system_error& e)
 {
     gu_throw_system_error(e.code().value()) << "Failed to open acceptor: " << e.what();
+}
+
+bool gu::AsioAcceptorReact::is_open() const
+{
+    return acceptor_.is_open();
 }
 
 

@@ -376,6 +376,10 @@ namespace galera
         wsrep_status_t get_membership(wsrep_allocator_cb        alloc,
                                       struct wsrep_membership** memb) const;
 
+        wsrep_status_t get_membership(wsrep_allocator_cb           alloc,
+                                      struct wsrep_membership_v2** memb) const;
+
+
         struct InitConfig
         {
             InitConfig(gu::Config&, const char* node_addr,const char* base_dir);
@@ -511,6 +515,10 @@ namespace galera
 
         /* aborts/exits the program in a clean way */
         void abort() GU_NORETURN;
+
+        template <typename M>
+        wsrep_status_t get_membership_tmpl(wsrep_allocator_cb const alloc,
+                                           M**                      memb) const;
 
 #ifdef GALERA_MONITOR_DEBUG_PRINT
     public:
