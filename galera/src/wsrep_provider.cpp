@@ -1782,6 +1782,7 @@ extern "C" void wsrep_deinit_membership_service_v2()
 {
 }
 
+extern "C"
 int wsrep_init_allowlist_service_v1(wsrep_allowlist_service_v1_t *allowlist_service)
 {
     return gu::init_allowlist_service_v1(allowlist_service);
