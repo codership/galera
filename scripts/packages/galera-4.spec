@@ -1,4 +1,4 @@
-# Copyright (c) 2011-2014, Codership Oy <info@codership.com>.
+# Copyright (c) 2007-2025, Codership Oy <info@codership.com>.
 # All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
@@ -19,7 +19,7 @@
 # use "rpmbuild --define 'version xxxx'" to define version
 %{!?version: %define version 4.x}
 %{!?release: %define release 1}
-%define copyright Copyright 2007-2014 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
+%define copyright Copyright 2007-2025 Codership Oy. All rights reserved. Use is subject to license terms under GPLv2 license.
 %define libs %{_libdir}/%{name}
 %define docs /usr/share/doc/%{name}
 
@@ -91,7 +91,7 @@ BuildRequires: python
 %endif
 
 # Systemd
-%if 0%{?suse_version} >= 1220 || 0%{?centos} >= 7 || 0%{?rhel} >= 7
+%if 0%{?suse_version} >= 1220 || 0%{?centos} >= 7 || 0%{?rhel} >= 7 || %{defined fedora}
 %define systemd 1
 BuildRequires: systemd
 %else
