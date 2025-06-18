@@ -1869,40 +1869,47 @@ static int wsrep_parameter_init(wsrep_parameter& wsrep_param,
     return 0;
 }
 
-static wsrep_status_t get_parameters(wsrep_t* gh,
-                                     wsrep_get_parameters_cb callback,
-                                     void* context)
+static wsrep_status_t
+get_parameters_from_config(const gu::Config& config,
+                           wsrep_get_parameters_cb callback, void* context)
 {
-    assert(gh != 0);
-    assert(gh->ctx != 0);
-    REPL_CLASS * repl(reinterpret_cast< REPL_CLASS * >(gh->ctx));
-    const gu::Config& config(repl->params());
-    for (auto &i : config)
+    for (auto& i : config)
     {
         const std::string& key(i.first);
         const gu::Config::Parameter& param(i.second);
         if (!param.is_hidden())
         {
             wsrep_parameter arg;
-            if (wsrep_parameter_init(arg, key, param) ||
-                (callback(&arg, context) != WSREP_OK))
+            if (wsrep_parameter_init(arg, key, param)
+                || (callback(&arg, context) != WSREP_OK))
             {
                 log_error << "Failed to initialize parameter '" << key
-                          << "', value " << param.value()
-                          << " , flags (" << gu::Config::Flag::to_string(param.flags())
-                          << ")";
+                          << "', value " << param.value() << " , flags ("
+                          << gu::Config::Flag::to_string(param.flags()) << ")";
                 return WSREP_FATAL;
             }
         }
     }
-
     return WSREP_OK;
+}
+
+static wsrep_status_t
+get_parameters_v1(wsrep_t* gh, wsrep_get_parameters_cb callback, void* context)
+{
+    assert(gh != 0);
+    if (gh->ctx)
+    {
+        REPL_CLASS* repl(reinterpret_cast<REPL_CLASS*>(gh->ctx));
+        return get_parameters_from_config(repl->params(), callback, context);
+    }
+    // Attempt to call the service before galera_init()
+    return WSREP_NOT_ALLOWED;
 }
 
 extern "C"
 int wsrep_init_config_service_v1(wsrep_config_service_v1_t *config_service)
 {
-    config_service->get_parameters = get_parameters;
+    config_service->get_parameters = get_parameters_v1;
     // Deprecation checks will be done by application which uses
     // the service.
     gu::Config::disable_deprecation_check();
@@ -1911,6 +1918,44 @@ int wsrep_init_config_service_v1(wsrep_config_service_v1_t *config_service)
 
 extern "C"
 void wsrep_deinit_config_service_v1()
+{
+    gu::Config::enable_deprecation_check();
+}
+
+
+/*
+ * Version 2 allows the service to be used before provider is initialized,
+ * i.e. before galera_init().
+ */
+static wsrep_status_t
+get_parameters_v2(wsrep_t* gh, wsrep_get_parameters_cb callback, void* context)
+{
+    assert(gh != 0);
+
+    if (gh->ctx)
+    {
+        REPL_CLASS* repl(reinterpret_cast<REPL_CLASS*>(gh->ctx));
+        return get_parameters_from_config(repl->params(), callback, context);
+    }
+    else
+    {
+        gu::Config config;
+        galera::ReplicatorSMM::InitConfig init(config, NULL, NULL);
+        return get_parameters_from_config(config, callback, context);
+    }
+}
+
+extern "C" int
+wsrep_init_config_service_v2(wsrep_config_service_v2_t* config_service)
+{
+    config_service->get_parameters = get_parameters_v2;
+    // Deprecation checks will be done by application which uses
+    // the service.
+    gu::Config::disable_deprecation_check();
+    return WSREP_OK;
+}
+
+extern "C" void wsrep_deinit_config_service_v2()
 {
     gu::Config::enable_deprecation_check();
 }

@@ -45,8 +45,10 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     version_(check_range(Conf::EvsVersion,
                          param<int>(conf, uri, Conf::EvsVersion, Defaults::EvsVersion),
                          0, GCOMM_PROTOCOL_MAX_VERSION + 1)),
-    debug_mask_(param<int>(conf, uri, Conf::EvsDebugLogMask, "0x1", std::hex)),
-    info_mask_(param<int>(conf, uri, Conf::EvsInfoLogMask, "0x0", std::hex)),
+    debug_mask_(param<int>(conf, uri, Conf::EvsDebugLogMask,
+                           Defaults::EvsDebugLogMask, std::hex)),
+    info_mask_(param<int>(conf, uri, Conf::EvsInfoLogMask,
+                          Defaults::EvsInfoLogMask, std::hex)),
     last_stats_report_(gu::datetime::Date::monotonic()),
     collect_stats_(true),
     hs_agreed_("0.0,0.0001,0.00031623,0.001,0.0031623,0.01,0.031623,0.1,0.31623,1.,3.1623,10.,31.623"),
@@ -100,9 +102,9 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
         check_range(Conf::EvsKeepalivePeriod,
                     param<gu::datetime::Period>(
                         conf, uri, Conf::EvsKeepalivePeriod,
-                        Defaults::EvsRetransPeriod),
+                        Defaults::EvsKeepalivePeriod),
                     gu::from_string<gu::datetime::Period>(
-                        Defaults::EvsRetransPeriodMin),
+                        Defaults::EvsKeepalivePeriodMin),
                     suspect_timeout_/3 + 1)),
     install_timeout_(
         check_range(Conf::EvsInstallTimeout,
@@ -116,7 +118,7 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
                         conf, uri, Conf::EvsJoinRetransPeriod,
                         Defaults::EvsJoinRetransPeriod),
                     gu::from_string<gu::datetime::Period>(
-                        Defaults::EvsRetransPeriodMin),
+                        Defaults::EvsJoinRetransPeriodMin),
                     gu::datetime::Period::max())),
     stats_report_period_(
         check_range(Conf::EvsStatsReportPeriod,
@@ -173,7 +175,8 @@ gcomm::evs::Proto::Proto(gu::Config&    conf,
     send_buf_(),
     max_output_size_(128),
     mtu_(mtu),
-    use_aggregate_(param<bool>(conf, uri, Conf::EvsUseAggregate, "true")),
+    use_aggregate_(param<bool>(conf, uri, Conf::EvsUseAggregate,
+                               Defaults::EvsUseAggregate)),
     self_loopback_(false),
     state_(S_CLOSED),
     shift_to_rfcnt_(0),
@@ -329,7 +332,7 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val,
         retrans_period_ = check_range(
             Conf::EvsKeepalivePeriod,
             gu::from_string<gu::datetime::Period>(val),
-            gu::from_string<gu::datetime::Period>(Defaults::EvsRetransPeriodMin),
+            gu::from_string<gu::datetime::Period>(Defaults::EvsKeepalivePeriodMin),
             gu::datetime::Period::max());
         conf_.set(Conf::EvsKeepalivePeriod, gu::to_string(retrans_period_));
         reset_timer(T_RETRANS);
@@ -352,7 +355,7 @@ gcomm::evs::Proto::set_param(const std::string& key, const std::string& val,
         join_retrans_period_ = check_range(
             Conf::EvsJoinRetransPeriod,
             gu::from_string<gu::datetime::Period>(val),
-            gu::from_string<gu::datetime::Period>(Defaults::EvsRetransPeriodMin),
+            gu::from_string<gu::datetime::Period>(Defaults::EvsJoinRetransPeriodMin),
             gu::datetime::Period::max());
         conf_.set(Conf::EvsJoinRetransPeriod, gu::to_string(join_retrans_period_));
         reset_timer(T_RETRANS);
