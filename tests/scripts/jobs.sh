@@ -37,10 +37,10 @@ virtual_job()
     if [ "${NODE_LOCATION[$node]}" = "local" ]
     then
 #        local_job "$cmd" 1>"$out"
-        eval "$cmd" 1>"$out"
+        eval "$cmd" 1>"$out" 2>&1
     else
 #        ssh_job "$cmd" 1>"$out"
-        ssh -ax -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no ${NODE_LOCATION[$node]} "$cmd" 1>"$out"
+        ssh -ax -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no ${NODE_LOCATION[$node]} "$cmd" 1>"$out" 2>&1
     fi
 
 }
