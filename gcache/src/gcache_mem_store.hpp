@@ -32,10 +32,10 @@ namespace gcache
 
         void reset ()
         {
-            for (std::set<void*>::iterator buf(allocd_.begin());
-                 buf != allocd_.end(); ++buf)
+            for (std::set<BufferHeader*>::iterator bh(allocd_.begin());
+                 bh != allocd_.end(); ++bh)
             {
-                ::free (*buf);
+                ::free (*bh);
             }
 
             allocd_.clear();
@@ -98,29 +98,26 @@ namespace gcache
             BufferHeader* bh(ptr2BH(ptr));
             assert (SEQNO_NONE == bh->seqno_g);
 
-            if (!size)
-            {
-                free(bh);
-                return nullptr;
-            }
-
-            uintptr_t const orig(reinterpret_cast<uintptr_t>(bh));
             size_type const old_size(bh->size);
             diff_type const diff_size(size - old_size);
+            if (diff_size == 0) return ptr;
 
             if (size > max_size_ ||
                 have_free_space(diff_size) == false) return 0;
 
             assert (size_ + diff_size <= max_size_);
 
-            allocd_.erase(bh);
-            void* tmp = ::realloc (bh, size);
+            BufferHeader* const orig(bh);
+            bh = BH_cast(::realloc(bh, size));
 
-            if (tmp)
+            if (bh != nullptr)
             {
-                allocd_.insert(tmp);
+                if (bh != orig)
+                {
+                    allocd_.erase(orig);
+                    allocd_.insert(bh);
+                }
 
-                bh = BH_cast(tmp);
                 assert (bh->size == old_size);
                 bh->size  = size;
 
@@ -131,9 +128,7 @@ namespace gcache
             else
             {
                 assert(size > 0);
-                /* orginal buffer is still allocated so we need to restore it
-                 * but we can't use bh directly due to GCC warnings */
-                allocd_.insert(reinterpret_cast<BufferHeader*>(orig));
+                /* orginal buffer is still allocated so we keep it in allocd_*/
             }
 
             return 0;
@@ -170,7 +165,7 @@ namespace gcache
 
         size_t          max_size_;
         size_t          size_;
-        std::set<void*> allocd_;
+        std::set<BufferHeader*> allocd_;
         seqno2ptr_t&    seqno2ptr_;
         seqno_t         seqno_locked_;
         int             debug_;
