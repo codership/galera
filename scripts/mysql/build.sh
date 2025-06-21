@@ -327,12 +327,16 @@ fi
 if [ "$TAR" == "yes" -o "$BIN_DIST" == "yes" ]
 then
     cd $GALERA_SRC
-    debug_opt=""
+    build_opt=""
     if [ $GALERA_DEBUG == "yes" ]
     then
-        debug_opt="-d"
+        build_opt+=" -d"
     fi
-    scripts/build.sh $debug_opt # options are passed via environment variables
+    if [ $CONFIGURE == "yes" ]
+    then
+        build_opt+=" -s"
+    fi
+    scripts/build.sh $build_opt # options are passed via environment variables
     # sadly we can't easily pass GALERA_REV from Galera build script
     GALERA_REV=${GALERA_REV:-"XXXX"}
 fi
@@ -571,6 +575,7 @@ install_mysql_5.5_demo()
     pushd $MYSQL_DIST_DIR
     [ -d usr/local ] && ( mv usr/local/* ./ && rmdir usr/local ) # FreeBSD
     [ -d libexec -a ! -d sbin ] && mv libexec sbin # FreeBSD
+    mkdir -p ./lib64 && mv usr/lib64/* ./lib64/ && rm -rf usr/lib64
     mv usr/* ./ && rmdir usr
     popd
 }
