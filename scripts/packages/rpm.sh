@@ -14,14 +14,21 @@ THIS_DIR=$(pwd -P)
 
 RPM_TOP_DIR=$SCRIPT_ROOT/rpm_top_dir
 rm -rf $RPM_TOP_DIR
-mkdir -p $RPM_TOP_DIR/RPMS
-ln -s ../../../ $RPM_TOP_DIR/BUILD
+mkdir -p $RPM_TOP_DIR/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+PROJECT_ROOT=$(cd $SCRIPT_ROOT/../..; pwd -P)
+CMAKE_BUILD_DIR=$RPM_TOP_DIR/cmake_build
+mkdir -p $CMAKE_BUILD_DIR
+
+pushd $CMAKE_BUILD_DIR > /dev/null
+# Generate CPack config
+cmake $PROJECT_ROOT
+# Create source package with the specified version
+cpack --config CPackSourceConfig.cmake -D CPACK_PACKAGE_VERSION=$1 -G TGZ
+mv galera-4-$1.tar.gz $RPM_TOP_DIR/SOURCES/
+popd > /dev/null
+
 export CK_TIMEOUT_MULTIPLIER=5
 
-fast_cflags="-O3 -fno-omit-frame-pointer"
-uname -m | grep -q i686 && \
-cpu_cflags="-mtune=i686" || cpu_cflags="-mtune=core2"
-RPM_OPT_FLAGS="$fast_cflags $cpu_cflags"
 GALERA_SPEC=$SCRIPT_ROOT/galera-4.spec
 
 RELEASE=${RELEASE:-"1"}
@@ -62,14 +69,11 @@ then
   DIST_TAG=".${ID:-unknown}${VERSION_ID%%.*}"
 fi
 
-# no cmake3 installed? Pretend the build dependency is cmake
-rpm -q cmake3 || sed -i -e 's/cmake3/cmake/' "$GALERA_SPEC"
-
 rpmbuild --clean --define "_topdir $RPM_TOP_DIR" \
-                  --define "optflags $RPM_OPT_FLAGS" \
                   --define "version $1" \
                   --define "dist ${DIST_TAG}" \
-                  -bb $GALERA_SPEC
+                  ${JOBS:+--define "_smp_mflags -j$JOBS"} \
+                  -bb $GALERA_SPEC || (rpm --showrc && exit 1)
 
 RPM_ARCH=$(rpm --showrc | grep "^build arch" | awk '{print $4}')
 
