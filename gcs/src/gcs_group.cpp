@@ -23,6 +23,8 @@ std::string const GCS_STATELESS_KEY("gcs.stateless");
 bool        const GCS_STATELESS_DEFAULT(false);
 std::string const GCS_VOTE_POLICY_KEY("gcs.vote_policy");
 uint8_t     const GCS_VOTE_POLICY_DEFAULT(0);
+std::string const GCS_CHECK_APPL_PROTO_KEY("gcs.check_appl_proto");
+bool        const GCS_CHECK_APPL_PROTO_DEFAULT(true);
 
 void gcs_group::register_params(gu::Config& cnf)
 {
@@ -32,6 +34,8 @@ void gcs_group::register_params(gu::Config& cnf)
     cnf.add(GCS_VOTE_POLICY_KEY,
             gu::Config::Flag::read_only |
             gu::Config::Flag::type_integer);
+    cnf.add(GCS_CHECK_APPL_PROTO_KEY,
+            gu::Config::Flag::type_bool);
 }
 
 const char* gcs_group_state_str[GCS_GROUP_STATE_MAX] =
@@ -46,6 +50,12 @@ static bool
 group_conf_stateless_flag(gu::Config& cnf)
 {
     return cnf.get(GCS_STATELESS_KEY, GCS_STATELESS_DEFAULT);
+}
+
+static bool
+group_conf_check_appl_proto(gu::Config& cnf)
+{
+    return cnf.get(GCS_CHECK_APPL_PROTO_KEY, GCS_CHECK_APPL_PROTO_DEFAULT);
 }
 
 uint8_t gcs_group_conf_to_vote_policy(gu::Config& cnf)
@@ -357,7 +367,10 @@ group_check_proto_ver(gcs_group_t* group)
 
     GROUP_CHECK_NODE_PROTO_VER(gcs_proto_ver);
     GROUP_CHECK_NODE_PROTO_VER(repl_proto_ver);
-    GROUP_CHECK_NODE_PROTO_VER(appl_proto_ver);
+    if (group_conf_check_appl_proto(group->cnf))
+    {
+        GROUP_CHECK_NODE_PROTO_VER(appl_proto_ver);
+    }
 
 #undef GROUP_CHECK_NODE_PROTO_VER
 
@@ -2136,6 +2149,12 @@ gcs_group_param_set(gcs_group_t& group,
     {
         gu_throw_error(ENOTSUP) << "Setting '" << key << "' in runtime may "
             "have unintended consequences and is currently not supported.";
+    }
+
+    if (GCS_CHECK_APPL_PROTO_KEY == key)
+    {
+        group.cnf.set(key, val); // in case of error throws like above
+        return 0;
     }
 
     return 1;
