@@ -109,7 +109,7 @@ START_TEST(test_str_table)
 END_TEST
 
 
-Suite* gu_str_suite()
+Suite* gu_str_suite(void)
 {
     Suite* s = suite_create("Galera Str util suite");
     TCase* tc;
