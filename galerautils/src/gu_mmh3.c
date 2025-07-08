@@ -163,7 +163,7 @@ _mmh3_128_blocks (const uint64_t* const blocks, size_t const nblocks,
 // Block read - if your platform needs to do endian-swapping or can only
 // handle aligned reads, do the conversion here
         uint64_t k[2];
-        memcpy(k, &blocks[i], sizeof(k));
+        memcpy(k, (char *) &blocks[i], sizeof(k));
         _mmh3_128_block (gu_le64(k[0]), gu_le64(k[1]), h1, h2);
     }
 }
@@ -343,7 +343,7 @@ gu_mmh128_append (gu_mmh128_ctx_t* const mmh,
     _mmh3_128_blocks (blocks, nblocks, &mmh->hash[0], &mmh->hash[1]);
 
     /* save possible trailing bytes to tail */
-    memcpy (mmh->tail, blocks + nblocks, len & 15);
+    memcpy (mmh->tail, (char *) (blocks + nblocks), len & 15);
 }
 
 /*! Get the accumulated message hash (does not change the context) */
