@@ -108,6 +108,7 @@ private:
     TestRecord& operator= (const TestRecord&);
 };
 
+#ifndef GALERA_ONLY_ALIGNED
 START_TEST (empty)
 {
     gu::RecordSetIn<TestRecord> const rset_in(0, 0);
@@ -124,6 +125,7 @@ START_TEST (empty)
     }
 }
 END_TEST
+#endif
 
 static void
 test_version (gu::RecordSet::Version version)
@@ -412,11 +414,13 @@ test_version (gu::RecordSet::Version version)
     catch (std::exception& e) {}
 }
 
+#ifndef GALERA_ONLY_ALIGNED
 START_TEST (ver1)
 {
     test_version(gu::RecordSet::VER1);
 }
 END_TEST
+#endif
 
 START_TEST (ver2)
 {
@@ -482,11 +486,13 @@ test_padding(gu::RecordSet::Version rsv)
     }
 }
 
+#ifndef GALERA_ONLY_ALIGNED
 START_TEST (ver1_padding)
 {
     test_padding(gu::RecordSet::VER1);
 }
 END_TEST
+#endif
 
 START_TEST (ver2_padding)
 {
@@ -593,11 +599,12 @@ Suite* gu_rset_suite ()
 {
     Suite* s(suite_create("gu::RecordSet"));
 
-    TCase* t(tcase_create("RecordSet v1"));
+    TCase* t;
+#ifndef GALERA_ONLY_ALIGNED
+    t = tcase_create("RecordSet v1");
     tcase_add_test (t, empty);
     tcase_add_test (t, ver1);
     tcase_add_test (t, ver1_padding);
-#ifndef GALERA_ONLY_ALIGNED
     suite_add_tcase (s, t);
 #endif
 
