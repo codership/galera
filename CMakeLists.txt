@@ -37,6 +37,8 @@ option(GALERA_SOURCE
 
 # Developer options and instrumentation.
 option(GALERA_WITH_ASAN "Enable ASAN instrumentation" OFF)
+option(GALERA_WITH_ASAN_SCOPED "Enable ASAN instrumentation with -fsanitize-address-use-after-scope" OFF)
+option(GALERA_WITH_UBSAN "Enable UBSAN instrumentation" OFF)
 option(GALERA_WITH_VALGRIND "Optionally run tests with valgrind" OFF)
 option(GALERA_WITH_COVERAGE "Compile with coverage instrumentation" OFF)
 option(GALERA_GCS_SM_DEBUG
