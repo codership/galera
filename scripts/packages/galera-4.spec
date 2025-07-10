@@ -96,11 +96,10 @@ BuildRequires: python
 %endif
 
 # Systemd
-%if 0%{?suse_version} >= 1220 || 0%{?centos} >= 7 || 0%{?rhel} >= 7 || %{defined fedora}
-%define systemd 1
-BuildRequires: systemd
-%else
-%define systemd 0
+%bcond_without systemd
+
+%if %{with systemd}
+%systemd_requires
 %endif
 
 Requires:      openssl
@@ -159,7 +158,7 @@ CBD=build
 [ "$RBR" != "/" ] && [ -d $RBR ] && rm -rf $RBR;
 mkdir -p $RBR
 
-%if 0%{?systemd}
+%if %{with systemd}
 install -D -m 644 $RBD/garb/files/garb.service $RBR%{_unitdir}/garb.service
 install -D -m 755 $RBD/garb/files/garb-systemd $RBR%{_bindir}/garb-systemd
 %else
@@ -167,7 +166,7 @@ install -d $RBR%{_sysconfdir}/init.d
 install -m 755 $RBD/garb/files/garb.sh  $RBR%{_sysconfdir}/init.d/garb
 
 # Symlink required by SUSE policy
-%if 0%{?suse_version}
+%if 0%{?suse_version} && %{without systemd}
 install -d $RBR/usr/sbin
 ln -sf /etc/init.d/garb $RBR/usr/sbin/rcgarb
 %endif
@@ -197,12 +196,20 @@ install -d $RBR%{_mandir}
 install -d $RBR%{_mandir}/man8
 install -m 644 $RBD/man/garbd.8        $RBR%{_mandir}/man8/garbd.8
 
-%pre
-
 %post
+%if %{with systemd}
+%systemd_post garb.service
+%endif
 
 %preun
-rm -f $(find %{libs} -type l)
+%if %{with systemd}
+%systemd_preun garb.service
+%endif
+
+%postun
+%if %{with systemd}
+%systemd_postun garb.service
+%endif
 
 %files
 %defattr(-,root,root,0755)
@@ -213,7 +220,7 @@ rm -f $(find %{libs} -type l)
 %endif
 
 
-%if 0%{?systemd}
+%if %{with systemd}
 %attr(0644,root,root) %{_unitdir}/garb.service
 %attr(0755,root,root) %{_bindir}/garb-systemd
 %else
