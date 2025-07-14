@@ -471,7 +471,8 @@ static void ssl_prepare_context(const gu::Config& conf, asio::ssl::context& ctx,
                 log_info << "SSL cipher list set to '" << value << '\'';
             }
         }
-        ctx.set_options(asio::ssl::context::no_sslv2 |
+        ctx.set_options(asio::ssl::context::no_compression |
+                        asio::ssl::context::no_sslv2 |
                         asio::ssl::context::no_sslv3 |
                         asio::ssl::context::no_tlsv1);
     }
@@ -615,22 +616,6 @@ void gu::ssl_init_options(gu::Config& conf)
         // cipher list
         const std::string cipher_list(conf.get(conf::ssl_cipher, ""));
         conf.set(conf::ssl_cipher, cipher_list);
-
-        // compression
-        try
-        {
-            (void) conf.get(conf::ssl_compression);
-            // warn the user if socket.ssl_compression is set explicitly
-            log_warn << "SSL compression is not effective. The option "
-                     << conf::ssl_compression << " is deprecated and "
-                     << "will be removed in future releases.";
-        }
-        catch (NotSet&)
-        {
-            // this is a desirable situation
-        }
-        log_info << "not using SSL compression";
-        sk_SSL_COMP_zero(SSL_COMP_get_compression_methods());
 
         // verify that asio::ssl::context can be initialized with provided
         // values
