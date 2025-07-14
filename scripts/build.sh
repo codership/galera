@@ -393,7 +393,7 @@ build_sources()
 GALERA_VER=$RELEASE
 
 pushd "$build_base"
-GALERA_REV=$(git log --pretty=format:'%h' -n1.) || \
+GALERA_REV=$(git log --pretty=format:'%h' -n1) || \
 GALERA_REV="XXXXX"
 # trim spaces (sed is not working on Solaris, so using bash built-in)
 GALERA_REV=${GALERA_REV//[[:space:]]/}
@@ -404,9 +404,9 @@ then
     source GALERA_VERSION
     RELEASE="$GALERA_VERSION_WSREP_API.$GALERA_VERSION_MAJOR.$GALERA_VERSION_MINOR"
 fi
-if [ "$PACKAGE" == "yes" -a $DEBIAN -ne 0 ]
+if [ "$PACKAGE" == "yes" -a "$OS" == "Linux" ]
 then
-    echo "Debian package build"
+    echo "Debian or RPM package build"
 elif [ "$CMAKE" == "yes" ] # Build using CMake
 then
     cmake_args="$CMAKE_OPTS -DGALERA_REVISION=$GALERA_REV"

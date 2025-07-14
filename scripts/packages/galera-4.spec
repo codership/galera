@@ -40,16 +40,21 @@ Group:         System Environment/Libraries
 Version:       %{version}
 Release:       %{release}%{dist}
 License:       GPL-2.0
-Source:        http://www.codership.com/downloads/download-mysqlgalera/
+Source:        %{name}-%{version}.tar.gz
 URL:           http://www.codership.com/
 Packager:      Codership Oy
 Vendor:        Codership Oy
 
-BuildRoot:     %{_tmppath}/%{name}-%{version}
-
-#BuildRequires: boost-devel
-#BuildRequires: check-devel
+%if 0%{?suse_version} >= 1500
+BuildRequires: (libboost_filesystem1_66_0-devel or libboost_filesystem1_75_0-devel)
+BuildRequires: (libboost_program_options1_66_0-devel or libboost_program_options1_75_0-devel)
+BuildRequires: (libboost_system1_66_0-devel or libboost_system1_75_0-devel)
+%else
+BuildRequires: boost-devel
+%endif
+BuildRequires: check-devel
 BuildRequires: glibc-devel
+BuildRequires: pkgconfig
 %if "%{dist}" == ".opensuse-leap15"
 BuildRequires: pkgconfig(libssl)
 %else
@@ -119,18 +124,36 @@ This software comes with ABSOLUTELY NO WARRANTY. This is free software,
 and you are welcome to modify and redistribute it under the GPLv2 license.
 
 %prep
-#%setup -T -a 0 -c -n galera-%{version}
+%setup -q
+
+# Note: We don't use cmake macros as they don't provide uniform
+# bahavior on all platforms in Buildbot. Instead, define cmake_exe
+# and ctest_exe based on platform (RHEL7 is the only one left with cmake3)
+# and work directly on those.
+%if 0%{?rhel} == 7
+%define cmake_exe cmake3
+%define ctest_exe ctest3
+%else
+%define cmake_exe cmake
+%define ctest_exe ctest
+%endif
 
 %build
-Build() {
-CFLAGS=${CFLAGS:-$RPM_OPT_FLAGS}
-CXXFLAGS=${CXXFLAGS:-$RPM_OPT_FLAGS}
-# We assume that Galera is built already by the top build.sh script
-}
+%cmake_exe -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+           -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
+           -DCMAKE_INSTALL_DO_STRIP:BOOL=OFF
+%cmake_exe --build build %_smp_mflags
+
+%check
+%ctest_exe --output-on-failure --force-new-ctest-process \
+           --timeout 120 --test-dir build
 
 %install
-RBR=$RPM_BUILD_ROOT
-RBD=$RPM_BUILD_DIR
+RBR=%{buildroot}
+# Install step is executed in build dir
+RBD=.
+# CMake build directory
+CBD=build
 
 # Clean up the BuildRoot first
 [ "$RBR" != "/" ] && [ -d $RBR ] && rm -rf $RBR;
@@ -159,10 +182,10 @@ install -m 644 $RBD/garb/files/garb.cnf $RBR%{_sysconfdir}/sysconfig/garb
 %endif
 
 install -d $RBR%{_bindir}
-install -m 755 $RBD/garb/garbd                    $RBR%{_bindir}/garbd
+install -m 755 $CBD/garb/garbd                    $RBR%{_bindir}/garbd
 
 install -d $RBR%{libs}
-install -m 755 $RBD/libgalera_smm.so              $RBR%{libs}/libgalera_smm.so
+install -m 755 $CBD/libgalera_smm.so              $RBR%{libs}/libgalera_smm.so
 
 install -d $RBR%{docs}
 install -m 644 $RBD/COPYING                       $RBR%{docs}/COPYING
