@@ -244,7 +244,7 @@ namespace gu
         {
             errno = ret;
 #endif
-            if ((EINVAL == errno || ENOSYS == errno) && start >= 0 && diff > 0)
+            if ((EINVAL == errno || ENOSYS == errno || EOPNOTSUPP == errno) && start >= 0 && diff > 0)
             {
                 // FS does not support the operation, try physical write
                 write_file (start);
