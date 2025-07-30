@@ -39,6 +39,7 @@ void gcs_group::register_params(gu::Config& cnf)
             gu::Config::Flag::read_only |
             gu::Config::Flag::type_integer);
     cnf.add(GCS_CHECK_APPL_PROTO_KEY,
+            std::to_string(GCS_CHECK_APPL_PROTO_DEFAULT),
             gu::Config::Flag::type_bool);
 }
 
