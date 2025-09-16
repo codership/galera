@@ -1,5 +1,5 @@
-galera-4 (26.4.23) UNRELEASED; urgency=medium
+galera-4 (26.4.24) UNRELEASED; urgency=medium
 
   * Galera 4 release
 
- -- MariaDB Developers <developers@lists.mariadb.org>  Tue, 01 Jul 2025 15:25:44 +0200
+ -- Codership Oy <info@codership.com>  Mon, 08 Sep 2025 15:06:14 +0300

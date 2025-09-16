@@ -18,8 +18,10 @@
             wsrep_init_config_service_v1;
             wsrep_deinit_config_service_v1;
             wsrep_node_isolation_mode_set_v1;
-            wsrep_certity_v1;
+            wsrep_certify_v1;
             wsrep_init_connection_monitor_service_v1;
             wsrep_deinit_connection_monitor_service_v1;
+            wsrep_init_config_service_v2;
+            wsrep_deinit_config_service_v2;
     local:  *;
 };

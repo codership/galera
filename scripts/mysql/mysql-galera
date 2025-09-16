@@ -63,7 +63,9 @@ MYSQLD_USER=$(whoami)
 ##
 # use mysqld server directly, better not have automatic restarting
 MYSQLD="$MYSQL_BASE_DIR/sbin/mysqld"
-[ ! -x "$MYSQLD" -a -x "${MYSQLD}-debug" ] && MYSQLD=${MYSQLD}-debug 
+MARIADBD="$MYSQL_BASE_DIR/sbin/mariadbd"
+[ -x "$MARIADBD" ] && MYSQLD=$MARIADBD
+[ ! -x "$MYSQLD" -a -x "${MYSQLD}-debug" ] && MYSQLD=${MYSQLD}-debug
 MYSQLADMIN="$MYSQL_BASE_DIR/bin/mysqladmin"
 # Port, socket and pid files
 MYSQL_PORT=${MYSQL_PORT:-3306}

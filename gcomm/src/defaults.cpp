@@ -18,6 +18,7 @@ namespace gcomm
         GCOMM_ASIO_AUTO_BUF_SIZE;
     std::string const Defaults::GMCastVersion           = "0";
     std::string const Defaults::GMCastTcpPort           = BASE_PORT_DEFAULT;
+    std::string const Defaults::GMCastMCastTTL          = "1";
     std::string const Defaults::GMCastSegment           = "0";
     std::string const Defaults::GMCastTimeWait          = "PT5S";
     std::string const Defaults::GMCastPeerTimeout       = "PT3S";
@@ -28,11 +29,15 @@ namespace gcomm
     std::string const Defaults::EvsSuspectTimeoutMin    = "PT0.1S";
     std::string const Defaults::EvsInactiveTimeout      = "PT15S";
     std::string const Defaults::EvsInactiveTimeoutMin   = "PT0.1S";
-    std::string const Defaults::EvsRetransPeriod        = "PT1S";
-    std::string const Defaults::EvsRetransPeriodMin     = "PT0.1S";
+    std::string const Defaults::EvsKeepalivePeriod      = "PT1S";
+    std::string const Defaults::EvsCausalKeepalivePeriod= Defaults::EvsKeepalivePeriod;
+    std::string const Defaults::EvsKeepalivePeriodMin   = "PT0.1S";
     std::string const Defaults::EvsJoinRetransPeriod    = "PT1S";
+    std::string const Defaults::EvsJoinRetransPeriodMin = "PT0.1S";
     std::string const Defaults::EvsStatsReportPeriod    = "PT1M";
     std::string const Defaults::EvsStatsReportPeriodMin = "PT1S";
+    std::string const Defaults::EvsDebugLogMask         = "0x1";
+    std::string const Defaults::EvsInfoLogMask          = "0";
     std::string const Defaults::EvsSendWindow           = "4";
     std::string const Defaults::EvsSendWindowMin        = "1";
     std::string const Defaults::EvsUserSendWindow       = "2";
@@ -42,6 +47,7 @@ namespace gcomm
     std::string const Defaults::EvsDelayedKeepPeriod    = "PT30S";
     std::string const Defaults::EvsAutoEvict            = "0";
     std::string const Defaults::EvsVersion              = "1";
+    std::string const Defaults::EvsUseAggregate         = "true";
     std::string const Defaults::PcAnnounceTimeout       = "PT3S";
     std::string const Defaults::PcChecksum              = "false";
     std::string const Defaults::PcIgnoreQuorum          = "false";
@@ -52,4 +58,5 @@ namespace gcomm
     std::string const Defaults::PcWaitPrimTimeout       = "PT30S";
     std::string const Defaults::PcWeight                = "1";
     std::string const Defaults::PcRecovery              = "true";
+    std::string const Defaults::PcLinger                = "PT20S";
 }

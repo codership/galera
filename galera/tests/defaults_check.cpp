@@ -67,6 +67,7 @@ static const char* Defaults[] =
     "gcache.recover",              "yes",
     "gcache.size",                 "128M",
     "gcomm.thread_prio",           "",
+    "gcs.check_appl_proto",        "1",
     "gcs.fc_debug",                "0",
     "gcs.fc_factor",               "1.0",
     "gcs.fc_limit",                "16",

@@ -2624,6 +2624,10 @@ bool galera::ReplicatorSMM::skip_prim_conf_change(
             cert_.adjust_position(view_info,
                                   gu::GTID(view_info.state_id.uuid, cc_seqno),
                                   trx_ver);
+            // even if CC was part of SST, it still may carry updated protocol
+            // version and updated CC seqno
+            finish_local_prim_conf_change(proto_ver, cc_seqno, "CC");
+
             keep = true;
         }
     }
