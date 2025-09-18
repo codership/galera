@@ -51,8 +51,13 @@
 # include <stdint.h>
 # define GU_WORDSIZE __WORDSIZE
 #else
-# include <bits/wordsize.h>
-# define GU_WORDSIZE __WORDSIZE
+# if __SIZEOF_POINTER__ == 8
+#  define GU_WORDSIZE 64
+# elif __SIZEOF_POINTER__ == 4
+#  define GU_WORDSIZE 32
+# else
+#  error "Unsupported pointer size"
+# endif
 #endif
 
 #include <stdint.h>
