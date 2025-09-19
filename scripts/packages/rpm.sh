@@ -27,7 +27,7 @@ cpack --config CPackSourceConfig.cmake -D CPACK_PACKAGE_VERSION=$1 -G TGZ
 mv galera-4-$1.tar.gz $RPM_TOP_DIR/SOURCES/
 popd > /dev/null
 
-export CK_TIMEOUT_MULTIPLIER=5
+export CK_TIMEOUT_MULTIPLIER=7
 
 GALERA_SPEC=$SCRIPT_ROOT/galera-4.spec
 

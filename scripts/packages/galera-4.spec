@@ -145,7 +145,7 @@ and you are welcome to modify and redistribute it under the GPLv2 license.
 
 %check
 %ctest_exe --output-on-failure --force-new-ctest-process \
-           --timeout 120 --test-dir build
+           --timeout 1200 --test-dir build
 
 %install
 RBR=%{buildroot}

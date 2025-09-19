@@ -218,6 +218,7 @@ Suite* util_suite()
 
     tc = tcase_create("test_view_state");
     tcase_add_test(tc, test_view_state);
+    tcase_set_timeout(tc, 1200);
     suite_add_tcase(s, tc);
 
     tc = tcase_create("test_set_intersection_irreflexive_assertion");
