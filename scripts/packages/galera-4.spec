@@ -67,7 +67,11 @@ BuildRequires: pkgconfig(libssl)
 %if "%{dist}" == ".sle15"
 BuildRequires: pkgconfig(libssl)
 %else
+%if "%{dist}" == ".sle16"
+BuildRequires: pkgconfig(libssl)
+%else
 BuildRequires: openssl-devel
+%endif
 %endif
 %endif
 %endif
