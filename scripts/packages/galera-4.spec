@@ -33,6 +33,9 @@
 %if 0%{?suse_version} == 1500
 %define dist .sle15
 %endif
+%if 0%{?suse_version} == 1600
+%define dist .sle16
+%endif
 
 Name:          %{name}
 Summary:       Galera: a synchronous multi-master wsrep provider (replication engine)
@@ -46,9 +49,9 @@ Packager:      Codership Oy
 Vendor:        Codership Oy
 
 %if 0%{?suse_version} >= 1500
-BuildRequires: (libboost_filesystem1_66_0-devel or libboost_filesystem1_75_0-devel)
-BuildRequires: (libboost_program_options1_66_0-devel or libboost_program_options1_75_0-devel)
-BuildRequires: (libboost_system1_66_0-devel or libboost_system1_75_0-devel)
+BuildRequires: (libboost_filesystem1_66_0-devel or libboost_filesystem1_75_0-devel or libboost_filesystem1_86_0-devel)
+BuildRequires: (libboost_program_options1_66_0-devel or libboost_program_options1_75_0-devel or libboost_program_options1_86_0-devel)
+BuildRequires: (libboost_system1_66_0-devel or libboost_system1_75_0-devel or libboost_system1_86_0-devel)
 %else
 BuildRequires: boost-devel
 %endif
@@ -58,10 +61,14 @@ BuildRequires: pkgconfig
 %if "%{dist}" == ".opensuse-leap15"
 BuildRequires: pkgconfig(libssl)
 %else
+%if "%{dist}" == ".opensuse-leap16"
+BuildRequires: pkgconfig(libssl)
+%else
 %if "%{dist}" == ".sle15"
 BuildRequires: pkgconfig(libssl)
 %else
 BuildRequires: openssl-devel
+%endif
 %endif
 %endif
 
