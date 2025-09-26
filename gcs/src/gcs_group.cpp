@@ -486,6 +486,15 @@ group_post_state_exchange (gcs_group_t* group)
                 assert(quorum->last_applied >= 0);
                 group->last_applied = quorum->last_applied;
             }
+
+            if (quorum->gcs_proto_ver >= 6) {
+                /* removing
+                   group->last_applied = quorum->last_applied;
+                 * above was a mistake as it allowed last_applied
+                 * from the old history survive into the new one.
+                 * Reinstating with new protocol version. */
+                group->last_applied = quorum->last_applied;
+            }
         }
         else {
             // no state exchange happend, processing old state messages
