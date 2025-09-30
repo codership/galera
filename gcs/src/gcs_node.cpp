@@ -44,6 +44,18 @@ gcs_node_init (gcs_node_t* const node,
     node->stateless      = stateless;
 }
 
+/*! Reset certain node properties after it joins a different cluster.
+ *  Setting to 0 as it is what it is initialized to in gcs_node_init(). */
+static void
+node_reset(gcs_node_t* node)
+{
+    node->bootstrap = false;
+    node->status    = GCS_NODE_STATE_NON_PRIM;
+    node->last_applied = 0;
+    node->vote_seqno= GCS_NO_VOTE_SEQNO;
+    node->vote_res  = 0;
+}
+
 /*! Move data from one node object to another */
 void
 gcs_node_move (gcs_node_t* dst, gcs_node_t* src)
@@ -213,9 +225,12 @@ gcs_node_update_status (gcs_node_t* node, const gcs_state_quorum_t* quorum)
         }
         else {
             // node joins completely different group, clear all status
-            if (node->status > GCS_NODE_STATE_PRIM) {
+            if (node->status > GCS_NODE_STATE_PRIM || node->last_applied > 0) {
                 gu_info ("'%s' has a different history, demoted %s->PRIMARY",
                          node->name, gcs_node_state_to_str(node->status));
+            }
+            if (quorum->gcs_proto_ver >= 6) {
+                node_reset(node);
             }
             node->status = GCS_NODE_STATE_PRIM;
         }
