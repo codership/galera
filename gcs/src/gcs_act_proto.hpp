@@ -28,8 +28,10 @@ typedef uint8_t gcs_proto_t;
  *     (must keep it identical on all nodes)
  * 5 - fix for commit cut tracking for just SYNCED nodes
  *     (must keep it identical on all nodes)
+ * 6 - fix for commit cut "infection" from a node with different history
+ *     (must keep it identical on all nodes)
  */
-#define GCS_PROTO_MAX 5
+#define GCS_PROTO_MAX 6
 
 /*! Internal action fragment data representation */
 typedef struct gcs_act_frag
