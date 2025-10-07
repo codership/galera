@@ -74,20 +74,16 @@ private:
     struct addrinfo get_addrinfo(int flags, int family, int socktype,
                                  int protocol)
     {
-        struct addrinfo ret = {
-            flags,
-            family,
-            socktype,
-            protocol,
-#if defined(__FreeBSD__)
-	    0, // FreeBSD gives ENOMEM error with non-zero value
+        addrinfo ret{};
+        ret.ai_flags = flags;
+        ret.ai_family = family;
+        ret.ai_socktype = socktype;
+        ret.ai_protocol = protocol;
+#ifdef __FreeBSD__
+        ret.ai_addrlen = 0;
 #else
-            sizeof(struct sockaddr),
+        ret.ai_addrlen = sizeof(struct sockaddr);
 #endif
-            0,
-            0,
-            0
-        };
         return ret;
     }
 };
@@ -98,6 +94,7 @@ static SchemeMap scheme_map;
 // Helper to copy addrinfo structs.
 static void copy(const addrinfo& from, addrinfo& to)
 {
+    memset(&to, 0, sizeof(to));
     to.ai_flags = from.ai_flags;
     to.ai_family = from.ai_family;
     to.ai_socktype = from.ai_socktype;
