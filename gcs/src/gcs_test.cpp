@@ -26,6 +26,7 @@
 #define USE_WAIT
 
 #define gcs_malloc(a) ((a*) malloc (sizeof (a)))
+#define gcs_free(a) (free ((a)))
 
 static pthread_mutex_t gcs_test_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -206,7 +207,12 @@ test_log_open (gcs_test_log_t **log, const char *name)
 
     snprintf (real_name, 1024, "%s.%lld", name, (long long)getpid());
     // cppcheck-suppress memleak
-    if (!(l->file = fopen (real_name, "w"))) return errno;
+    if (!(l->file = fopen (real_name, "w")))
+    {
+        gu_free(l);
+	*log = NULL;
+        return errno;
+    }
     pthread_mutex_init (&l->lock, NULL);
     *log = l;
     return 0;
