@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2011 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2025 Codership Oy <info@codership.com>
  *
  * $Id$
  *
@@ -32,9 +32,10 @@ gcs_fifo_lite_t* gcs_fifo_lite_create (size_t length, size_t item_size)
     /* Find real length. It must be power of 2*/
     while (l < length) l = l << 1;
 
-    if (l * item_size > (uint64_t)GU_LONG_MAX) {
-        gu_error ("Resulting FIFO size %lld exceeds signed limit: %lld",
-                  (long long)(l*item_size), (long long)GU_LONG_MAX);
+    if (item_size > (uint64_t)(GU_LONG_MAX/l)) {
+        gu_error ("Resulting FIFO size %llu * %lu exceeds signed limit: %lld",
+                  (unsigned long long)(item_size), l,
+                  (signed long long)GU_LONG_MAX);
         return NULL;
     }
 
@@ -45,6 +46,7 @@ gcs_fifo_lite_t* gcs_fifo_lite_create (size_t length, size_t item_size)
         ret->item_size = item_size;
 	ret->mask      = ret->length - 1;
         ret->closed    = true;
+        assert(item_size < (uint64_t)(GU_LONG_MAX/ ret->length));
 	ret->queue     = gu_malloc (ret->length * item_size);
 
 	if (ret->queue) {
