@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2016 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2025 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -230,11 +230,22 @@ namespace gu
     void
     FileDescriptor::prealloc(off_t const start)
     {
+        if (start < 0)
+        {
+          log_warn << "Offset is negative in '" << name_ << "'";
+          return;
+        }
+
         off_t const diff (size_ - start);
+
+        if (diff < 0)
+        {
+          log_warn << "Offset is greater than the file size in '" << name_ << "'";
+          return;
+        }
 
         log_debug << "Preallocating " << diff << '/' << size_ << " bytes in '"
                   << name_ << "'...";
-
 #if defined(__APPLE__)
         if (-1 == fcntl (fd_, F_SETSIZE, size_) && -1 == ftruncate (fd_, size_))
         {
@@ -242,17 +253,17 @@ namespace gu
         int const ret = posix_fallocate (fd_, start, diff);
         if (0 != ret)
         {
-            errno = ret;
+          errno = ret;
 #endif
-            if ((EINVAL == errno || ENOSYS == errno) && start >= 0 && diff > 0)
-            {
-                // FS does not support the operation, try physical write
-                write_file (start);
-            }
-            else
-            {
-                gu_throw_system_error (errno) << "File preallocation failed";
-            }
+          if ((EINVAL == errno || ENOSYS == errno))
+          {
+              // FS does not support the operation, try physical write
+              write_file (start);
+          }
+          else
+          {
+              gu_throw_system_error (errno) << "File preallocation failed";
+          }
         }
     }
 }
