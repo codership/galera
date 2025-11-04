@@ -1471,24 +1471,24 @@ gcs_core_set_pkt_size (gcs_core_t* core, int const pkt_size)
     int ret(msg_size - hdr_size); // message payload
     assert(ret > 0);
 
-    if (core->send_buf_len == (size_t)msg_size) return ret;
-
     if (gu_mutex_lock (&core->send_lock)) abort();
     {
-        if (core->state != CORE_DESTROYED) {
-            void* new_send_buf(gu_realloc(core->send_buf, msg_size));
-            if (new_send_buf) {
-                core->send_buf     = new_send_buf;
-                core->send_buf_len = msg_size;
-                memset (core->send_buf, 0, hdr_size); // to pacify valgrind
-                gu_debug ("Message payload (action fragment size): %d", ret);
+        if (core->send_buf_len != (size_t)msg_size) {
+            if (core->state != CORE_DESTROYED) {
+                void* new_send_buf(gu_realloc(core->send_buf, msg_size));
+                if (new_send_buf) {
+                    core->send_buf     = new_send_buf;
+                    core->send_buf_len = msg_size;
+                    memset (core->send_buf, 0, hdr_size); // to pacify valgrind
+                    gu_debug ("Message payload (action fragment size): %d", ret);
+                }
+                else {
+                    ret = -ENOMEM;
+                }
             }
             else {
-                ret = -ENOMEM;
+                ret =  -EBADFD;
             }
-        }
-        else {
-            ret =  -EBADFD;
         }
     }
     gu_mutex_unlock (&core->send_lock);
