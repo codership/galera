@@ -108,6 +108,8 @@ namespace gu
     void
     MMap::unmap ()
     {
+        // Do logging before munmap because it makes ptr invalid memory on success
+        log_debug << "Memory unmapped: " << ptr << "(" << size <<" bytes)";
         if (munmap (ptr, size) < 0)
         {
             gu_throw_system_error(errno)
@@ -115,8 +117,6 @@ namespace gu
         }
 
         mapped = false;
-
-        log_debug << "Memory unmapped: " << ptr << " (" << size <<" bytes)";
     }
 
     MMap::~MMap ()
