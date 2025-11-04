@@ -2523,21 +2523,21 @@ _set_fc_factor (gcs_conn_t* conn, const char* value)
 
     if (factor >= 0.0 && factor <= 1.0 && *endptr == '\0') {
 
-        if (factor == conn->params.fc_resume_factor) return 0;
-
         gu_fifo_lock(conn->recv_q);
+        if (!gu_mutex_lock (&conn->fc_lock))
         {
-            if (!gu_mutex_lock (&conn->fc_lock)) {
-                conn->params.fc_resume_factor = factor;
-                _set_fc_limits (conn);
-                gu_config_set_double (conn->config, GCS_PARAMS_FC_FACTOR,
-                                      conn->params.fc_resume_factor);
-                gu_mutex_unlock (&conn->fc_lock);
-            }
-            else {
-                gu_fatal ("Failed to lock mutex.");
-                abort();
-            }
+            if (factor != conn->params.fc_resume_factor)
+            {
+              conn->params.fc_resume_factor = factor;
+              _set_fc_limits (conn);
+              gu_config_set_double (conn->config, GCS_PARAMS_FC_FACTOR,
+                                    conn->params.fc_resume_factor);
+	    }
+            gu_mutex_unlock (&conn->fc_lock);
+        }
+        else {
+            gu_fatal ("Failed to lock mutex.");
+            abort();
         }
         gu_fifo_release (conn->recv_q);
 
