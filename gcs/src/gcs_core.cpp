@@ -394,7 +394,7 @@ gcs_core_send (gcs_core_t*          const conn,
 
     int            idx  = 0;
     const uint8_t* ptr  = (const uint8_t*)action[idx].ptr;
-    size_t         left = action[idx].size;
+    ssize_t        left = action[idx].size;
 
     do {
         const size_t chunk_size =
@@ -402,16 +402,18 @@ gcs_core_send (gcs_core_t*          const conn,
 
         /* Here is the only time we have to cast frg.frag */
         char* dst = (char*)frg.frag;
-        size_t to_copy = chunk_size;
+        ssize_t to_copy = chunk_size;
 
         while (to_copy > 0) {        // gather action bufs into one
             if (to_copy <= left) {
+                assert(to_copy > 0);
                 memcpy (dst, ptr, to_copy);
                 ptr     += to_copy;
                 left    -= to_copy;
                 to_copy = 0;
             }
             else {
+                assert(left >= 0);
                 memcpy (dst, ptr, left);
                 dst     += left;
                 to_copy -= left;
@@ -457,6 +459,7 @@ gcs_core_send (gcs_core_t*          const conn,
                 do {
                     if (move_back <= ptrdiff) {
                         ptr -= move_back;
+                        assert((size_t)action[idx].size > ptrdiff + move_back);
                         left = action[idx].size - ptrdiff + move_back;
                         break;
                     }
