@@ -232,16 +232,16 @@ namespace gu
     {
         if (start < 0)
         {
-          log_warn << "Offset is negative in '" << name_ << "'";
-          return;
+            log_warn << "Offset is negative in '" << name_ << "'";
+            return;
         }
 
         off_t const diff (size_ - start);
 
         if (diff < 0)
         {
-          log_warn << "Offset is greater than the file size in '" << name_ << "'";
-          return;
+            log_warn << "Offset is greater than the file size in '" << name_ << "'";
+            return;
         }
 
         log_debug << "Preallocating " << diff << '/' << size_ << " bytes in '"
@@ -253,17 +253,17 @@ namespace gu
         int const ret = posix_fallocate (fd_, start, diff);
         if (0 != ret)
         {
-          errno = ret;
+            errno = ret;
 #endif
-          if ((EINVAL == errno || ENOSYS == errno))
-          {
-              // FS does not support the operation, try physical write
-              write_file (start);
-          }
-          else
-          {
-              gu_throw_system_error (errno) << "File preallocation failed";
-          }
+            if ((EINVAL == errno || ENOSYS == errno))
+            {
+                // FS does not support the operation, try physical write
+                write_file (start);
+            }
+            else
+            {
+                gu_throw_system_error (errno) << "File preallocation failed";
+            }
         }
     }
 }

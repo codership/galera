@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2021 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2025 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -1766,7 +1766,7 @@ gcs_conn::~gcs_conn()
 
             gu_cond_destroy (&tmp_cond);
 
-            gu_throw_error(EBADFD);
+            gu_abort();
         }
 
         gcs_sm_leave (conn->sm);
@@ -1786,13 +1786,13 @@ gcs_conn::~gcs_conn()
     gcs_sm_destroy (conn->sm);
 
     if ((err = gcs_fifo_lite_destroy (conn->repl_q))) {
-        gu_debug ("Error destroying repl FIFO: %d (%s)", err, strerror(-err));
-        gu_throw_error(-err);
+        gu_error ("Error destroying repl FIFO: %d (%s)", err, strerror(-err));
+        gu_abort();
     }
 
     if ((err = gcs_core_destroy (conn->core))) {
-        gu_debug ("Error destroying core: %d (%s)", err, strerror(-err));
-        gu_throw_error(-err);
+        gu_error ("Error destroying core: %d (%s)", err, strerror(-err));
+        gu_abort();
     }
 
     /* This must not last for long */
@@ -2528,16 +2528,16 @@ _set_fc_factor (gcs_conn_t* conn, const char* value)
         {
             if (factor != conn->params.fc_resume_factor)
             {
-              conn->params.fc_resume_factor = factor;
-              _set_fc_limits (conn);
-              gu_config_set_double (conn->config, GCS_PARAMS_FC_FACTOR,
-                                    conn->params.fc_resume_factor);
-	    }
+                conn->params.fc_resume_factor = factor;
+                _set_fc_limits (conn);
+                gu_config_set_double (conn->config, GCS_PARAMS_FC_FACTOR,
+                                      conn->params.fc_resume_factor);
+            }
             gu_mutex_unlock (&conn->fc_lock);
         }
         else {
             gu_fatal ("Failed to lock mutex.");
-            abort();
+            gu_abort();
         }
         gu_fifo_release (conn->recv_q);
 

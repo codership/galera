@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2017 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2025 Codership Oy <info@codership.com>
  *
  */
 
@@ -10,6 +10,7 @@
 #include "gu_threads.h"
 #include "gu_throw.hpp"
 #include "gu_logger.hpp"
+#include "gu_abort.h"
 
 #include <cerrno>
 #include <cstring>
@@ -40,8 +41,9 @@ namespace gu
             int const err(gu_mutex_destroy (&value_));
             if (gu_unlikely(err != 0))
             {
-                assert(0);
-                gu_throw_system_error(err) << "gu_mutex_destroy()";
+                log_fatal << "Mutex destroy failed: " << err << " ("
+                          << strerror(err) << "), Aborting.";
+                gu_abort();
             }
         }
 
@@ -57,8 +59,11 @@ namespace gu
             }
             else
             {
-                assert(0);
-                gu_throw_system_error(err) << "Mutex lock failed";
+                log_fatal << "Mutex lock failed: " << err << " ("
+                          << strerror(err) << "), Aborting.";
+                // Do not throw exception here because it will be
+                // uncaught in many destructors.
+                gu_abort();
             }
         }
 
@@ -79,7 +84,7 @@ namespace gu
             {
                 log_fatal << "Mutex unlock failed: " << err << " ("
                           << strerror(err) << "), Aborting.";
-                ::abort();
+                gu_abort();
             }
         }
 

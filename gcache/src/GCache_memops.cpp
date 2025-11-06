@@ -3,8 +3,8 @@
  */
 
 #include "GCache.hpp"
-
 #include <cassert>
+#include "gu_logger.hpp"
 
 namespace gcache
 {
@@ -182,20 +182,29 @@ namespace gcache
             /* free() should not be used on ordered buffers,
              * GCache::seqno_release() should be used instead */
             assert(bh->seqno_g <= 0);
-            gu::Lock      lock(mtx);
+
+            try
+            {
+                gu::Lock      lock(mtx);
 
 #ifndef NDEBUG
-            if (params.debug()) { log_info << "GCache::free() " << bh; }
-            seqno_t const old_sr(seqno_released);
+                if (params.debug()) { log_info << "GCache::free() " << bh; }
+                seqno_t const old_sr(seqno_released);
 #endif
-            free_common (bh);
+                free_common (bh);
 #ifndef NDEBUG
-            if (params.debug())
-            {
-                log_info << "GCache::free() seqno_released: "
-                         << old_sr << " -> " << seqno_released;
-            }
+                if (params.debug())
+                {
+                    log_info << "GCache::free() seqno_released: "
+                             << old_sr << " -> " << seqno_released;
+                }
 #endif
+            }
+            catch(gu::Exception& e)
+            {
+                gu_error("GCache::free() caught exception %s.", e.what());
+                gu_abort();
+            }
         }
         else {
             log_warn << "Attempt to free a null pointer";

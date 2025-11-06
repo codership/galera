@@ -51,7 +51,7 @@ namespace galera
         } State;
 
         Replicator() { }
-        virtual ~Replicator() { }
+        virtual ~Replicator() noexcept(false) { }
         virtual wsrep_status_t connect(const std::string& cluster_name,
                                        const std::string& cluster_url,
                                        const std::string& state_donor,

@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2020 Codership Oy <info@codership.com>
+// Copyright (C) 2020-2025 Codership Oy <info@codership.com>
 //
 
 #define GU_ASIO_IMPL
@@ -90,7 +90,10 @@ gu::AsioUdpSocket::AsioUdpSocket(gu::AsioIoService& io_service)
     , local_if_()
 { }
 
-gu::AsioUdpSocket::~AsioUdpSocket() { close(); }
+gu::AsioUdpSocket::~AsioUdpSocket() noexcept(false)
+{
+    close();
+}
 
 asio::ip::udp::resolver::iterator
 gu::AsioUdpSocket::resolve_and_open(const gu::URI& uri)

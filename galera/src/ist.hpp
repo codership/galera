@@ -51,7 +51,7 @@ namespace galera
             // Report IST end
             virtual void ist_end(const Result&) = 0;
         protected:
-            virtual ~EventHandler() {}
+            virtual ~EventHandler() noexcept(false) {}
         };
 
         class Receiver

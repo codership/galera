@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2021 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2025 Codership Oy <info@codership.com>
  *
  * $Id$
  */
@@ -210,7 +210,7 @@ test_log_open (gcs_test_log_t **log, const char *name)
     if (!(l->file = fopen (real_name, "w")))
     {
         gu_free(l);
-	*log = NULL;
+        *log = NULL;
         return errno;
     }
     pthread_mutex_init (&l->lock, NULL);
@@ -713,6 +713,8 @@ int main (int argc, char *argv[])
     gu_config_t* gconf;
     bool bstrap;
 
+    try
+    {
     gcs_conf_debug_on(); // turn on debug messages
 
     if ((err = gcs_test_conf     (&conf, argc, argv)))   goto out;
@@ -853,6 +855,31 @@ int main (int argc, char *argv[])
 		(long long)allocs,
 		(long long)reallocs,
 		(long long)deallocs);
+    }
+    }
+    catch (gu::UUIDScanException& u)
+    {
+      printf("UUIDScanException: %d\n", u.get_errno());
+    }
+    catch (gu::NotFound& nf)
+    {
+      printf("NotFound exception\n");
+    }
+    catch (gu::NotSet& ns)
+    {
+      printf("NotSet exception\n");
+    }
+    catch (gu::Exception& e)
+    {
+      printf("Exception caught: %d : %s\n", e.get_errno(), e.what());
+    }
+    catch (std::exception& e)
+    {
+      printf("Exception caught: %s\n", e.what());
+    }
+    catch (...)
+    {
+      printf("Error : unknown exception happened.\n");
     }
 
     return 0;

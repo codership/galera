@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2021 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2025 Codership Oy <info@codership.com>
  *
  */
 
@@ -25,19 +25,53 @@ main (int argc, char* argv[])
     log_debug << "DEBUG output enabled";
 
     if (argc > 1) fname.assign(argv[1]); // take supplied file name if any
-    gu::Config conf;
-    GCache::register_params(conf);
-    conf.parse("gcache.name = " TEST_CACHE "; gcache.size = 16K");
-    GCache* cache = new GCache (NULL, conf, "");
 
-    log_info  << "";
-    log_info  << "...do something...";
-    log_info  << "";
+    try
+    {
+        gu::Config conf;
+        GCache::register_params(conf);
+        conf.parse("gcache.name = " TEST_CACHE "; gcache.size = 16K");
+        GCache* cache = new GCache (NULL, conf, "");
 
-    delete cache;
-    ::unlink(TEST_CACHE);
+        log_info  << "";
+        log_info  << "...do something...";
+        log_info  << "";
 
-    log_info  << "Exit: " << ret;
+        delete cache;
+        ::unlink(TEST_CACHE);
+
+        log_info  << "Exit: " << ret;
+    }
+    catch (gu::UUIDScanException& u)
+    {
+      gu_error("UUIDScanException: %d.", u.get_errno());
+      abort();
+    }
+    catch (gu::NotFound& nf)
+    {
+      gu_error("NotFound exception.");
+      abort();
+    }
+    catch (gu::NotSet& ns)
+    {
+      gu_error("NotSet exception.");
+      abort();
+    }
+    catch (gu::Exception& e)
+    {
+      gu_error("Exception caught: %d : %s", e.get_errno(), e.what());
+      abort();
+    }
+    catch (std::exception& e)
+    {
+      gu_error("Exception caught: %s\n", e.what());
+      abort();
+    }
+    catch (...)
+    {
+      gu_error("GCS test caught unknown exception.");
+      abort();
+    }
 
     try {
         throw gu::Exception ("My test exception", EINVAL);

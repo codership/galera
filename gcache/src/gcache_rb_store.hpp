@@ -31,7 +31,7 @@ namespace gcache
                     int                dbg,
                     bool               recover);
 
-        ~RingBuffer ();
+        ~RingBuffer () noexcept(false);
 
         void* malloc  (size_type size);
 

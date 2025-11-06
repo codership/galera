@@ -52,7 +52,7 @@ namespace galera
 
         ReplicatorSMM(const wsrep_init_args* args);
 
-        ~ReplicatorSMM();
+        ~ReplicatorSMM() noexcept(false);
 
         wsrep_cap_t capabilities() const { return capabilities(proto_max_); }
         int trx_proto_ver() const { return trx_params_.version_; }

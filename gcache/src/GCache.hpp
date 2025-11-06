@@ -44,7 +44,7 @@ namespace gcache
                 gu::Config&        cfg,
                 const std::string& data_dir);
 
-        virtual ~GCache();
+        virtual ~GCache() noexcept(false);
 
         /*! prints object properties */
         void  print (std::ostream& os);

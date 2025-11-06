@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2024 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2025 Codership Oy <info@codership.com>
  *
  * $Id$
  *
@@ -64,7 +64,7 @@ struct gcs_core
              int          repl_proto_ver,
              int          appl_proto_ver,
              int          gcs_proto_ver = GCS_PROTO_MAX);
-    ~gcs_core();
+    ~gcs_core() noexcept(false);
 
     gu_config_t*    config;
     gcache_t*       cache;
@@ -1418,11 +1418,13 @@ core_destroy(gcs_core_t* core)
     return 0;
 }
 
-gcs_core::~gcs_core()
+gcs_core::~gcs_core() noexcept(false)
 {
     int const ret(core_destroy(this));
     if (ret) {
-        gu_throw_error(ret) << "GCS core destructor failed";
+        gu_error("GCS core destructor failed %d (%s)",
+                 ret, strerror(ret));
+        gu_abort();
     }
 }
 

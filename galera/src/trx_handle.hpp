@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2024 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2025 Codership Oy <info@codership.com>
 //
 
 
@@ -204,7 +204,7 @@ namespace galera
         bool master() const { return master_; }
 
 
-        virtual ~TrxHandle() {}
+        virtual ~TrxHandle() noexcept(false) {}
 
         // Force state, for testing purposes only.
         void force_state(State state)
@@ -1071,7 +1071,7 @@ namespace galera
             return static_cast<void*>(this + 1);
         }
 
-        ~TrxHandleMaster()
+        ~TrxHandleMaster() noexcept(false)
         {
             release_write_set_out();
         }
