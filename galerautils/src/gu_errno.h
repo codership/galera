@@ -7,7 +7,7 @@
 
 #include <errno.h>
 
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__)
 #  define GU_ELAST ELAST
 #else
 /* must be high enough to not collide with system errnos but lower than 256 */

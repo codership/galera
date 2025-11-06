@@ -654,7 +654,7 @@ GCS_BACKEND_CREATE_FN(gcs_spread_create)
 	if (spread_priv_name (spread->priv_name,
 #if defined(__sun__)
                               getexecname (),
-#elif defined(__APPLE__) || defined(__FreeBSD__)
+#elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__NetBSD__)
                               getprogname (),
 #elif defined(__linux__)
                               program_invocation_short_name,
