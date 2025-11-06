@@ -88,6 +88,14 @@ ReplicatorSMM::sst_received(const wsrep_gtid_t& state_id,
         return WSREP_CONN_FAIL;
     }
 
+    if (rcode == -ECANCELED) {
+        // perform a graceful shutdown
+        sst_graceful_shutdown_ = true;
+        sst_received_ = true;
+        sst_cond_.signal();
+        return WSREP_OK;
+    }
+
     assert(rcode <= 0);
     if (rcode) { assert(state_id.seqno == WSREP_SEQNO_UNDEFINED); }
 
@@ -928,6 +936,19 @@ ReplicatorSMM::request_state_transfer (void* recv_ctx,
         else
         {
             while (false == sst_received_) sst_lock.wait(sst_cond_);
+        }
+
+        if (sst_graceful_shutdown_) {
+            log_warn  << "State transfer interrupted, shutting down gracefully:"
+                      << "\n\t sst_uuid = " << sst_uuid_
+                      << "\n\t sst_seqno = " << sst_seqno_
+                      << "\n\t group_uuid = " << group_uuid
+                      << "\n\t safe_to_bootstrap_ = " << safe_to_bootstrap_
+                      << "\n\t cc_seqno = " << cc_seqno;
+
+            st_.restore_saved_state();
+
+            abort();
         }
 
         if (sst_uuid_ != group_uuid)

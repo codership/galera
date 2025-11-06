@@ -1036,6 +1036,8 @@ namespace galera
         gu::Cond      sst_cond_;
         int           sst_retry_sec_;
         bool          sst_received_;
+        bool          sst_graceful_shutdown_; // server has requested a
+	                                      // graceful shutdown
 
         // services
         ProgressCallback<int64_t> gcache_progress_cb_;
