@@ -118,7 +118,7 @@ namespace gcache
     {
         gu::Lock lock(mtx);
 
-        BufferHeader* const bh(ptr2BH(ptr));
+        BufferHeader* const bh = get_BH(ptr, true);
         seqno2ptr_iter_t p = seqno2ptr.find(seqno_g);
 
         /* sanity checks */
