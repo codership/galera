@@ -33,7 +33,7 @@ namespace gu
     public:
         AsioUdpSocket(gu::AsioIoService& io_service);
 
-        ~AsioUdpSocket();
+        ~AsioUdpSocket() noexcept(false);
 
         asio::ip::udp::resolver::iterator resolve_and_open(const gu::URI& uri);
 

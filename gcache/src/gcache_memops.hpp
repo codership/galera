@@ -31,7 +31,7 @@ namespace gcache
         typedef ssize_type   diff_type;  // difference between two size_types
 
         MemOps() {}
-        virtual ~MemOps() {}
+        virtual ~MemOps() noexcept(false) {}
 
         virtual void*
         malloc  (size_type size)          = 0;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2013 Codership Oy <info@codership.com>
+ * Copyright (C) 2010-2025 Codership Oy <info@codership.com>
  *
  * Using broadcasts instead of signals below to wake flush callers due to
  * theoretical possibility of more than 2 threads involved.
@@ -98,7 +98,7 @@ galera::ServiceThd::ServiceThd (GcsI& gcs, gcache::GCache& gcache) :
                       thd_func, this);
 }
 
-galera::ServiceThd::~ServiceThd ()
+galera::ServiceThd::~ServiceThd () noexcept(false)
 {
     {
         gu::Lock lock(mtx_);
@@ -106,7 +106,6 @@ galera::ServiceThd::~ServiceThd ()
         cond_.signal();
         flush_.broadcast();
     }
-
     gu_thread_join(thd_, NULL);
 }
 

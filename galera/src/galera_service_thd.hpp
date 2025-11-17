@@ -18,7 +18,7 @@ namespace galera
 
         ServiceThd (GcsI& gcs, gcache::GCache& gcache);
 
-        ~ServiceThd ();
+        ~ServiceThd () noexcept(false);
 
         /*! flush all ongoing operations (before processing CC)
          *  and install new group UUID */

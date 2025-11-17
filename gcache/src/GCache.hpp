@@ -48,7 +48,7 @@ namespace gcache
                 wsrep_encrypt_cb_t encrypt_cb = NULL,
                 void*              app_ctx    = NULL);
 
-        virtual ~GCache();
+        virtual ~GCache() noexcept(false);
 
         /*! prints object properties */
         void  print (std::ostream& os);

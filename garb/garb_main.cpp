@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2024 Codership Oy <info@codership.com> */
+/* Copyright (C) 2011-2025 Codership Oy <info@codership.com> */
 
 #include "garb_config.hpp"
 #include "garb_recv_loop.hpp"
@@ -77,6 +77,12 @@ become_daemon (const std::string& workdir)
     {
         if (open("/dev/null", O_RDONLY) < 0)
         {
+            // Avoid leaking file descriptors
+            if (fd == 2)
+              close(1);
+            if (fd > 0)
+              close(0);
+
             gu_throw_system_error(errno)
                 << "Unable to open /dev/null for fd " << fd;
         }
