@@ -52,7 +52,7 @@ namespace galera
 
         ReplicatorSMM(const wsrep_init_args* args);
 
-        ~ReplicatorSMM();
+        ~ReplicatorSMM() noexcept(false);
 
         wsrep_cap_t capabilities() const { return capabilities(proto_max_); }
         int trx_proto_ver() const { return trx_params_.version_; }
@@ -1048,6 +1048,8 @@ namespace galera
         gu::Cond      sst_cond_;
         int           sst_retry_sec_;
         bool          sst_received_;
+        bool          sst_graceful_shutdown_; // server has requested a
+	                                      // graceful shutdown
 
         // services
         ProgressCallback<int64_t> gcache_progress_cb_;

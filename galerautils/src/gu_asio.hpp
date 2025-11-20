@@ -532,7 +532,7 @@ namespace gu
     {
     public:
         AsioDatagramSocket() { }
-        virtual ~AsioDatagramSocket() { }
+        virtual ~AsioDatagramSocket() noexcept(false) { }
 
         /**
          * Open the socket.

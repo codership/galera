@@ -3,8 +3,8 @@
  */
 
 #include "GCache.hpp"
-
 #include <cassert>
+#include "gu_logger.hpp"
 
 namespace gcache
 {
@@ -258,24 +258,33 @@ namespace gcache
     {
         if (gu_likely(0 != ptr))
         {
-            gu::Lock lock(mtx);
-            BufferHeader* const bh(get_BH(ptr));
-            /* free() should not be used on ordered buffers,
-             * GCache::seqno_release() should be used instead */
-            assert(bh->seqno_g <= 0);
+            try
+            {
+                gu::Lock lock(mtx);
+                BufferHeader* const bh(get_BH(ptr));
+                /* free() should not be used on ordered buffers,
+                 * GCache::seqno_release() should be used instead */
+                assert(bh->seqno_g <= 0);
+
 #ifndef NDEBUG
-            assert(bh->store == BUFFER_IN_PAGE || !encrypt_cache);
-            if (params.debug()) { log_info << "GCache::free() " << bh; }
-            seqno_t const old_sr(seqno_released);
+                assert(bh->store == BUFFER_IN_PAGE || !encrypt_cache);
+                if (params.debug()) { log_info << "GCache::free() " << bh; }
+                seqno_t const old_sr(seqno_released);
 #endif
             free_common (bh, ptr);
 #ifndef NDEBUG
-            if (params.debug())
-            {
-                log_info << "GCache::free() seqno_released: "
-                         << old_sr << " -> " << seqno_released;
-            }
+                if (params.debug())
+                {
+                    log_info << "GCache::free() seqno_released: "
+                             << old_sr << " -> " << seqno_released;
+                }
 #endif
+            }
+            catch(gu::Exception& e)
+            {
+                gu_error("GCache::free() caught exception %s.", e.what());
+                gu_abort();
+            }
         }
         else {
             log_warn << "Attempt to free a null pointer";

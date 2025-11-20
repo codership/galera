@@ -29,7 +29,7 @@ namespace gcache
          * (global lock should be held while it is called) */
         virtual void set_low_limit(const seqno_t& seqno) = 0;
 
-        virtual ~SeqnoMap() {}
+        virtual ~SeqnoMap() noexcept(false) {}
     }; /* SeqnoMap */
 
 } /* namespace gcache */

@@ -995,6 +995,15 @@ gcs_state_msg_get_quorum (const gcs_state_msg_t* states[],
         quorum->vote_policy = rep->vote_policy;
     }
 
+    if (quorum->gcs_proto_ver >= 6)
+    {
+        if (quorum->last_applied > quorum->act_id)
+        {
+            // commit cut is infected from pre v6 versions, reset it
+            quorum->last_applied = 0;
+        }
+    }
+
     if (quorum->version < 2) {;} // for future generations
 
     if (quorum->version < 1) {

@@ -76,6 +76,9 @@
  *      - Changed initialization so that it is done on the first
  *        call to _gu_db_push().
  *
+ *      Jan Lindström
+ *      - Silence coverity resource leak issue.
+ *
  * $Id$
  */
 
@@ -667,7 +670,13 @@ _gu_db_push_(const char *control)
 	    _gu_db_on_ = TRUE;
 	    _gu_db_stack->flags |= DEBUG_ON;
 	    if (*scan++ == ',') {
-		_gu_db_stack->keywords = ListParse(scan);
+			temp = ListParse(scan);
+			if (_gu_db_stack->keywords) {
+			    temp->next_link= _gu_db_stack->keywords;
+				_gu_db_stack->keywords = temp;
+			}
+			else
+		    	_gu_db_stack->keywords = temp;
 	    }
 	    break;
 	case 'D':
@@ -680,7 +689,13 @@ _gu_db_push_(const char *control)
 	    break;
 	case 'f':
 	    if (*scan++ == ',') {
-		_gu_db_stack->functions = ListParse(scan);
+			temp = ListParse(scan);
+			if (_gu_db_stack->functions) {
+			    temp->next_link= _gu_db_stack->functions;
+				_gu_db_stack->functions = temp;
+			}
+			else
+		    	_gu_db_stack->functions = temp;
 	    }
 	    break;
 	case 'F':
@@ -694,8 +709,14 @@ _gu_db_push_(const char *control)
 	    _gu_db_pon_ = TRUE;
 	    if (OpenProfile(PROF_FILE)) {
 		_gu_db_stack->flags |= PROFILE_ON;
-		if (*scan++ == ',')
-		    _gu_db_stack->p_functions = ListParse(scan);
+		if (*scan++ == ',') {
+			temp = ListParse(scan);
+			if (_gu_db_stack->p_functions) {
+			    temp->next_link= _gu_db_stack->p_functions;
+				_gu_db_stack->p_functions = temp;
+			}
+			else
+		    	_gu_db_stack->p_functions = temp;
 	    }
 	    break;
 #endif
@@ -725,7 +746,13 @@ _gu_db_push_(const char *control)
 	    break;
 	case 'p':
 	    if (*scan++ == ',') {
-		_gu_db_stack->processes = ListParse(scan);
+			temp = ListParse(scan);
+			if (_gu_db_stack->processes) {
+			    temp->next_link= _gu_db_stack->processes;
+				_gu_db_stack->processes = temp;
+			}
+			else
+		    	_gu_db_stack->processes = temp;
 	    }
 	    break;
 	case 'P':

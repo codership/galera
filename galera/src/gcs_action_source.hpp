@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2010-2020 Codership Oy <info@codership.com>
+// Copyright (C) 2010-2025 Codership Oy <info@codership.com>
 //
 
 #ifndef GALERA_GCS_ACTION_SOURCE_HPP
@@ -42,7 +42,7 @@ namespace galera
             received_bytes_(0         )
         { }
 
-        ~GcsActionSource()
+        ~GcsActionSource() noexcept(false)
         {
             log_info << trx_pool_;
         }

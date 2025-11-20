@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008-2024 Codership Oy <info@codership.com>
+ * Copyright (C) 2008-2025 Codership Oy <info@codership.com>
  *
  * $Id$
  *
@@ -65,7 +65,7 @@ struct gcs_core
              int          repl_proto_ver,
              int          appl_proto_ver,
              int          gcs_proto_ver = GCS_PROTO_MAX);
-    ~gcs_core();
+    ~gcs_core() noexcept(false);
 
     gu_config_t*    config;
     gcache_t*       cache;
@@ -399,7 +399,7 @@ gcs_core_send (gcs_core_t*          const conn,
 
     int            idx  = 0;
     const uint8_t* ptr  = (const uint8_t*)action[idx].ptr;
-    size_t         left = action[idx].size;
+    ssize_t        left = action[idx].size;
 
     do {
         const size_t chunk_size =
@@ -407,16 +407,18 @@ gcs_core_send (gcs_core_t*          const conn,
 
         /* Here is the only time we have to cast frg.frag */
         char* dst = (char*)frg.frag;
-        size_t to_copy = chunk_size;
+        ssize_t to_copy = chunk_size;
 
         while (to_copy > 0) {        // gather action bufs into one
             if (to_copy <= left) {
+                assert(to_copy > 0);
                 memcpy (dst, ptr, to_copy);
                 ptr     += to_copy;
                 left    -= to_copy;
                 to_copy = 0;
             }
             else {
+                assert(left >= 0);
                 memcpy (dst, ptr, left);
                 dst     += left;
                 to_copy -= left;
@@ -462,6 +464,7 @@ gcs_core_send (gcs_core_t*          const conn,
                 do {
                     if (move_back <= ptrdiff) {
                         ptr -= move_back;
+                        assert((size_t)action[idx].size > ptrdiff + move_back);
                         left = action[idx].size - ptrdiff + move_back;
                         break;
                     }
@@ -1420,11 +1423,13 @@ core_destroy(gcs_core_t* core)
     return 0;
 }
 
-gcs_core::~gcs_core()
+gcs_core::~gcs_core() noexcept(false)
 {
     int const ret(core_destroy(this));
     if (ret) {
-        gu_throw_error(ret) << "GCS core destructor failed";
+        gu_error("GCS core destructor failed %d (%s)",
+                 ret, strerror(ret));
+        gu_abort();
     }
 }
 
@@ -1476,24 +1481,24 @@ gcs_core_set_pkt_size (gcs_core_t* core, int const pkt_size)
     int ret(msg_size - hdr_size); // message payload
     assert(ret > 0);
 
-    if (core->send_buf_len == (size_t)msg_size) return ret;
-
     if (gu_mutex_lock (&core->send_lock)) abort();
     {
-        if (core->state != CORE_DESTROYED) {
-            void* new_send_buf(gu_realloc(core->send_buf, msg_size));
-            if (new_send_buf) {
-                core->send_buf     = new_send_buf;
-                core->send_buf_len = msg_size;
-                memset (core->send_buf, 0, hdr_size); // to pacify valgrind
-                gu_debug ("Message payload (action fragment size): %d", ret);
+        if (core->send_buf_len != (size_t)msg_size) {
+            if (core->state != CORE_DESTROYED) {
+                void* new_send_buf(gu_realloc(core->send_buf, msg_size));
+                if (new_send_buf) {
+                    core->send_buf     = new_send_buf;
+                    core->send_buf_len = msg_size;
+                    memset (core->send_buf, 0, hdr_size); // to pacify valgrind
+                    gu_debug ("Message payload (action fragment size): %d", ret);
+                }
+                else {
+                    ret = -ENOMEM;
+                }
             }
             else {
-                ret = -ENOMEM;
+                ret =  -EBADFD;
             }
-        }
-        else {
-            ret =  -EBADFD;
         }
     }
     gu_mutex_unlock (&core->send_lock);

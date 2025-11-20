@@ -19,6 +19,8 @@ namespace galera
 #define VERSION "2.1"
 #define MAX_SIZE 256
 
+bool SavedState::first_time_ = true;
+
 SavedState::SavedState  (const std::string& file) :
     fs_           (0),
     filename_     (file),
@@ -32,7 +34,10 @@ SavedState::SavedState  (const std::string& file) :
     current_len_  (0),
     total_marks_  (0),
     total_locks_  (0),
-    total_writes_ (0)
+    total_writes_ (0),
+    saved_uuid_   (WSREP_UUID_UNDEFINED),
+    saved_seqno_  (WSREP_SEQNO_UNDEFINED),
+    saved_safe_to_bootstrap_(true)
 {
 
     GU_DBUG_EXECUTE("galera_init_invalidate_state",
@@ -139,6 +144,13 @@ SavedState::SavedState  (const std::string& file) :
         current_len_ = 0;
         set (uuid_, seqno_, safe_to_bootstrap_);
     }
+
+    if (first_time_) {
+        first_time_ = false;
+        saved_uuid_ = uuid_;
+        saved_seqno_ = seqno_;
+        saved_safe_to_bootstrap_ = safe_to_bootstrap_;
+    }
 }
 
 SavedState::~SavedState ()
@@ -187,6 +199,18 @@ SavedState::set (const wsrep_uuid_t& u, wsrep_seqno_t s, bool safe_to_bootstrap)
     else
         log_debug << "Not writing state: unsafe counter is " << unsafe_();
 }
+
+void
+SavedState::restore_saved_state ()
+{
+    log_info  << "Restoring saved state:"
+              << "\n\t uuid = " << saved_uuid_
+              << "\n\t seqno = " << saved_seqno_
+              << "\n\t safe_to_bootstrap_ = " << saved_safe_to_bootstrap_;
+
+    write_file(saved_uuid_, saved_seqno_, saved_safe_to_bootstrap_);
+}
+
 
 /* the goal of unsafe_, written_uuid_, current_len_ below is
  * 1. avoid unnecessary mutex locks

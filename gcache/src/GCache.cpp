@@ -43,7 +43,7 @@ namespace gcache
         {
             if (recover)
             {
-                log_warn << "GCache recovery is not supported when encryption "
+                log_info << "GCache recovery is not supported when encryption "
                     "is enabled. Recovery will be skipped.";
             }
             return false;

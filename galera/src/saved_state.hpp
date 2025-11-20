@@ -26,6 +26,7 @@ public:
 
     void get (wsrep_uuid_t& u, wsrep_seqno_t& s, bool& safe_to_bootstrap);
     void set (const wsrep_uuid_t& u, wsrep_seqno_t s, bool safe_to_bootstrap);
+    void restore_saved_state();
 
     void mark_unsafe();
     void mark_safe();
@@ -59,6 +60,10 @@ private:
     gu::Atomic<long>    total_marks_;
     long                total_locks_;
     long                total_writes_;
+    wsrep_uuid_t        saved_uuid_;
+    wsrep_seqno_t       saved_seqno_;
+    bool                saved_safe_to_bootstrap_;
+    static bool         first_time_;
 
     void write_file (const wsrep_uuid_t& u, const wsrep_seqno_t s,
                      bool safe_to_bootstrap);
