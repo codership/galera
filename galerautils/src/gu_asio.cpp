@@ -402,6 +402,17 @@ static SSL_CTX* native_ssl_ctx(asio::ssl::context& context)
 #endif
 }
 
+static const std::string& ssl_check_param(const gu::Config& conf,
+                                          const std::string& param)
+{
+    if (!conf.has(param) || !conf.is_set(param))
+    {
+        gu_throw_error(EINVAL) << "Required SSL parameter '" << param
+                               << "' not set.";
+    }
+    return param;
+}
+
 static void ssl_prepare_context(const gu::Config& conf, asio::ssl::context& ctx,
                                 bool verify_peer_cert = true)
 {
@@ -438,13 +449,13 @@ static void ssl_prepare_context(const gu::Config& conf, asio::ssl::context& ctx,
             EC_KEY_free(ecdh);
         }
 #endif /* OPENSSL_HAS_SET_ECDH_AUTO | OPENSSL_HAS_SET_TMP_ECDH */
-        param = gu::conf::ssl_cert;
+        param = ssl_check_param(conf, gu::conf::ssl_cert);
         ctx.use_certificate_chain_file(conf.get(param));
-        param = gu::conf::ssl_key;
+        param = ssl_check_param(conf, gu::conf::ssl_key);
         ctx.use_private_key_file(conf.get(param), asio::ssl::context::pem);
-        param = gu::conf::ssl_ca;
+        param = gu::conf::ssl_ca; // no need to check as we fallback to ssl_cert
         ctx.load_verify_file(conf.get(param, conf.get(gu::conf::ssl_cert)));
-        param = gu::conf::ssl_cipher;
+        param = ssl_check_param(conf, gu::conf::ssl_cipher);
         std::string const value(conf.get(param));
         if (!value.empty())
         {
@@ -467,11 +478,6 @@ static void ssl_prepare_context(const gu::Config& conf, asio::ssl::context& ctx,
         gu_throw_error(EINVAL) << "Bad value '" << conf.get(param, "")
                                << "' for SSL parameter '" << param
                                << "': " << ::extra_error_info(ec.code());
-    }
-    catch (gu::NotSet& ec)
-    {
-        gu_throw_error(EINVAL) << "Missing required value for SSL parameter '"
-                               << param << "'";
     }
 }
 

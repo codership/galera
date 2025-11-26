@@ -100,7 +100,6 @@ int
 main (int argc, char* argv[])
 {
     Config config(argc, argv);
-    if (config.exit()) return 0;
 
     log_info << "Read config: " <<  config << std::endl;
 
@@ -145,7 +144,11 @@ main (int argc, char* argv[])
     {
         return garb::main (argc, argv);
     }
-    catch (std::exception& e)
+    catch (const garb::Config::Exit&)
+    {
+        return 0;
+    }
+    catch (const std::exception& e)
     {
         log_fatal << e.what();
         return 1;

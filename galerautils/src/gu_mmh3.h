@@ -3,8 +3,8 @@
 /**
  * @file MurmurHash3 header
  *
- * This code is based on the reference C++ MurMurHash3 implementation by its
- * author Austin Appleby, who released it to public domain.
+ * This code is based on the reference C++ MurMurHash3 implementation by
+ * Austin Appleby, who released it to public domain.
  *
  * $Id$
  */

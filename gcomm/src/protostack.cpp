@@ -10,13 +10,11 @@ void gcomm::Protostack::push_proto(Protolay* p)
 {
     Critical<Protostack> crit(*this);
     protos_.push_front(p);
-	
-    // connect the pushed Protolay that's now on top
-    // with the one that was previously on top,
-    // if we had one, of course.
-    if (protos_.size() > 1)
+
+    /* connect the pushed layer to the previous one */
+    if (protos_.size() >= 2)
     {
-        gcomm::connect(protos_[1], p);
+        gcomm::connect(protos_[1], protos_[0]);
     }
 }
 

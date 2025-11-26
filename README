@@ -8,12 +8,12 @@ The software and other files in this directory unless otherwise noted
 are distributed under GPLv2, see COPYING for details.
 
 
-BUILDING - General
+BUILDING - General Instructions
 
 Build Requirements:
-* CMake build system https://cmake.org/
+* CMake build system      https://cmake.org/
 * Check unit test library http://check.sourceforge.net/
-* Boost devel package http://www.boost.org/
+* Boost devel package     http://www.boost.org/
 * OpenSSL devel package
 
 Optional:
@@ -24,15 +24,6 @@ To build with CMake, do:
  $ make
 Run unit tests with CMake:
  $ make test
-
-Note that Scons has been obsoleted since Galera 3.32, but it is still possible
-to compile by running:
- $ scons
-(default optimized build)
-or
- $ ./scripts/build.sh --scons
-(see ./scripts/build.sh --help for information on options)
-
 
 To build MySQL/Galera demo distribution, clone
 https://github.com/codership/mysql-wsrep into some directory (hereafter
@@ -48,14 +39,14 @@ After successful build, demo package can be found under scripts/mysql.
 
 BUILDING - on Ubuntu 20.04 or later
 
- 1) apt-get install check cmake libasio-dev libboost-dev \
-         libboost-program-options-dev libssl-dev
+ 1) sudo apt-get install check cmake libasio-dev libboost-dev \
+                         libboost-program-options-dev libssl-dev
 
 Then proceed as described above.
 
 BUILDING - on RHEL 8 or later
 
- 1) yum install gcc gcc-c++ cmake boost-devel check-devel openssl-devel
+ 1) sudo yum install gcc gcc-c++ cmake boost-devel check-devel openssl-devel
 
 Then proceed as described above.
 

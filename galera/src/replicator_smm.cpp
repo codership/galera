@@ -2492,8 +2492,8 @@ void galera::ReplicatorSMM::drain_monitors_for_local_conf_change()
     assert(upto >= last_committed());
     if (upto >= last_committed())
     {
-        log_debug << "Drain monitors from " << last_committed()
-                  << " up to " << upto;
+        log_debug << "Drain monitors from " << last_committed() << " up to "
+                  << upto;
         gu_trace(drain_monitors(upto));
     }
     else

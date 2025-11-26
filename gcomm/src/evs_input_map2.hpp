@@ -30,18 +30,13 @@ namespace gcomm
 {
     /* Forward declarations */
     class InputMapMsgKey;
-    std::ostream& operator<<(std::ostream&, const InputMapMsgKey&);
     namespace evs
     {
         class InputMapMsg;
-        std::ostream& operator<<(std::ostream&, const InputMapMsg&);
         class InputMapMsgIndex;
         class InputMapNode;
-        std::ostream& operator<<(std::ostream&, const InputMapNode&);
         typedef std::vector<InputMapNode> InputMapNodeIndex;
-        std::ostream& operator<<(std::ostream&, const InputMapNodeIndex&);
         class InputMap;
-        std::ostream& operator<<(std::ostream&, const InputMap&);
     }
 }
 
@@ -358,11 +353,11 @@ private:
      */
     void cleanup_recovery_index();
 
-    seqno_t            safe_seq_;       /*!< Safe seqno               */
-    seqno_t            aru_seq_;        /*!< All received up to seqno */
-    InputMapNodeIndex* node_index_;     /*!< Index of nodes           */
-    InputMapMsgIndex*  msg_index_;      /*!< Index of messages        */
-    InputMapMsgIndex*  recovery_index_; /*!< Recovery index           */
+    seqno_t            safe_seq_;
+    seqno_t            aru_seq_;
+    InputMapNodeIndex* node_index_;
+    InputMapMsgIndex*  msg_index_;
+    InputMapMsgIndex*  recovery_index_;
 };
 
 #endif // EVS_INPUT_MAP2_HPP

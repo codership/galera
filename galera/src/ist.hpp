@@ -57,15 +57,16 @@ namespace galera
         class Receiver
         {
         public:
-            static std::string const RECV_ADDR;
-            static std::string const RECV_BIND;
-
             Receiver(gu::Config& conf, gcache::GCache&,
                      TrxHandleSlave::Pool& slave_pool,
                      EventHandler&, const char* addr,
                      gu::Progress<wsrep_seqno_t>::Callback* callback);
             ~Receiver();
 
+            /**
+             * @return address where donor should connect to (different from
+             *         receiver bind address in case of a NAT)
+             */
             std::string   prepare(wsrep_seqno_t       first_seqno,
                                   wsrep_seqno_t       last_seqno,
                                   int                 protocol_version,
@@ -80,12 +81,14 @@ namespace galera
 
             wsrep_seqno_t first_seqno() const { return first_seqno_; }
 
-        private:
+            // public for unit tests
+            static const std::string& conf_recv_addr_key();
+            static const std::string& conf_bind_addr_key();
 
+        private:
             void interrupt();
 
             std::string                                   recv_addr_;
-            std::string                                   recv_bind_;
             gu::AsioIoService                             io_service_;
             std::shared_ptr<gu::AsioAcceptor>             acceptor_;
             gu::Mutex                                     mutex_;
@@ -179,10 +182,9 @@ namespace galera
 
     } // namespace ist
 
-    // Helpers to determine receive addr and receive bind. Public for
-    // testing.
-    std::string IST_determine_recv_addr(gu::Config& conf);
-    std::string IST_determine_recv_bind(gu::Config& conf);
+    // Helper to determine addresses. Public for testing.
+    void check_recv_addr(gu::Config& conf);
+    std::string IST_determine_addr(gu::Config& conf, std::string key);
 
 } // namespace galera
 

@@ -98,9 +98,9 @@ if install:
                 '#garb/files/garb.cnf')
     env.Install(install + '/doc/', '#COPYING')
     env.Install(install + '/doc/', '#AUTHORS')
+    env.Install(install + '/doc/', '#scripts/packages/README')
     env.InstallAs(install + '/doc/LICENSE.asio',
                 '#asio/LICENSE_1_0.txt')
-    env.InstallAs(install + '/doc/README',
-                '#scripts/packages/README')
-    env.Install(install + '/man/man8', '#man/garbd.8')
-    env.Install(install + '/man/man8', '#man/garb-systemd.8')
+    man_dir = install + '/man/man8'
+    env.Install(man_dir, '#man/garbd.8')
+    env.Install(man_dir, '#man/garb-systemd.8' )

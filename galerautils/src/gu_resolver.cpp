@@ -109,8 +109,8 @@ static void copy(const addrinfo& from, addrinfo& to)
         if ((to.ai_addr =
              reinterpret_cast<sockaddr*>(malloc(to.ai_addrlen))) == 0)
         {
-            gu_throw_fatal 
-                << "out of memory while trying to allocate " 
+            gu_throw_fatal
+                << "out of memory while trying to allocate "
                 << to.ai_addrlen << " bytes";
         }
 
@@ -253,9 +253,9 @@ out:
         err = errno;
         goto out;
     }
-    
+
     log_debug << "read: " << ifc.ifc_len;
-    
+
     for (size_t i(0); i < ifc.ifc_len/sizeof(struct ifreq); ++i)
     {
         struct ifreq* ifrp(&ifr[i]);
@@ -270,10 +270,10 @@ out:
                 {
                     err = errno;
                 }
-#if defined(__linux__) || defined(__GNU__)
-                idx = ifrp->ifr_ifindex;
-#elif defined(__sun__) || defined(__FreeBSD_kernel__)
+#if defined(__sun__) || defined(__FreeBSD_kernel__)
                 idx = ifrp->ifr_index;
+#elif defined(__linux__) || defined(__GNU__)
+                idx = ifrp->ifr_ifindex;
 #else
 # error "Unsupported ifreq structure"
 #endif
@@ -284,7 +284,7 @@ out:
         {
         }
     }
-    
+
 out:
     close(fd);
 #endif /* !__APPLE__ && !__FreeBSD__ */

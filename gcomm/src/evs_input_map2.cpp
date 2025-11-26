@@ -64,46 +64,50 @@ public:
 //////////////////////////////////////////////////////////////////////////
 
 
-std::ostream& gcomm::evs::operator<<(std::ostream& os, const InputMapNode& in)
+namespace gcomm
 {
-    return (os << "node: {"
-            << "idx="      << in.index()    << ","
-            << "range="    << in.range()    << ","
-            << "safe_seq=" << in.safe_seq() << "}");
-}
+    std::ostream& operator<<(std::ostream& os, const InputMapMsgKey& mk)
+    {
+        return (os << "(" << mk.index() << "," << mk.seq() << ")");
+    }
 
-std::ostream& gcomm::evs::operator<<(std::ostream& os, const InputMapNodeIndex& ni)
-{
-    copy(ni.begin(), ni.end(), std::ostream_iterator<const InputMapNode>(os, " "));
-    return os;
-}
+    namespace evs
+    {
+        std::ostream& operator<<(std::ostream& os, const InputMapNode& in)
+        {
+            return (os << "node: {"
+                    << "idx="      << in.index()    << ","
+                    << "range="    << in.range()    << ","
+                    << "safe_seq=" << in.safe_seq() << "}");
+        }
 
-std::ostream& gcomm::operator<<(std::ostream& os, const InputMapMsgKey& mk)
-{
-    return (os << "(" << mk.index() << "," << mk.seq() << ")");
-}
+        std::ostream& operator<<(std::ostream& os, const InputMapNodeIndex& ni)
+        {
+            copy(ni.begin(), ni.end(),
+                 std::ostream_iterator<const InputMapNode>(os, " "));
+            return os;
+        }
 
+        std::ostream& operator<<(std::ostream& os, const InputMapMsg& m)
+        {
+            return (os << m.msg());
+        }
 
-std::ostream& gcomm::evs::operator<<(std::ostream& os, const InputMapMsg& m)
-{
-    return (os << m.msg());
-}
-
-
-std::ostream& gcomm::evs::operator<<(std::ostream& os, const InputMap& im)
-{
-    return (os << "evs::input_map: {"
-            << "aru_seq="        << im.aru_seq()   << ","
-            << "safe_seq="       << im.safe_seq()  << ","
-            << "node_index="     << *im.node_index_
+        std::ostream& operator<<(std::ostream& os, const InputMap& im)
+        {
+            return (os << "evs::input_map: {"
+                    << "aru_seq="        << im.aru_seq()   << ","
+                    << "safe_seq="       << im.safe_seq()  << ","
+                    << "node_index="     << *im.node_index_
 #ifndef NDEBUG
-            << ","
-            << "msg_index="      << *im.msg_index_      << ","
-            << "recovery_index=" << *im.recovery_index_
+                    << ","
+                    << "msg_index="      << *im.msg_index_      << ","
+                    << "recovery_index=" << *im.recovery_index_
 #endif // !NDEBUG
-            << "}");
-}
-
+                    << "}");
+        }
+    } // namespace evs
+} // namespace gcomm
 
 
 //////////////////////////////////////////////////////////////////////////

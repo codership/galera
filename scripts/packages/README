@@ -42,9 +42,9 @@ CONTENTS:
 1. WHAT IS GALERA
 
 Galera is a synchronous multi-master replication engine that provides its
-service through wsrep API (https://github.com/codership/wsrep-API). It features optimistic
-transaction execution and commit time replication and certification of
-writesets.
+service through wsrep API (https://github.com/codership/wsrep-API). It features
+optimistic transaction execution and commit time replication and certification
+of writesets.
 
 Since it replicates only final changes to the database it is transparent to
 triggers, stored procedures and non-deterministic functions.
@@ -437,12 +437,10 @@ recv_addr
     turns on incremental state transfer. IST will use SSL if SSL is configured
     as described above. No default.
 
-recv_bind
-    Address to which the incremental state transfer is bound. This
-    configuration is optional. When it is not set it will take its value from
-    recv_addr. It can be useful if the node is running behind a NAT, where the
-    public address and the internal address differ.
-
+recv_bind 
+    Defaults to recv_addr. The node will bind to this address when listening
+    for IST. If running behind NAT set this parameter to the internal address
+    and recv_addr to the external address.
 
 4. GALERA ARBITRATOR
 

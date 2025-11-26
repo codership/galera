@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2013 Codership Oy <info@codership.com> */
+/* Copyright (C) 2011-2025 Codership Oy <info@codership.com> */
 
 #ifndef _GARB_CONFIG_HPP_
 #define _GARB_CONFIG_HPP_
@@ -12,6 +12,7 @@ namespace garb
 class Config
 {
 public:
+    class Exit{}; // thrown by ctor to signal exit on --help and --version
 
     static std::string const DEFAULT_SST; // default (empty) SST request
 
@@ -28,7 +29,6 @@ public:
     const std::string& cfg()     const { return cfg_    ; }
     const std::string& log()     const { return log_    ; }
     const std::string& workdir() const { return workdir_; }
-    bool               exit()    const { return exit_   ; }
 
 private:
 
@@ -40,9 +40,8 @@ private:
     std::string donor_;
     std::string options_;
     std::string log_;
-    std::string cfg_;
     std::string workdir_;
-    bool exit_; /* Exit on --help or --version */
+    std::string cfg_;
 
 }; /* class Config */
 

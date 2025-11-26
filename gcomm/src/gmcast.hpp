@@ -317,8 +317,7 @@ public:
         void gmcast_forget(const gcomm::UUID&, const gu::datetime::Period&);
         // Handle proto entry that has established connection to remote host
         void handle_connected(gmcast::Proto*);
-        // Handle proto entry that has successfully finished handshake
-        // sequence
+        // Handle proto entry that has successfully finished handshake sequence
         void handle_established(gmcast::Proto*);
         // Handle proto entry that has failed
         void handle_failed(gmcast::Proto*);

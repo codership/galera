@@ -1,4 +1,4 @@
-# Copyright (C) 2012 Codership Oy
+# Copyright (C) 2022 Codership Oy
 # This config file is to be sourced by garb service script.
 
 # A comma-separated list of node addresses (address[:port]) in the cluster

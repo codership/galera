@@ -788,10 +788,8 @@ START_TEST (gcs_core_test_own_v1)
 END_TEST
 
 #ifdef GCS_ALLOW_GH74
-/*
- * Disabled test because it is too slow and timeouts on crowded
+/* Disabled test because it is too slow and timeouts on crowded
  * build systems like e.g. build.opensuse.org */
-
 START_TEST (gcs_core_test_gh74)
 {
     gu::Config config;
@@ -1020,8 +1018,6 @@ START_TEST (gcs_core_test_gh74)
 }
 END_TEST
 #endif /* GCS_ALLOW_GH74 */
-
-
 #if 0 // requires multinode support from gcs_dummy
 START_TEST (gcs_core_test_foreign)
 {
