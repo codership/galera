@@ -2511,8 +2511,13 @@ void galera::ReplicatorSMM::process_non_prim_conf_change(
     assert(conf.conf_id == WSREP_SEQNO_UNDEFINED);
 
     /* ignore outdated non-prim configuration change */
-    if (conf.uuid == state_uuid_ && conf.seqno < sst_seqno_) return;
-
+    {
+        gu::Lock lock(sst_mutex_);
+        if (conf.uuid == state_uuid_)
+        {
+            if (conf.seqno < sst_seqno_) return;
+        }
+    }
     wsrep_uuid_t new_uuid(uuid_);
     wsrep_view_info_t* const view_info
         (galera_view_info_create(conf,

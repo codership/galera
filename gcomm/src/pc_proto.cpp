@@ -376,11 +376,13 @@ void gcomm::pc::Proto::shift_to(const State s)
     };
 
 
+    const State old_state = state();
 
-    if (allowed[state()][s] == false)
+    if (old_state < 0 || old_state >= S_MAX || s < 0 || s >= S_MAX ||
+        allowed[old_state][s] == false)
     {
         gu_throw_fatal << "Forbidden state transition: "
-                       << to_string(state()) << " -> " << to_string(s);
+                       << to_string(old_state) << " -> " << to_string(s);
     }
 
     switch (s)
@@ -1514,18 +1516,22 @@ void gcomm::pc::Proto::handle_msg(const Message&   msg,
         {  FAIL,   ACCEPT,  ACCEPT,   ACCEPT  }   // NON-PRIM
     };
 
-    Message::Type msg_type(msg.type());
-    Verdict       verdict (verdicts[state()][msg.type()]);
+    const Message::Type msg_type(msg.type());
+    const State cur_state = state();
+    assert(cur_state >= 0 && cur_state < S_MAX);
+    assert(msg_type >= 0 && msg_type < Message::PC_T_MAX);
+
+    Verdict       verdict (verdicts[cur_state][msg_type]);
 
     if (verdict == FAIL)
     {
         gu_throw_fatal << "Invalid input, message " << msg.to_string()
-                       << " in state " << to_string(state());
+                       << " in state " << to_string(cur_state);
     }
     else if (verdict == DROP)
     {
         log_debug << "Dropping input, message " << msg.to_string()
-                  << " in state " << to_string(state());
+                  << " in state " << to_string(cur_state);
         return;
     }
 

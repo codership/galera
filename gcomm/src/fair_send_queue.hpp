@@ -15,6 +15,8 @@
 #define GCOMM_FAIR_SEND_QUEUE_HPP
 
 #include "gcomm/datagram.hpp"
+#include "gu_log.h"
+#include "gu_abort.h"
 
 #include <deque>
 #include <map>
@@ -52,7 +54,12 @@ namespace gcomm
         {
             assert(current_segment_ != -1);
             queue_type::const_iterator i(queue_.find(current_segment_));
-            assert(i != queue_.end());
+            if (i == queue_.end())
+            {
+                gu_error("Front element not found from queue segment: %d",
+                        current_segment_);
+                gu_abort();
+            }
             return i->second.front();
         }
 
@@ -61,7 +68,12 @@ namespace gcomm
         {
             assert(last_pushed_segment_ != -1);
             queue_type::const_iterator i(queue_.find(last_pushed_segment_));
-            assert(i != queue_.end());
+            if (i == queue_.end())
+            {
+                gu_error("Front element not found from queue segment: %d",
+                        last_pushed_segment_);
+                gu_abort();
+            }
             return i->second.back();
         }
 
@@ -115,16 +127,23 @@ namespace gcomm
         int get_next_segment() const
         {
             queue_type::const_iterator i(queue_.find(current_segment_));
-            assert(i != queue_.end());
-            do
+            if (i != queue_.end())
             {
-                // Increment and wrap around
-                ++i;
-                if (i == queue_.end()) i = queue_.begin();
+                do
+                {
+                    // Increment and wrap around
+                    ++i;
+                    if (i == queue_.end()) i = queue_.begin();
 
-                if (not i->second.empty()) return i->first;
+                    if (not i->second.empty()) return i->first;
+                }
+                while (i->first != current_segment_);
             }
-            while (i->first != current_segment_);
+            else
+            {
+                gu_error("Next segment not found current : %d", current_segment_);
+                gu_abort();
+            }
 
             return -1;
         }

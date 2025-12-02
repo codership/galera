@@ -549,10 +549,13 @@ std::string gcomm::evs::Proto::stats() const
     os << "\n\tdelivered {";
     std::copy(delivered_msgs_.begin(), delivered_msgs_.end(),
               std::ostream_iterator<long long int>(os, ", "));
-    os << "}\n\teff(delivered/sent) " <<
-        double(accumulate(delivered_msgs_.begin() + 1,
-                          delivered_msgs_.begin() + O_SAFE + 1, 0))
-        /double(accumulate(sent_msgs_.begin(), sent_msgs_.end(), 0));
+    const double delivered = double(accumulate(delivered_msgs_.begin() + 1,
+                                      delivered_msgs_.begin() + O_SAFE + 1, 0));
+    double sent = double(accumulate(sent_msgs_.begin(), sent_msgs_.end(), 0));
+    if (!sent)
+        sent = 1;
+
+    os << "}\n\teff(delivered/sent) " << delivered / sent;
     return os.str();
 }
 

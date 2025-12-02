@@ -283,7 +283,7 @@ test_log_msg (gcs_test_log_t* log, const char* msg)
     long ret;
     pthread_mutex_lock (&log->lock);
     ret = fprintf (recv_log->file, "%s\n", msg);
-    pthread_mutex_lock (&log->lock);
+    pthread_mutex_unlock (&log->lock);
     return ret;
 }
 
@@ -491,7 +491,7 @@ gcs_test_handle_configuration (gcs_conn_t* gcs, gcs_test_thread_t* thread)
         gu_to_release (to, thread->act.seqno_l);
     }
     else {
-        fprintf (stderr, "Failed to grab TO: %ld (%s)", ret, strerror(ret));
+        fprintf (stderr, "Failed to grab TO: %ld (%s)", ret, strerror(-ret));
     }
     conf_id = conf.conf_id;
 }

@@ -201,7 +201,7 @@ StateRequest_v1::StateRequest_v1 (
                                << ") unrepresentable";
 
     if (ist_req_len > INT32_MAX || ist_req_len < 0)
-        gu_throw_error (EMSGSIZE) << "IST request length (" << sst_req_len
+        gu_throw_error (EMSGSIZE) << "IST request length (" << ist_req_len
                                << ") unrepresentable";
 
     char* ptr(req_);

@@ -21,7 +21,15 @@ typedef struct gcs_recv_msg
     int            sender_idx;
     gcs_msg_type_t type;
 
-    gcs_recv_msg() { }
+    gcs_recv_msg()
+        :
+        buf(nullptr),
+        buf_len(0),
+        size(0),
+        sender_idx(0),
+        type(GCS_MSG_ERROR)
+    { }
+
     gcs_recv_msg(void* b, long bl, long sz, long si, gcs_msg_type_t t)
         :
         buf(b),

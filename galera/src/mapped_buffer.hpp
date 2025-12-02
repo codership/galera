@@ -21,7 +21,7 @@ namespace galera
         typedef gu::byte_t const* const_iterator;
 
         MappedBuffer(const std::string& working_dir, 
-                     size_t threshold = 1 << 20);
+                     size_t threshold = size_t(1) << size_t(20));
 
         ~MappedBuffer();
 

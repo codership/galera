@@ -89,6 +89,8 @@ std::ostream& gu::operator<<(std::ostream& os, const Histogram& hs)
     {
         i_next = i;
         ++i_next;
+        if (!norm)
+            norm = 1;
         os << i->first << ":" << std::fabs(double(i->second)/double(norm));
         if (i_next != hs.cnt_.end()) os << ",";
     }

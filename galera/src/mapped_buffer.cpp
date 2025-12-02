@@ -45,7 +45,12 @@ galera::MappedBuffer::~MappedBuffer()
     if (fd_ != -1)
     {
         struct stat st;
-        fstat(fd_, &st);
+        const int ret = fstat(fd_, &st);
+        if (ret < 0)
+        {
+            const int error = errno;
+            gu_info("fstat() failed error: %s", strerror(error));
+        }
         log_debug << "file size " << st.st_size;
     }
     clear();

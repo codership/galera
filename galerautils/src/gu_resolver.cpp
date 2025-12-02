@@ -423,7 +423,7 @@ gu::net::Addrinfo::Addrinfo(const Addrinfo& ai) :
 gu::net::Addrinfo::Addrinfo(const Addrinfo& ai, const Sockaddr& sa) :
     ai_()
 {
-    if (ai.get_addrlen() != sa.get_sockaddr_len())
+    if (ai_.ai_addr == nullptr || (ai.get_addrlen() != sa.get_sockaddr_len()))
     {
         gu_throw_fatal;
     }

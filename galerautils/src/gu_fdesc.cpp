@@ -93,6 +93,18 @@ namespace gu
 
         off_t const current_size(lseek (fd_, 0, SEEK_END));
 
+        if (current_size == (off_t)-1)
+        {
+            const int my_errno= errno;
+            ::close(fd_);
+            ::unlink(name_.c_str());
+            gu_throw_error(my_errno) << "Can't determine file size for '"
+                                     << name_
+                                     << "' error "
+                                     << my_errno << "("
+                                     << strerror(my_errno) << ")";
+        }
+
         if (current_size < size_)
         {
             unsigned long long const available(available_storage(name_, size_));

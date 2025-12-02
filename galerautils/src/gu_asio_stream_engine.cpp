@@ -477,7 +477,18 @@ public:
                     client_encrypted_message_sent_ts_ = gu::datetime::Date::monotonic();
                     if (not non_blocking_)
                     {
-                        fcntl(fd_, F_SETFL, fcntl(fd_, F_GETFL, 0) | O_NONBLOCK);
+                        int flags = fcntl(fd_, F_GETFL, 0);
+                        if (flags >= 0)
+                        {
+                            flags = fcntl(fd_, F_SETFL, flags | O_NONBLOCK);
+                        }
+
+                        if (flags < 0)
+                        {
+                            GU_ASIO_DEBUG(this << " AsioDynamicStreamEngine::fcntl: "
+                                               << " error " << errno
+                                               << " sys error " << strerror(errno));
+                        }
                     }
                     op_status result = success;
                     bool tcp_engine_switch = false;
@@ -504,7 +515,19 @@ public:
                     }
                     if (not non_blocking_)
                     {
-                        fcntl(fd_, F_SETFL, fcntl(fd_, F_GETFL, 0) ^ O_NONBLOCK);
+                        int flags = fcntl(fd_, F_GETFL, 0);
+                        if (flags >= 0)
+                        {
+                            flags = fcntl(fd_, F_SETFL, flags ^ O_NONBLOCK);
+                        }
+
+                        if (flags < 0)
+                        {
+                            GU_ASIO_DEBUG(this << " AsioDynamicStreamEngine::fcntl: "
+                                               << " error " << errno
+                                               << " sys error " << strerror(errno));
+                        }
+
                         if (not tcp_engine_switch)
                         {
                             return result;

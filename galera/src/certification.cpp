@@ -1287,11 +1287,16 @@ wsrep_seqno_t galera::Certification::set_trx_committed(TrxHandleSlave& trx)
         {
             assert(trx.last_seen_seqno() != WSREP_SEQNO_UNDEFINED);
             DepsSet::iterator i(deps_set_.find(trx.last_seen_seqno()));
-            assert(i != deps_set_.end());
+            if (i != deps_set_.end())
+            {
+                if (deps_set_.size() == 1) safe_to_discard_seqno_ = *i;
 
-            if (deps_set_.size() == 1) safe_to_discard_seqno_ = *i;
-
-            deps_set_.erase(i);
+                deps_set_.erase(i);
+            }
+            else
+            {
+                assert(i != deps_set_.end());
+            }
         }
 
         if (gu_unlikely(index_purge_required()))

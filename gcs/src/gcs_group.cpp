@@ -435,10 +435,9 @@ group_post_state_exchange (gcs_group_t* group)
     gu_debug ("STATE EXCHANGE: " GU_UUID_FORMAT " complete.",
               GU_UUID_ARGS(&group->state_uuid));
 
-    gcs_state_msg_get_quorum (states, group->num, quorum);
-    assert(quorum->version >= 2);
+    const long ret = gcs_state_msg_get_quorum (states, group->num, quorum);
 
-    if (quorum->version >= 0) {
+    if (ret == 0 && quorum->version >= 0) {
         if (quorum->version < 2) {
             group->last_applied_proto_ver = 0;
         }
@@ -447,7 +446,8 @@ group_post_state_exchange (gcs_group_t* group)
         }
     }
     else {
-        gu_fatal ("Negative quorum version: %d", quorum->version);
+        gu_fatal ("Could get quorum version: %d ret: %ld num: %ld",
+            quorum->version, ret, group->num);
         return -ENOTRECOVERABLE;
     }
 
@@ -618,7 +618,11 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
         // Self-leave message
         gu_info ("New SELF-LEAVE.");
         assert (0 == new_nodes_num);
-        assert (!prim_comp);
+        if (prim_comp)
+        {
+            gu_error("Bogus primary configuration message with my_idx = %ld", new_my_idx);
+            gu_abort();
+        }
     }
 
     bool my_bootstrap(bootstrap);
@@ -667,9 +671,14 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
 
                 group->last_applied = group->act_id_;
                 assert(group->last_applied >= 0);
-
-                new_nodes[0].status = GCS_NODE_STATE_JOINED;
-                new_nodes[0].last_applied = group->last_applied;
+                if (new_nodes) {
+                    new_nodes[0].status = GCS_NODE_STATE_JOINED;
+                    new_nodes[0].last_applied = group->last_applied;
+                } else {
+                    gu_error("New nodes not allocated for new configuration last_applied: %lu",
+                             group->last_applied);
+                    gu_abort();
+                }
             }
         }
     }
@@ -681,6 +690,7 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
     for (new_idx = 0; new_idx < new_nodes_num; new_idx++) {
         /* find member index in old component by unique member id */
         for (old_idx = 0; old_idx < group->num; old_idx++) {
+            assert(new_nodes != nullptr);
             // just scan through old group
             if (!strcmp(group->nodes[old_idx].id, new_nodes[new_idx].id)) {
                 /* the node was in previous configuration with us */
@@ -713,21 +723,9 @@ gcs_group_handle_comp_msg (gcs_group_t* group, const gcs_comp_msg_t* comp)
          * However this means aborting ongoing actions. Find a way to avoid
          * this extra state exchange. Generate new state messages on behalf
          * of other nodes? see #238 */
-        new_memb = true;
-        /* if new nodes joined, reset ongoing actions and state messages */
-        if (new_memb) {
-            group_nodes_reset (group);
-            group->state      = GCS_GROUP_WAIT_STATE_UUID;
-            group->state_uuid = GU_UUID_NIL; // prepare for state exchange
-        }
-        else {
-            if (GCS_GROUP_PRIMARY == group->state) {
-                /* since we don't have any new nodes since last PRIMARY,
-                   we skip state exchange */
-                int const err(group_post_state_exchange(group));
-                if (err) return gcs_group_state_t(err);
-            }
-        }
+        group_nodes_reset (group);
+        group->state      = GCS_GROUP_WAIT_STATE_UUID;
+        group->state_uuid = GU_UUID_NIL; // prepare for state exchange
 
         if (group->quorum.gcs_proto_ver < 2)
         {

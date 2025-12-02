@@ -320,27 +320,36 @@ void gcomm::AsioTcpSocket::write_handler(gu::AsioSocket& socket,
                      << "Transport may not be reliable, closing the socket";
             FAILED_HANDLER(gu::AsioErrorCode(EPROTO));
         }
-        else if (send_q_.front().len() < bytes_transferred
+        else
+        {
+            const Datagram& dg(send_q_.front());
+            size_t len = dg.len();
+
+            if (len < bytes_transferred
 #ifdef GCOMM_ASIO_TCP_SIMULATE_WRITE_HANDLER_ERROR
                  || ::rand() % bytes_transferred_less_than_rate == 0
 #endif // GCOMM_ASIO_TCP_SIMULATE_WRITE_HANDLER_ERROR
-            )
-        {
-            log_warn << "write_handler() bytes_transferred "
-                     << bytes_transferred
-                     << " less than sent "
-                     << send_q_.front().len()
-                     << ". Transport may not be reliable, closing the socket";
-            FAILED_HANDLER(gu::AsioErrorCode(EPROTO));
-        }
-        else
-        {
-            while (send_q_.empty() == false &&
-                   bytes_transferred >= send_q_.front().len())
+                )
             {
-                const Datagram& dg(send_q_.front());
-                bytes_transferred -= dg.len();
-                send_q_.pop_front();
+                log_warn << "write_handler() bytes_transferred "
+                         << bytes_transferred
+                         << " less than sent "
+                        << len
+                        << ". Transport may not be reliable, closing the socket";
+                FAILED_HANDLER(gu::AsioErrorCode(EPROTO));
+            }
+            else
+            {
+                while(send_q_.empty() == false && bytes_transferred >= len)
+                {
+                    bytes_transferred -= len;
+                    send_q_.pop_front();
+                    if (send_q_.empty() == false)
+                    {
+                        const Datagram& dg(send_q_.front());
+                        len = dg.len();
+                    }
+                }
             }
             log_debug << "AsioTcpSocket::write_handler() after queue purge "
                       << socket_

@@ -654,7 +654,7 @@ _gu_db_push_(const char *control)
 	if (*++control == '#')
 	    control++;
     }
-    if (*control)
+    if (control && *control)
 	_gu_no_db_ = FALSE;		    /* We are using dbug after all */
     else
 	return;

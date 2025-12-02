@@ -269,7 +269,9 @@ to_release_and_wake_next (gu_to_t* to, to_waiter_t* w) {
          to->seqno++) {
         w->state = RELEASED;
     }
-    to_wake_waiter (w);
+    if (w) {
+        to_wake_waiter (w);
+    }
 }
 
 long gu_to_release (gu_to_t *to, gu_seqno_t seqno)
