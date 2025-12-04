@@ -22,6 +22,7 @@
 #include <gu_logger.hpp>
 #include <gu_serialize.hpp>
 #include <gu_digest.hpp>
+#include <gu_lock.hpp>
 
 #include <stdlib.h>
 #include <stdbool.h>
@@ -199,6 +200,7 @@ struct gcs_conn
 
     /* #603, #606 join control */
     bool         need_to_join;
+    gu::Mutex    join_mutex;
     gu::GTID     join_gtid;
     int          join_code;
 
@@ -296,6 +298,7 @@ gcs_conn::gcs_conn(gu::Config& conf,
     stats_fc_received(),
     conf_id(),
     need_to_join(),
+    join_mutex(),
     join_gtid(),
     join_code(),
     sync_sent_(),
@@ -757,7 +760,10 @@ gcs_become_primary (gcs_conn_t* conn)
     }
 
     conn->join_gtid    = gu::GTID();
-    conn->need_to_join = false;
+    {
+        gu::Lock lock(conn->join_mutex);
+        conn->need_to_join = false;
+    }
 
     int ret;
 
@@ -882,7 +888,10 @@ gcs_become_joined (gcs_conn_t* conn)
     if (gcs_shift_state (conn, GCS_CONN_JOINED)) {
         conn->fc_offset    = conn->queue_len;
         conn->join_gtid    = gu::GTID();
-        conn->need_to_join = false;
+        {
+            gu::Lock lock(conn->join_mutex);
+            conn->need_to_join = false;
+        }
         start_progress(conn);
         gu_debug("Become joined, FC offset %ld", conn->fc_offset);
         /* One of the cases when the node can become SYNCED */
@@ -983,14 +992,13 @@ s_join (gcs_conn_t* conn)
             gu_info("Sending JOIN failed: %s. "
                     "Will retry in new primary component.",
                     gcs_error_str(-err));
-            return 0;
+            break;
         default:
             gu_error("Sending JOIN failed: %d (%s).", err, gcs_error_str(-err));
-            return err;
         }
     }
 
-    return 0;
+    return err;
 }
 
 /*! Handles configuration action */
@@ -1145,7 +1153,20 @@ gcs_handle_act_conf (gcs_conn_t* conn, gcs_act_rcvd& rcvd)
         /* #603, #606 - duplicate JOIN msg in case we lost it */
         assert (conf.conf_id >= 0);
 
-        if (conn->need_to_join) s_join (conn);
+        {
+            gu::Lock lock(conn->join_mutex);
+
+            if (conn->need_to_join)
+            {
+                int err = s_join(conn);
+                if (err)
+                {
+                    log_info << "Failed to join on new configuration: "
+                             << err << "(" << gcs_error_str(err) << ")";
+                }
+                conn->need_to_join = err != 0;
+            }
+        }
 
         break;
     default:
@@ -2418,9 +2439,13 @@ gcs_join (gcs_conn_t* conn, const gu::GTID& gtid, int const code)
     {
         conn->join_gtid    = gtid;
         conn->join_code    = code;
-        conn->need_to_join = true;
 
-        return s_join (conn);
+        gu::Lock lock(conn->join_mutex);
+
+        int ret = s_join(conn);
+        conn->need_to_join = ret != 0;
+
+        return ret;
     }
 
     assert(0);
