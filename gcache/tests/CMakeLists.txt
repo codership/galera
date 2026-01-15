@@ -23,3 +23,6 @@ add_test(
   NAME gcache_tests
   COMMAND gcache_tests
   )
+
+# Install test binary
+install(TARGETS gcache_tests DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/galera-test)

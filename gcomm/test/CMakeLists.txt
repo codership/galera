@@ -32,6 +32,9 @@ add_test(
   WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/Testing
   )
 
+# Install test binary
+install(TARGETS check_gcomm DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/galera-test)
+
 #
 # Nondeterministic unit tests, must be run manually.
 #

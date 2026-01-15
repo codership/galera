@@ -68,3 +68,6 @@ add_test(
   NAME gcs_tests
   COMMAND gcs_tests
   )
+
+# Install test binary
+install(TARGETS gcs_tests DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/galera-test)

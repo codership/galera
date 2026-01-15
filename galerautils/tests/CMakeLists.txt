@@ -44,6 +44,9 @@ add_test(
   COMMAND gu_tests
   )
 
+# Install test binary
+install(TARGETS gu_tests DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/galera-test)
+
 #
 # C++ galerautils tests.
 #
@@ -92,6 +95,10 @@ add_test(
   NAME gu_tests++
   COMMAND gu_tests++
   )
+
+# Install test binary
+install(TARGETS gu_tests++ DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/galera-test)
+
 #
 # Deqmap micro benchmark.
 #

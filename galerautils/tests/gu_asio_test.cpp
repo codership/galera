@@ -1073,6 +1073,29 @@ END_TEST
 
 static std::string get_cert_dir()
 {
+    // To allow running test binaries from an out-of-source directory use the
+    // path in environment variable GALERA_TEST_CERT_DIR if set
+    const char* env_dir = std::getenv("GALERA_TEST_CERT_DIR");
+    if (env_dir && ::strlen(env_dir) > 0)
+    {
+        const std::string ret{ env_dir };
+        auto* dir = opendir(ret.c_str());
+        if (!dir)
+        {
+            if (mkdir(ret.c_str(), S_IRWXU))
+            {
+                const auto* errstr = ::strerror(errno);
+                gu_throw_fatal << "Could not create dir " << ret << ": " << errstr;
+            }
+        }
+        else
+        {
+            closedir(dir);
+        }
+        return ret;
+    }
+
+    // If no GALERA_TEST_CERT_DIR is set, just use the compile-time path
     assert(::strlen(GU_ASIO_TEST_CERT_DIR) > 0);
     const std::string ret{ GU_ASIO_TEST_CERT_DIR };
     auto* dir = opendir(ret.c_str());
