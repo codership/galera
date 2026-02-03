@@ -1,12 +1,11 @@
 #
-# Copyright (C) 2020 Codership Oy <info@codership.com>
+# Copyright (C) 2020-2026 Codership Oy <info@codership.com>
 #
 # OS specific tweaks and libraries.
 #
 
 find_library(PTHREAD_LIB pthread)
-find_library(RT_LIB rt)
-set(GALERA_SYSTEM_LIBS ${PTHREAD_LIB} ${RT_LIB})
+set(GALERA_SYSTEM_LIBS ${PTHREAD_LIB})
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   # Check if linkage with atomic library is needed for 8 byte atomics

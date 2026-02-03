@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2020 Codership Oy <info@codership.com>
+# Copyright (C) 2020-2026 Codership Oy <info@codership.com>
 #
 
 #
@@ -23,6 +23,12 @@ find_library(GALERA_HAVE_SUBUNIT_LIB subunit)
 if (GALERA_HAVE_SUBUNIT_LIB)
   list(APPEND GALERA_UNIT_TEST_LIBS "${GALERA_HAVE_SUBUNIT_LIB}")
 endif()
+
+# needed on old systems with glibc < 2.17 for timer_create() in rt
+CHECK_LIBRARY_EXISTS(rt timer_create "" HAVE_TIMER_CREATE)
+IF (HAVE_TIMER_CREATE)
+  LIST(APPEND GALERA_UNIT_TEST_LIBS rt)
+ENDIF(HAVE_TIMER_CREATE)
 
 list(APPEND GALERA_UNIT_TEST_LIBS m)
 list(APPEND GALERA_UNIT_TEST_LIBS ${GALERA_SYSTEM_LIBS})

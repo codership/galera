@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2020 Codership Oy <info@codership.com>
+# Copyright (C) 2020-2026 Codership Oy <info@codership.com>
 #
 
 #
@@ -102,7 +102,7 @@ target_compile_options(deqmap_bench
   PRIVATE
   -Wno-conversion)
 
-target_link_libraries(deqmap_bench galerautilsxx rt)
+target_link_libraries(deqmap_bench galerautilsxx)
 
 #
 # CRC32C micro benchmark.
