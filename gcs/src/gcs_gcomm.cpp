@@ -178,7 +178,6 @@ public:
     {
         if (tp_ == 0)
         {
-            log_warn << "gcomm: backend already closed";
             return;
         }
         {
@@ -373,12 +372,32 @@ void GCommConn::connect(string channel, bool const bootstrap)
         gu_throw_system_error(err) << "Failed to create thread";
     }
 
-    thread_set_schedparam(thd_, schedparam_);
-    log_info << "gcomm thread scheduling priority set to "
-             << thread_get_schedparam(thd_) << " ";
+    std::exception_ptr saved_exception = NULL;
+    try
+    {
+        thread_set_schedparam(thd_, schedparam_);
+
+        log_info << "gcomm thread scheduling priority set to "
+                 << thread_get_schedparam(thd_) << " ";
+    }
+    catch (gu::Exception& e)
+    {
+        log_error << e.what()
+                  << "; thread scheduling priority was not changed";
+        /* this exception can not be rethrown before connect_task_ has
+           completed
+        */
+        saved_exception = std::current_exception();
+    }
 
     /* Will throw if an exception was thrown in connect_task. */
     future.get();
+
+    if (saved_exception) {
+        /* rethrow saved exception that resulted from failed
+           thread priority setting */
+        std::rethrow_exception(saved_exception);
+    }
 }
 
 void
@@ -550,7 +569,7 @@ static GCS_BACKEND_SEND_FN(gcomm_send)
         }
     }
 
-    if (conn.schedparam() != gu::ThreadSchedparam::system_default)
+    if (err == 0 && conn.schedparam() != gu::ThreadSchedparam::system_default)
     {
         try
         {
@@ -559,6 +578,8 @@ static GCS_BACKEND_SEND_FN(gcomm_send)
         catch (gu::Exception& e)
         {
             err = e.get_errno();
+            log_error << e.what()
+                      << "; thread scheduling priority was not changed";
         }
     }
 
@@ -787,6 +808,8 @@ static GCS_BACKEND_DESTROY_FN(gcomm_destroy)
     GCommConn* conn(ref.get());
     try
     {
+        /* Force close if not already closed */
+        conn->close(true);
         delete conn;
     }
     catch (Exception& e)
