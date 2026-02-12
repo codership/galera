@@ -4,7 +4,8 @@
 Description=Galera Arbitrator Daemon
 Documentation=man:garbd(8)
 Documentation=https://galeracluster.com/library/documentation/arbitrator.html
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Install]
 WantedBy=multi-user.target

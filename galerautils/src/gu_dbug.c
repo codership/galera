@@ -78,6 +78,7 @@
  *
  *      Jan Lindström
  *      - Silence coverity resource leak issue.
+ *      - Remove extra va_end() from _gu_db_doprnt_()
  *
  * $Id$
  */
@@ -1072,7 +1073,6 @@ _gu_db_doprnt_(const char *format, ...)
 	}
 	(void) fprintf(_gu_db_fp_, "%s: ", state->u_keyword);
 	(void) vfprintf(_gu_db_fp_, format, args);
-	va_end(args);
 	(void) fputc('\n', _gu_db_fp_);
 	dbug_flush(state);
 	errno = save_errno;
