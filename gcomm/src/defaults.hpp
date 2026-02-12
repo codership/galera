@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2019 Codership Oy <info@codership.com>
+ * Copyright (C) 2009-2026 Codership Oy <info@codership.com>
  */
 
 #ifndef GCOMM_DEFAULTS_HPP
@@ -125,7 +125,7 @@ namespace gcomm
         static const int EvsDelayedKeepPeriod = gu::Config::Flag::type_duration;
         static const int EvsEvict             = 0;
         static const int EvsAutoEvict         = gu::Config::Flag::read_only |
-                                                gu::Config::Flag::type_bool;
+                                                gu::Config::Flag::type_integer;
 
         static const int PcVersion            = gu::Config::Flag::read_only;
         static const int PcIgnoreSb           = gu::Config::Flag::type_bool;
