@@ -110,14 +110,18 @@ add_subdirectory(galera)
 add_subdirectory(scripts/packages)
 add_subdirectory(wsrep/tests)
 
+# Make the install destination for documentation files configurable
+if(NOT DEFINED INSTALL_DOCDIR)
+  set(INSTALL_DOCDIR "doc" CACHE STRING "path to install documentation to")
+endif()
+
 if (NOT ${CMAKE_SYSTEM_NAME} MATCHES ".*BSD")
   install(FILES
-    ${PROJECT_SOURCE_DIR}/AUTHORS
     ${PROJECT_SOURCE_DIR}/COPYING
-    ${PROJECT_SOURCE_DIR}/README
-    DESTINATION doc)
+    ${PROJECT_SOURCE_DIR}/scripts/packages/README-MySQL
+    DESTINATION ${INSTALL_DOCDIR})
   install(FILES ${PROJECT_SOURCE_DIR}/asio/LICENSE_1_0.txt
-    DESTINATION doc
+    DESTINATION ${INSTALL_DOCDIR}
     RENAME LICENSE.asio)
 endif()
 
