@@ -264,6 +264,8 @@ START_TEST(top_level_page_caching_locking) // test that caching in pages work
                   "seqno_min: %" PRId64 " (expected 4)", gc.seqno_min());
 
     gc.seqno_unlock();
+    /* Re-release them now as all the locks are removed. */
+    gc.seqno_release(12);
     ps.wait_page_discard(); // pages 2 and 3 should be discarded
     ck_assert_msg(ps.total_pages() == 2,
                   "total_pages %zu (expected 2)", ps.total_pages());
@@ -279,6 +281,102 @@ START_TEST(top_level_page_caching_locking) // test that caching in pages work
 }
 END_TEST
 
+
+/*
+ * Verify that seqno_release() does not free buffers that are locked for IST.
+ */
+START_TEST(top_level_seqno_lock_protects_ist_buffers)
+{
+    log_info << "\n#\n# top_level_seqno_lock_protects_ist_buffers\n#";
+    const char* const dir_name = "";
+    size_t const bh_size = sizeof(gcache::BufferHeader);
+    size_t const page_size = (8 + bh_size)*3;
+
+    gu::Config cfg;
+    GCache::register_params(cfg);
+    cfg.set("gcache.dir", dir_name);
+    cfg.set("gcache.size", 0); // turn off ring buffer
+    cfg.set("gcache.page_size", page_size);
+    cfg.set("gcache.keep_pages_size", 10 * page_size);
+#ifndef NDEBUG
+    cfg.set("gcache.debug", DEBUG);
+#endif
+
+    GCache gc(nullptr, cfg, dir_name);
+    const PageStore&   ps(gc.page_store());
+    ck_assert_msg(ps.page_size() == page_size,
+                  "ps.page_size: %zu (expected %zu)",
+                  ps.page_size(), page_size);
+
+    std::vector<void*> buf;
+
+    mark_point();
+
+    /*
+     * 1. Populate 5 pages
+     */
+    for (size_t page_count(1); page_count <= 5; page_count++)
+        test_caching_fill_page(gc, buf, page_count);
+    ck_assert_msg(ps.total_pages() == 5,
+                  "total_pages %zu (expected 5)", ps.total_pages());
+
+    /*
+     * 2. Assign seqnos
+     */
+    for (size_t seqno(1); seqno <= buf.size(); seqno++)
+        gc.seqno_assign(buf[seqno - 1], seqno, 0, false);
+    ck_assert(gc.seqno_min() == 1);
+
+    /*
+     * 3. Lock seqno 1
+     */
+    gc.seqno_lock(1);
+
+    /*
+     * Release up to seqno 5. This MUST NOT free buffers
+     * at or above seqno_locked (1).
+     */
+    gc.seqno_release(5);
+
+    /* DIAGNOSTIC: check BH_is_released flag after seqno_release */
+    for (int i = 0; i < 5; ++i)
+    {
+        BufferHeader* const bh = ptr2BH(buf[i]);
+        ck_assert_msg(!BH_is_released(bh),
+                      "buffer %d (seqno %ld) released despite seqno_lock(1)!",
+                      i, (long)bh->seqno_g);
+    }
+
+    /*
+     * Now simulate IST sender reading: seqno_get_buffers() should
+     * return all 5 buffers since they are protected by the lock.
+     * Without the seqno_locked guard in seqno_release(), this returns 0.
+     */
+    std::vector<GCache::Buffer> got(5);
+    size_t const n = gc.seqno_get_buffers(got, 1);
+    ck_assert_msg(n == (size_t)5,
+                  "seqno_get_buffers returned %zu, expected 5. "
+                  "seqno_release() freed locked IST buffers!",
+                  n);
+
+    for (int i = 0; i < 5; i++)
+    {
+        ck_assert_msg(got[i].seqno_g() == (seqno_t)(i + 1),
+                      "buffer %d has wrong seqno, expected %d",
+                      i, i + 1);
+    }
+
+    gc.seqno_unlock();
+
+    /* Release all remaining buffers so pages can be discarded */
+    gc.seqno_release(buf.size());
+    ps.wait_page_discard();
+
+    mark_point();
+}
+END_TEST
+
+
 Suite* gcache_top_suite()
 {
     Suite* s = suite_create("gcache::top-level");
@@ -287,6 +385,7 @@ Suite* gcache_top_suite()
     tc = tcase_create("test");
     tcase_add_test(tc, top_level_page_caching);
     tcase_add_test(tc, top_level_page_caching_locking);
+    tcase_add_test(tc, top_level_seqno_lock_protects_ist_buffers);
     suite_add_tcase(s, tc);
 
     return s;
