@@ -210,8 +210,9 @@ namespace gcache
             old_gap = new_gap;
 
             seqno_t const start  (idx - 1);
-            seqno_t const end    (seqno - start >= 2*batch_size ?
+            seqno_t const s_end  (seqno - start >= 2*batch_size ?
                                   start + batch_size : seqno);
+            seqno_t const end    (std::min(s_end, seqno_locked - 1));
 #ifndef NDEBUG
             if (params.debug())
             {
@@ -250,6 +251,9 @@ namespace gcache
             assert (loop || seqno == seqno_released);
 
             loop = (end < seqno) && loop;
+
+            /* Stop if we hit the seqno_locked boundary - no more progress possible */
+            if (loop && seqno_released + 1 >= seqno_locked) loop = false;
 
 #ifndef NDEBUG
             if (params.debug())
