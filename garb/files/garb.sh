@@ -49,7 +49,7 @@ program_start() {
 	local rcode
 	if [ -f /etc/redhat-release ]; then
 		echo -n $"Starting $prog: "
-		daemon --user nobody $prog "$@" >/dev/null
+		daemon --user _galera $prog "$@" >/dev/null
 		rcode=$?
 		if [ $rcode -eq 0 ]; then
 			pidof $prog > $PIDFILE || rcode=$?
@@ -58,7 +58,7 @@ program_start() {
 		echo
 	else
 		log_daemon_msg "Starting $prog: "
-		start-stop-daemon --start --quiet -c nobody --background \
+		start-stop-daemon --start --quiet -c _galera --background \
 		                  --exec $prog -- "$@"
 		rcode=$?
 		# Hack: sleep a bit to give garbd some time to fork

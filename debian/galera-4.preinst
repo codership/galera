@@ -1,0 +1,15 @@
+#!/bin/bash
+
+set -e
+set -o nounset
+set -o pipefail
+set -o posix
+
+# creating _galera user, note that the '_' (underscore) before the name of the
+# user is a recommendation from
+# https://www.debian.org/doc/debian-policy/ch-opersys.html#users-and-groups
+getent passwd _galera >/dev/null 2>&1 ||
+  adduser --system --no-create-home --home /nonexistent \
+    --disabled-password --disabled-login --force-badname _galera
+
+#DEBHELPER#
