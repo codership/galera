@@ -112,9 +112,8 @@ add_subdirectory(wsrep/tests)
 
 if (NOT ${CMAKE_SYSTEM_NAME} MATCHES ".*BSD")
   install(FILES
-    ${PROJECT_SOURCE_DIR}/AUTHORS
     ${PROJECT_SOURCE_DIR}/COPYING
-    ${PROJECT_SOURCE_DIR}/README
+    ${PROJECT_SOURCE_DIR}/scripts/packages/README-MySQL
     DESTINATION doc)
   install(FILES ${PROJECT_SOURCE_DIR}/asio/LICENSE_1_0.txt
     DESTINATION doc
