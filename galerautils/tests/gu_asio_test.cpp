@@ -1212,7 +1212,7 @@ static X509* create_x509(EVP_PKEY* pkey, X509* issuer, const char* cn,
     X509_gmtime_adj(X509_get_notAfter(x509), 31536000L);
     X509_set_pubkey(x509, pkey);
 
-    auto* name = X509_get_subject_name(x509);
+    X509_NAME* name = (X509_NAME*)X509_get_subject_name(x509);
     static const unsigned char C_str [] = "FI";
     static const unsigned char ST_str[] = "Uusimaa";
     static const unsigned char L_str [] = "Helsinki";
