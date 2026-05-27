@@ -7,14 +7,17 @@ pipeline {
     stage ('Smoke Test') {
       steps {
         script {
-          def res = sh(script: "echo -e \"$ghprbPullLongDescription\" | grep '^MYSQL_BRANCH=' ||:",
-                                returnStdout: true)
-          if (!res.isEmpty()) {
-            env.MYSQL_BRANCH = res.split('=')[1].trim()
+          def desc = ghprbPullLongDescription.replace('\\r', '').replace('\\n', '\n')
+          def branchLine = desc.readLines().find { it.startsWith('MYSQL_BRANCH=') }
+          if (branchLine) {
+            def mysqlBranch = branchLine.substring('MYSQL_BRANCH='.length()).trim()
+            if (!(mysqlBranch ==~ /[A-Za-z0-9._\/-]+/)) {
+              error "Invalid MYSQL_BRANCH value in PR description: ${mysqlBranch}"
+            }
+            env.MYSQL_BRANCH = mysqlBranch
           } else {
             env.MYSQL_BRANCH = env.DEFAULT_MYSQL_BRANCH
           }
-          echo sh(script: 'env|sort', returnStdout: true)
 
           build job: 'pr-galera-4.x-smoke-test', wait: true,
                   parameters: [ string(name: 'GALERA_BRANCH', value: env.ghprbActualCommit )]
