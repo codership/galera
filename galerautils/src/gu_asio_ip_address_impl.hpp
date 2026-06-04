@@ -65,7 +65,11 @@ static inline std::string escape_addr(const asio::ip::address& addr)
 
 static inline asio::ip::address make_address(const std::string& addr)
 {
+#if ASIO_VERSION >= 101200
+    return asio::ip::make_address(gu::unescape_addr(addr));
+#else
     return asio::ip::address::from_string(gu::unescape_addr(addr));
+#endif
 }
 
 static inline std::string any_addr(const asio::ip::address& addr)

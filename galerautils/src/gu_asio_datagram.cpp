@@ -19,14 +19,20 @@
 
 #include <boost/bind.hpp>
 
-static asio::ip::udp::resolver::iterator resolve_udp(
+static asio::ip::udp::endpoint resolve_udp(
     asio::io_service& io_service,
     const gu::URI& uri)
 {
     asio::ip::udp::resolver resolver(io_service);
+#if ASIO_VERSION >= 101200
+    auto results(resolver.resolve(gu::unescape_addr(uri.get_host()),
+                                  uri.get_port()));
+    return results.begin()->endpoint();
+#else
     asio::ip::udp::resolver::query query(gu::unescape_addr(uri.get_host()),
                                          uri.get_port());
-    return resolver.resolve(query);
+    return resolver.resolve(query)->endpoint();
+#endif
 }
 
 static bool is_multicast(const asio::ip::udp::endpoint& ep)
@@ -95,13 +101,13 @@ gu::AsioUdpSocket::~AsioUdpSocket() noexcept(false)
     close();
 }
 
-asio::ip::udp::resolver::iterator
+asio::ip::udp::endpoint
 gu::AsioUdpSocket::resolve_and_open(const gu::URI& uri)
 {
     try
     {
         auto resolve_result(resolve_udp(io_service_.impl().native(), uri));
-        socket_.open(resolve_result->endpoint().protocol());
+        socket_.open(resolve_result.protocol());
         set_fd_options(socket_);
         return resolve_result;
     }
@@ -141,7 +147,7 @@ void gu::AsioUdpSocket::connect(const gu::URI& uri)
 {
     try
     {
-        asio::ip::udp::resolver::iterator resolve_result;
+        asio::ip::udp::endpoint resolve_result;
         if (not socket_.is_open())
         {
             resolve_result = resolve_and_open(uri);
@@ -164,18 +170,18 @@ void gu::AsioUdpSocket::connect(const gu::URI& uri)
             ::make_address(
                 uri.get_option("socket.if_addr",
                                ::any_addr(
-                                   resolve_result->endpoint().address())));
+                                   resolve_result.address())));
 
-        if (is_multicast(resolve_result->endpoint()))
+        if (is_multicast(resolve_result))
         {
-            join_group(socket_, resolve_result->endpoint(), local_if_);
+            join_group(socket_, resolve_result, local_if_);
             socket_.set_option(
                 asio::ip::multicast::enable_loopback(
                     gu::from_string<bool>(uri.get_option("socket.if_loop", "false"))));
             socket_.set_option(
                 asio::ip::multicast::hops(
                     gu::from_string<int>(uri.get_option("socket.mcast_ttl", "1"))));
-            socket_.bind(*resolve_result);
+            socket_.bind(resolve_result);
         }
         else
         {

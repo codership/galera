@@ -35,7 +35,7 @@ namespace gu
 
         ~AsioUdpSocket() noexcept(false);
 
-        asio::ip::udp::resolver::iterator resolve_and_open(const gu::URI& uri);
+        asio::ip::udp::endpoint resolve_and_open(const gu::URI& uri);
 
         virtual void open(const gu::URI& uri) GALERA_OVERRIDE;
 

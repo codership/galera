@@ -16,7 +16,13 @@
 
 #include "gu_asio.hpp"
 
+#include "asio/version.hpp"
+#if ASIO_VERSION >= 101200
+#include "asio/io_context.hpp"
+namespace asio { typedef io_context io_service; }
+#else
 #include "asio/io_service.hpp"
+#endif
 #ifdef GALERA_HAVE_SSL
 #include "asio/ssl.hpp"
 #endif // GALERA_HAVE_SSL

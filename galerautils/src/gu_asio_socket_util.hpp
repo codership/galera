@@ -113,18 +113,25 @@ static size_t get_send_buffer_size(Socket& socket)
     }
 }
 
-static inline asio::ip::tcp::resolver::iterator resolve_tcp(
+static inline asio::ip::tcp::endpoint resolve_tcp(
     asio::io_service& io_service,
     const gu::URI& uri)
 {
     asio::ip::tcp::resolver resolver(io_service);
     // Give query flags explicitly to avoid having AI_ADDRCONFIG in
     // underlying getaddrinfo() hint flags.
+#if ASIO_VERSION >= 101200
+    auto results(resolver.resolve(gu::unescape_addr(uri.get_host()),
+                                  uri.get_port(),
+                                  asio::ip::tcp::resolver::flags(0)));
+    return results.begin()->endpoint();
+#else
     asio::ip::tcp::resolver::query
         query(gu::unescape_addr(uri.get_host()),
               uri.get_port(),
               asio::ip::tcp::resolver::query::flags(0));
-    return resolver.resolve(query);
+    return resolver.resolve(query)->endpoint();
+#endif
 }
 
 template <class Socket>

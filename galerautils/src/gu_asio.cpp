@@ -33,6 +33,9 @@
 #define ASIO_HAS_BOOST_BIND
 #endif // ASIO_HAS_BOOST_BIND
 #include "asio/placeholders.hpp"
+#if ASIO_VERSION >= 101200
+#include "asio/post.hpp"
+#endif
 
 #ifdef GALERA_HAVE_SSL
 #include "asio/ssl.hpp"
@@ -760,7 +763,11 @@ size_t gu::AsioIoService::run()
 
 void gu::AsioIoService::post(std::function<void()> fun)
 {
+#if ASIO_VERSION >= 101200
+    asio::post(impl_->native(), fun);
+#else
     impl_->native().post(fun);
+#endif
 }
 
 void gu::AsioIoService::stop()
@@ -770,7 +777,11 @@ void gu::AsioIoService::stop()
 
 void gu::AsioIoService::reset()
 {
+#if ASIO_VERSION >= 101200
+    impl_->native().restart();
+#else
     impl_->native().reset();
+#endif
 }
 
 gu::AsioIoService::Impl& gu::AsioIoService::impl()
@@ -852,7 +863,11 @@ gu::AsioSteadyTimer::~AsioSteadyTimer()
 void gu::AsioSteadyTimer::expires_from_now(
     const AsioClock::duration& duration)
 {
+#if ASIO_VERSION >= 101200
+    impl_->native().expires_after(to_native_duration(duration));
+#else
     impl_->native().expires_from_now(to_native_duration(duration));
+#endif
 }
 
 void gu::AsioSteadyTimer::async_wait(
