@@ -63,7 +63,7 @@ gu::AsioStreamReact::~AsioStreamReact()
 void gu::AsioStreamReact::open(const gu::URI& uri) try
 {
     auto resolve_result(resolve_tcp(io_service_.impl().native(), uri));
-    socket_.open(resolve_result->endpoint().protocol());
+    socket_.open(resolve_result.protocol());
     set_fd_options(socket_);
 }
 catch (const asio::system_error& e)
@@ -124,14 +124,14 @@ void gu::AsioStreamReact::async_connect(
     auto resolve_result(resolve_tcp(io_service_.impl().native(), uri));
     if (not socket_.is_open())
     {
-        socket_.open(resolve_result->endpoint().protocol());
+        socket_.open(resolve_result.protocol());
     }
     connected_ = true;
-    socket_.async_connect(*resolve_result,
-                          boost::bind(&AsioStreamReact::connect_handler,
-                                      shared_from_this(),
-                                      handler,
-                                      asio::placeholders::error));
+    auto self = shared_from_this();
+    socket_.async_connect(resolve_result,
+        [self, handler](const asio::error_code& ec) {
+            self->connect_handler(handler, ec);
+        });
 }
 catch (const asio::system_error& e)
 {
@@ -200,10 +200,10 @@ void gu::AsioStreamReact::connect(const gu::URI& uri) try
     auto resolve_result(resolve_tcp(io_service_.impl().native(), uri));
     if (not socket_.is_open())
     {
-        socket_.open(resolve_result->endpoint().protocol());
+        socket_.open(resolve_result.protocol());
         set_fd_options(socket_);
     }
-    socket_.connect(resolve_result->endpoint());
+    socket_.connect(resolve_result);
     connected_ = true;
     prepare_engine(false);
     auto result(engine_->client_handshake());
@@ -707,32 +707,35 @@ void gu::AsioStreamReact::prepare_engine(bool non_blocking)
     }
 }
 
-template <typename Fn, typename ...FnArgs>
-void gu::AsioStreamReact::start_async_read(Fn fn, FnArgs... fn_args)
+template <typename Fn>
+void gu::AsioStreamReact::start_async_read(
+    Fn fn, const std::shared_ptr<AsioSocketHandler>& handler)
 {
     if (in_progress_ & read_in_progress)
     {
         return;
     }
     set_non_blocking(true);
+    auto self = shared_from_this();
     socket_.async_wait(socket_.wait_read,
-                       boost::bind(fn, shared_from_this(), fn_args...,
-                                   asio::placeholders::error));
-    ;
+                       [self, fn, handler](const asio::error_code& ec)
+                       { (self.get()->*fn)(handler, ec); });
     in_progress_ |= read_in_progress;
 }
 
-template <typename Fn, typename ...FnArgs>
-void gu::AsioStreamReact::start_async_write(Fn fn, FnArgs... fn_args)
+template <typename Fn>
+void gu::AsioStreamReact::start_async_write(
+    Fn fn, const std::shared_ptr<AsioSocketHandler>& handler)
 {
     if (in_progress_ & write_in_progress)
     {
         return;
     }
     set_non_blocking(true);
+    auto self = shared_from_this();
     socket_.async_wait(socket_.wait_write,
-                       boost::bind(fn, shared_from_this(), fn_args...,
-                                   asio::placeholders::error));
+                       [self, fn, handler](const asio::error_code& ec)
+                       { (self.get()->*fn)(handler, ec); });
     in_progress_ |= write_in_progress;
 }
 
@@ -865,7 +868,7 @@ gu::AsioAcceptorReact::AsioAcceptorReact(AsioIoService& io_service,
 void gu::AsioAcceptorReact::open(const gu::URI& uri) try
 {
     auto resolve_result(resolve_tcp(io_service_.impl().native(), uri));
-    acceptor_.open(resolve_result->endpoint().protocol());
+    acceptor_.open(resolve_result.protocol());
     set_fd_options(acceptor_);
 }
 catch (const asio::system_error& e)
@@ -884,12 +887,12 @@ void gu::AsioAcceptorReact::listen(const gu::URI& uri) try
     auto resolve_result(resolve_tcp(io_service_.impl().native(), uri));
     if (not acceptor_.is_open())
     {
-        acceptor_.open(resolve_result->endpoint().protocol());
+        acceptor_.open(resolve_result.protocol());
         set_fd_options(acceptor_);
     }
 
     acceptor_.set_option(asio::ip::tcp::socket::reuse_address(true));
-    acceptor_.bind(*resolve_result);
+    acceptor_.bind(resolve_result);
     acceptor_.listen();
     listening_ = true;
 }

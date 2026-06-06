@@ -95,12 +95,12 @@ namespace gu
         void prepare_engine(bool non_blocking);
         // Start async read if not in progress. May be called several times
         // without handling read in between.
-        template <typename Fn, typename ...FnArgs>
-        void start_async_read(Fn fn, FnArgs... args);
+        template <typename Fn>
+        void start_async_read(Fn fn, const std::shared_ptr<AsioSocketHandler>&);
         // Start async write if not in progress. May be called several times
         // without handling a write in between.
-        template <typename Fn, typename ...FnArgs>
-        void start_async_write(Fn, FnArgs...);
+        template <typename Fn>
+        void start_async_write(Fn, const std::shared_ptr<AsioSocketHandler>&);
 
         void complete_read_op(const std::shared_ptr<AsioSocketHandler>&,
                               size_t bytes_transferred);
