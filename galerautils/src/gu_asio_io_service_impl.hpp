@@ -16,7 +16,7 @@
 
 #include "gu_asio.hpp"
 
-#include "asio/io_service.hpp"
+#include "asio/io_context.hpp"
 #ifdef GALERA_HAVE_SSL
 #include "asio/ssl.hpp"
 #endif // GALERA_HAVE_SSL
@@ -28,16 +28,18 @@ namespace gu
     //
     class AsioIoService::Impl
     {
-    public:
-        Impl()
-            : io_service_()
+        public:
+            using native_type = asio::io_context;
+
+            Impl()
+                : io_service_()
 #ifdef GALERA_HAVE_SSL
-            , ssl_context_()
+                , ssl_context_()
 #endif // GALERA_HAVE_SSL
         { }
-        asio::io_service& native() { return io_service_; }
+        native_type& native() { return io_service_; }
     private:
-        asio::io_service io_service_;
+        native_type io_service_;
     public:
 #ifdef GALERA_HAVE_SSL
         std::unique_ptr<asio::ssl::context> ssl_context_;

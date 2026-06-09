@@ -760,7 +760,11 @@ size_t gu::AsioIoService::run()
 
 void gu::AsioIoService::post(std::function<void()> fun)
 {
+#if ASIO_VERSION < 103300
     impl_->native().post(fun);
+#else
+    asio::post(impl_->native(), fun);
+#endif /* ASIO_VERSION < 103300 */
 }
 
 void gu::AsioIoService::stop()
@@ -770,7 +774,11 @@ void gu::AsioIoService::stop()
 
 void gu::AsioIoService::reset()
 {
+#if ASIO_VERSION < 103300
     impl_->native().reset();
+#else
+    impl_->native().restart();
+#endif /* ASIO_VERSION < 103300 */
 }
 
 gu::AsioIoService::Impl& gu::AsioIoService::impl()
@@ -815,7 +823,7 @@ public:
     typedef asio::steady_timer native_timer_type;
 #endif /* #if (__GNUC__ == 4 && __GNUC_MINOR__ == 4) */
 
-    Impl(asio::io_service& io_service) : timer_(io_service) { }
+    Impl(AsioIoService::Impl::native_type& io_service) : timer_(io_service) { }
     native_timer_type& native() { return timer_; }
     void handle_wait(const std::shared_ptr<AsioSteadyTimerHandler>& handler,
                      const asio::error_code& ec)
@@ -852,15 +860,19 @@ gu::AsioSteadyTimer::~AsioSteadyTimer()
 void gu::AsioSteadyTimer::expires_from_now(
     const AsioClock::duration& duration)
 {
+#if ASIO_VERSION < 103300
     impl_->native().expires_from_now(to_native_duration(duration));
+#else
+    impl_->native().expires_after(to_native_duration(duration));
+#endif /* ASIO_VERSION < 103300 */
 }
 
 void gu::AsioSteadyTimer::async_wait(
     const std::shared_ptr<AsioSteadyTimerHandler>& handler)
 {
-    impl_->native().async_wait(boost::bind(&Impl::handle_wait,
-                                           impl_.get(), handler,
-                                           asio::placeholders::error));
+    impl_->native().async_wait([this, handler](const asio::error_code& ec) {
+        impl_->handle_wait(handler, ec);
+    });
 }
 
 void gu::AsioSteadyTimer::cancel()

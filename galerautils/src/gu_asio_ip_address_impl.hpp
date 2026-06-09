@@ -17,6 +17,7 @@
 #include "gu_asio.hpp"
 
 #include "asio/ip/address.hpp"
+#include "asio/version.hpp"
 
 namespace gu
 {
@@ -65,7 +66,11 @@ static inline std::string escape_addr(const asio::ip::address& addr)
 
 static inline asio::ip::address make_address(const std::string& addr)
 {
+#if ASIO_VERSION < 103300
     return asio::ip::address::from_string(gu::unescape_addr(addr));
+#else
+    return asio::ip::make_address(gu::unescape_addr(addr));
+#endif /* ASIO_VERSION < 103300 */
 }
 
 static inline std::string any_addr(const asio::ip::address& addr)
