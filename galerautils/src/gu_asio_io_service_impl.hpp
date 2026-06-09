@@ -16,11 +16,7 @@
 
 #include "gu_asio.hpp"
 
-#if ASIO_VERSION < 103300
-#include "asio/io_service.hpp"
-#else
 #include "asio/io_context.hpp"
-#endif /* ASIO_VERSION < 103300 */
 #ifdef GALERA_HAVE_SSL
 #include "asio/ssl.hpp"
 #endif // GALERA_HAVE_SSL
@@ -33,11 +29,7 @@ namespace gu
     class AsioIoService::Impl
     {
         public:
-#if ASIO_VERSION < 103300
-            using native_type = asio::io_service;
-#else
             using native_type = asio::io_context;
-#endif /* ASIO_VERSION < 103300 */
 
             Impl()
                 : io_service_()
