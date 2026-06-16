@@ -116,7 +116,7 @@ BuildRequires: python
 %endif
 
 # Systemd
-%if 0%{?suse_version} >= 1220 || 0%{?centos} >= 7 || 0%{?rhel} >= 7
+%if 0%{?suse_version} >= 1220 || 0%{?centos} >= 7 || 0%{?rhel} >= 7 || %{defined fedora}
 %define systemd 1
 BuildRequires: systemd
 %else
