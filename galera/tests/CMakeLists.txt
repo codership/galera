@@ -35,3 +35,6 @@ add_test(
   NAME galera_check
   COMMAND galera_check
   )
+
+# Install test binary
+install(TARGETS galera_check DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/galera-test)

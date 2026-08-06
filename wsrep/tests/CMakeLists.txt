@@ -19,3 +19,6 @@ target_compile_definitions(wsrep_test
   -DGALERA_GIT_REVISION="${GALERA_GIT_REVISION}")
 target_link_libraries(wsrep_test dl)
 add_test(NAME wsrep_test COMMAND wsrep_test)
+
+# Install test binary
+install(TARGETS wsrep_test DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/galera-test)

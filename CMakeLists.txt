@@ -99,6 +99,9 @@ include(cmake/coverage.cmake)
 # in compiler warnings.
 include(cmake/maintainer_mode.cmake)
 
+# Include GNUInstallDirs for standard installation directories
+include(GNUInstallDirs)
+
 include(CTest)
 enable_testing()
 add_subdirectory(galerautils)

@@ -27,6 +27,15 @@ static void log_fn(wsrep_log_level_t level, const char* msg)
 
 static const char* get_provider()
 {
+    // To allow running test binaries from an out-of-source directory, load
+    // libgalera_smm.so from the path in environment variable
+    // GALERA_TEST_PROVIDER if set
+    const char* env_provider = getenv("GALERA_TEST_PROVIDER");
+    if (env_provider && strlen(env_provider) > 0)
+    {
+        return env_provider;
+    }
+    // Fall back to compile-time path
     return WSREP_PROVIDER;
 }
 
