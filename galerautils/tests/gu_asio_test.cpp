@@ -1207,12 +1207,21 @@ static X509* create_x509(EVP_PKEY* pkey, X509* issuer, const char* cn,
     auto* x509 = X509_new();
     /* According to standard, value 2 means version 3. */
     X509_set_version(x509, 2);
-    ASN1_INTEGER_set(X509_get_serialNumber(x509), 1);
-    X509_gmtime_adj(X509_get_notBefore(x509), 0);
-    X509_gmtime_adj(X509_get_notAfter(x509), 31536000L);
+    /* OpenSSL 1.x returns non-const pointers from X509_get_serialNumber(),
+     * X509_get_notBefore(), and X509_get_notAfter(). OpenSSL 4.0 made
+     * these getters const-correct (returning const pointers). The
+     * underlying objects remain mutable, so const_cast is safe and
+     * preserves compatibility with all versions. */
+    ASN1_INTEGER_set(const_cast<ASN1_INTEGER*>(X509_get_serialNumber(x509)), 1);
+    X509_gmtime_adj(const_cast<ASN1_TIME*>(X509_get_notBefore(x509)), 0);
+    X509_gmtime_adj(const_cast<ASN1_TIME*>(X509_get_notAfter(x509)), 31536000L);
     X509_set_pubkey(x509, pkey);
 
-    auto* name = X509_get_subject_name(x509);
+    /* OpenSSL 1.x returns a non-const X509_NAME* from X509_get_subject_name().
+     * OpenSSL 4.0 made this getter const-correct (returning const X509_NAME*).
+     * The name is still mutable, so const_cast is safe and keeps the code
+     * compatible with all versions. */
+    auto* name = const_cast<X509_NAME*>(X509_get_subject_name(x509));
     static const unsigned char C_str [] = "FI";
     static const unsigned char ST_str[] = "Uusimaa";
     static const unsigned char L_str [] = "Helsinki";
@@ -1233,7 +1242,11 @@ static X509* create_x509(EVP_PKEY* pkey, X509* issuer, const char* cn,
     }
     else
     {
-        X509_set_issuer_name(x509, X509_get_subject_name(issuer));
+        /* OpenSSL 1.x returns a non-const X509_NAME* from X509_get_subject_name().
+         * OpenSSL 4.0 made this getter const-correct (returning const X509_NAME*).
+         * The name is still mutable, so const_cast is safe and keeps the code
+         * compatible with all versions. */
+        X509_set_issuer_name(x509, const_cast<X509_NAME*>(X509_get_subject_name(issuer)));
     }
 
     set_x509v3_extensions(x509, issuer, is_ca);
